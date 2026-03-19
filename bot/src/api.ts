@@ -119,6 +119,8 @@ export async function getPublicConfig(): Promise<{
     | { kind: "servers"; id: string; name: string; squadUuid: string; trafficGb?: number; price: number; currency: string }
   >;
   useRemnaSubscriptionPage?: boolean;
+  /** Тексты меню по языкам: { ru: {...}, en: {...}, zh: {...} } */
+  botMenuTextsLocales?: Record<string, Record<string, string> | null> | null;
 } | null> {
   return fetchJson("/api/public/config");
 }
@@ -135,7 +137,7 @@ export async function registerByTelegram(body: {
   utm_campaign?: string;
   utm_content?: string;
   utm_term?: string;
-}): Promise<{ token: string; client: { id: string; telegramUsername?: string | null; preferredCurrency: string; balance: number; trialUsed?: boolean; referralCode?: string | null } }> {
+}): Promise<{ token: string; client: { id: string; telegramUsername?: string | null; preferredLang: string; preferredCurrency: string; balance: number; trialUsed?: boolean; referralCode?: string | null } }> {
   return fetchJson("/api/client/auth/register", { method: "POST", body });
 }
 

@@ -25,6 +25,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Loader2, Download, Smartphone } from "lucide-react";
 import type { SubscriptionPageConfig } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 const PLATFORM_ORDER = ["ios", "android", "macos", "windows", "linux", "other"] as const;
 const PLATFORM_LABELS: Record<string, string> = {
@@ -33,7 +34,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   macos: "macOS",
   windows: "Windows",
   linux: "Linux",
-  other: "Другое",
+  other: "other",
 };
 
 type SubscriptionPageApp = NonNullable<
@@ -112,9 +113,11 @@ function mergeWithDefault(
 function SortableAppRow({
   item,
   onToggle,
+  dragTitle,
 }: {
   item: EditorApp;
   onToggle: (enabled: boolean) => void;
+  dragTitle: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -134,7 +137,7 @@ function SortableAppRow({
         className="flex h-8 w-8 shrink-0 cursor-grab active:cursor-grabbing items-center justify-center rounded-lg bg-muted/80 text-muted-foreground hover:bg-muted"
         {...attributes}
         {...listeners}
-        title="Перетащите для изменения порядка"
+        title={dragTitle}
       >
         <GripVertical className="h-4 w-4" />
       </span>
@@ -166,6 +169,7 @@ export function SubscriptionPageEditor({
   onSave: (configJson: string) => void;
   saving: boolean;
 }) {
+  const { t } = useTranslation();
   const [editorState, setEditorState] = useState<Record<string, { apps: EditorApp[] }>>(() =>
     parseConfigJson(currentConfigJson)
   );
@@ -188,17 +192,17 @@ export function SubscriptionPageEditor({
         config = await onFetchDefault() ?? null;
       }
       if (!config) {
-        setLoadDefaultError("Не удалось загрузить базовый конфиг. Проверьте, что файл subpage-00000000-0000-0000-0000-000000000000.json есть в корне проекта на сервере.");
+        setLoadDefaultError(t("subscriptionPageEditor.loadDefaultError"));
         return;
       }
       const merged = mergeWithDefault(parseConfigJson(currentConfigJson ?? null), config);
       setEditorState(merged);
     } catch (e) {
-      setLoadDefaultError(e instanceof Error ? e.message : "Ошибка загрузки");
+      setLoadDefaultError(e instanceof Error ? e.message : t("subscriptionPageEditor.loadError"));
     } finally {
       setLoadDefaultLoading(false);
     }
-  }, [defaultConfig, currentConfigJson, onFetchDefault]);
+  }, [defaultConfig, currentConfigJson, onFetchDefault, t]);
 
   const setPlatformApps = useCallback((platform: string, apps: EditorApp[]) => {
     setEditorState((s) => ({ ...s, [platform]: { apps } }));
@@ -253,17 +257,17 @@ export function SubscriptionPageEditor({
           ) : (
             <Download className="h-4 w-4" />
           )}
-          Загрузить базовый конфиг (subpage)
+          {t("subscriptionPageEditor.loadDefault")}
         </Button>
         {loadDefaultError && (
           <p className="text-sm text-destructive">{loadDefaultError}</p>
         )}
         <Button type="button" onClick={handleSubmit} disabled={saving}>
-          {saving ? "Сохранение…" : "Сохранить"}
+          {saving ? t("subscriptionPageEditor.saving") : t("subscriptionPageEditor.save")}
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Включите или отключите приложения для каждой платформы и измените порядок перетаскиванием. В кабинете клиента будут показаны только включённые приложения в указанном порядке.
+        {t("subscriptionPageEditor.description")}
       </p>
       <div className="space-y-6">
         {PLATFORM_ORDER.map((platformKey) => {
@@ -274,7 +278,7 @@ export function SubscriptionPageEditor({
             <Card key={platformKey}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">
-                  {PLATFORM_LABELS[platformKey] ?? platformKey}
+                  {platformKey === "other" ? t("subscriptionPageEditor.platforms.other") : PLATFORM_LABELS[platformKey] ?? platformKey}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -293,6 +297,7 @@ export function SubscriptionPageEditor({
                           key={item.id}
                           item={item}
                           onToggle={(enabled) => handleToggle(platformKey, item.id, enabled)}
+                          dragTitle={t("subscriptionPageEditor.dragTitle")}
                         />
                       ))}
                     </ul>

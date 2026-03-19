@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTranslation } from "react-i18next";
 
 export function ChangePasswordPage() {
   const [current, setCurrent] = useState("");
@@ -17,20 +18,21 @@ export function ChangePasswordPage() {
   const { state, updateAdmin } = useAuth();
   const navigate = useNavigate();
   const token = state.accessToken;
+  const { t } = useTranslation();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     if (newPass !== confirm) {
-      setError("Новый пароль и подтверждение не совпадают");
+      setError(t("admin.changePass.mismatch"));
       return;
     }
     if (newPass.length < 8) {
-      setError("Пароль не менее 8 символов");
+      setError(t("admin.changePass.minLength"));
       return;
     }
     if (!token) {
-      setError("Нет доступа");
+      setError(t("admin.noAccess"));
       return;
     }
     setLoading(true);
@@ -39,7 +41,7 @@ export function ChangePasswordPage() {
       if (res.admin) updateAdmin(res.admin);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка смены пароля");
+      setError(err instanceof Error ? err.message : t("admin.changePass.error"));
     } finally {
       setLoading(false);
     }
@@ -54,9 +56,9 @@ export function ChangePasswordPage() {
       >
         <Card>
           <CardHeader>
-            <CardTitle>Смена пароля</CardTitle>
+            <CardTitle>{t("admin.changePass.title")}</CardTitle>
             <p className="text-muted-foreground text-sm">
-              При первом входе необходимо сменить пароль.
+              {t("admin.changePass.subtitle")}
             </p>
           </CardHeader>
           <CardContent>
@@ -67,7 +69,7 @@ export function ChangePasswordPage() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="current">Текущий пароль</Label>
+                <Label htmlFor="current">{t("admin.changePass.currentLabel")}</Label>
                 <Input
                   id="current"
                   type="password"
@@ -78,7 +80,7 @@ export function ChangePasswordPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new">Новый пароль</Label>
+                <Label htmlFor="new">{t("admin.changePass.newLabel")}</Label>
                 <Input
                   id="new"
                   type="password"
@@ -90,7 +92,7 @@ export function ChangePasswordPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm">Подтверждение</Label>
+                <Label htmlFor="confirm">{t("admin.changePass.confirmLabel")}</Label>
                 <Input
                   id="confirm"
                   type="password"
@@ -102,7 +104,7 @@ export function ChangePasswordPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Сохранение…" : "Сменить пароль"}
+                {loading ? t("admin.saving") : t("admin.changePass.submit")}
               </Button>
             </form>
           </CardContent>

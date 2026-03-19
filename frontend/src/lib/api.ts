@@ -2190,6 +2190,7 @@ export interface PublicConfig {
   activeCurrencies: string[];
   defaultLanguage?: string;
   defaultCurrency?: string;
+  botMenuTextsLocales?: Record<string, Record<string, string> | null> | null;
   serviceName: string;
   logo?: string | null;
   favicon?: string | null;

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useClientAuth } from "@/contexts/client-auth";
 import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { api } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 type Message = {
   id: string;
@@ -16,19 +17,19 @@ type Message = {
 
 type ChatType = "ai" | "support";
 
-function getInitialAiMessage(serviceName: string): Message[] {
-  const name = (serviceName || "Сервис").trim() || "Сервис";
+function getInitialAiMessage(serviceName: string, fallbackServiceName: string, welcomeTemplate: string): Message[] {
+  const name = (serviceName || fallbackServiceName).trim() || fallbackServiceName;
   return [
     {
       id: "a1",
-      text: `Привет! Я AI-ассистент ${name} ✨ Готов помочь с настройкой VPN, тарифами и любыми другими вопросами. Что вас интересует?`,
+      text: welcomeTemplate.replace("{{name}}", name),
       from: "bot",
       time: "10:00",
     },
   ];
 }
 
-const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFloating = false, showAiTab = true }: any) => {
+const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFloating = false, showAiTab = true, t }: any) => {
   if (!showAiTab) {
     return (
       <div className={cn(
@@ -41,7 +42,7 @@ const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFl
           onClick={() => setActiveChat("support")}
           className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold text-primary-foreground bg-primary relative z-10"
         >
-          <Headset className="w-4 h-4" /> Поддержка
+          <Headset className="w-4 h-4" /> {t("floatingChat.support")}
           {supportUnread > 0 && (
             <span className="ml-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
               {supportUnread}
@@ -65,7 +66,7 @@ const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFl
         activeChat === "ai" ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
       )}
     >
-      <Sparkles className="w-4 h-4" /> AI Чат
+      <Sparkles className="w-4 h-4" /> {t("floatingChat.aiChat")}
       {aiUnread > 0 && activeChat !== "ai" && (
         <span className="ml-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
           {aiUnread}
@@ -79,7 +80,7 @@ const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFl
         activeChat === "support" ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
       )}
     >
-      <Headset className="w-4 h-4" /> Поддержка
+      <Headset className="w-4 h-4" /> {t("floatingChat.support")}
       {supportUnread > 0 && activeChat !== "support" && (
         <span className="ml-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
           {supportUnread}
@@ -98,7 +99,7 @@ const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFl
   );
 };
 
-const ChatHeader = ({ activeChat, setActiveChat, isExpanded, setIsExpanded, setIsOpen, aiUnread, supportUnread, showAiTab = true }: any) => (
+const ChatHeader = ({ activeChat, setActiveChat, isExpanded, setIsExpanded, setIsOpen, aiUnread, supportUnread, showAiTab = true, t }: any) => (
   <>
     <div className="px-4 py-3 sm:py-4 border-b border-white/5 bg-black/5 dark:bg-white/5 shrink-0 relative overflow-hidden pt-[max(env(safe-area-inset-top),16px)] sm:pt-4">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none" />
@@ -109,14 +110,14 @@ const ChatHeader = ({ activeChat, setActiveChat, isExpanded, setIsExpanded, setI
           </div>
           <div>
             <p className="text-base font-bold text-foreground leading-tight">
-              {activeChat === "ai" ? "AI Ассистент" : "Поддержка"}
+              {activeChat === "ai" ? t("floatingChat.aiAssistant") : t("floatingChat.support")}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5 font-medium flex items-center gap-1.5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              {activeChat === "ai" ? "Бот онлайн" : "Операторы онлайн"}
+              {activeChat === "ai" ? t("floatingChat.botOnline") : t("floatingChat.operatorsOnline")}
             </p>
           </div>
         </div>
@@ -145,6 +146,7 @@ const ChatHeader = ({ activeChat, setActiveChat, isExpanded, setIsExpanded, setI
 );
 
 function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefreshUnread?: () => void }) {
+  const { t, i18n } = useTranslation();
   const { state } = useClientAuth();
   const token = state.token ?? null;
 
@@ -240,8 +242,9 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
     try {
       const d = new Date(s);
       const isToday = new Date().toDateString() === d.toDateString();
-      if (isToday) return "Сегодня, " + d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-      return d.toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      const locale = i18n.language === "ru" ? "ru-RU" : i18n.language === "zh" ? "zh-CN" : "en-US";
+      if (isToday) return `${t("floatingChat.today")}, ` + d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+      return d.toLocaleString(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
     } catch {
       return s;
     }
@@ -261,10 +264,10 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold truncate">{detail?.subject || "Загрузка..."}</h3>
+              <h3 className="text-sm font-bold truncate">{detail?.subject || t("floatingChat.loading")}</h3>
               {detail && (
                 <span className={cn("text-[10px] uppercase font-bold tracking-wider", detail.status === "open" ? "text-emerald-500" : "text-muted-foreground")}>
-                  {detail.status === "open" ? "Открыт" : "Закрыт"}
+                  {detail.status === "open" ? t("floatingChat.open") : t("floatingChat.closed")}
                 </span>
               )}
             </div>
@@ -275,7 +278,7 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
             {detailLoading && !detail ? (
               <div className="flex justify-center items-center h-full"><Loader2 className="h-6 w-6 animate-spin text-primary/50" /></div>
             ) : detail?.messages?.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-muted-foreground text-sm font-medium">Нет сообщений</div>
+              <div className="flex h-full items-center justify-center text-muted-foreground text-sm font-medium">{t("floatingChat.noMessages")}</div>
             ) : (
               <AnimatePresence mode="popLayout">
                 {detail?.messages?.map((m: any) => {
@@ -312,7 +315,7 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
             <div className="relative flex items-end gap-2 bg-black/5 dark:bg-black/20 p-1.5 rounded-2xl border border-black/5 dark:border-white/10 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
               <textarea
                 className="flex-1 max-h-32 min-h-[40px] w-full resize-none bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none custom-scrollbar"
-                placeholder="Сообщение..."
+                placeholder={t("floatingChat.messagePlaceholder")}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 onKeyDown={(e) => {
@@ -347,23 +350,23 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-full -ml-2" onClick={() => setShowNewForm(false)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h3 className="text-base font-bold text-foreground">Новое обращение</h3>
+          <h3 className="text-base font-bold text-foreground">{t("floatingChat.newTicket")}</h3>
         </div>
         <div className="p-4 sm:p-5 space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Тема</label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">{t("floatingChat.subject")}</label>
             <input
               className="w-full rounded-2xl h-12 bg-black/5 dark:bg-black/20 border border-black/5 dark:border-white/10 px-4 text-sm font-medium text-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
-              placeholder="Коротко о проблеме"
+              placeholder={t("floatingChat.subjectPlaceholder")}
               value={newSubject}
               onChange={(e) => setNewSubject(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Сообщение</label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">{t("floatingChat.message")}</label>
             <textarea
               className="w-full resize-none rounded-2xl min-h-[120px] bg-black/5 dark:bg-black/20 border border-black/5 dark:border-white/10 p-4 text-sm font-medium text-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all custom-scrollbar"
-              placeholder="Подробное описание..."
+              placeholder={t("floatingChat.messageDetailedPlaceholder")}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
             />
@@ -374,7 +377,7 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
             disabled={createSending || !newSubject.trim() || !newMessage.trim()}
           >
             {createSending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-            Отправить
+            {t("floatingChat.send")}
           </Button>
         </div>
       </div>
@@ -386,7 +389,7 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
     <div className="flex flex-col flex-1 min-h-0 w-full overflow-y-auto custom-scrollbar">
       <ChatHeader {...headerProps} />
       <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 shrink-0 border-b border-black/5 dark:border-white/5 bg-background/90 backdrop-blur-md">
-        <h3 className="text-sm font-bold text-foreground">Мои обращения</h3>
+        <h3 className="text-sm font-bold text-foreground">{t("floatingChat.myTickets")}</h3>
         <Button 
           variant="outline" 
           size="sm" 
@@ -394,7 +397,7 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
           onClick={() => setShowNewForm(true)}
         >
           <MessageSquarePlus className="h-3 w-3 mr-1.5" />
-          Создать
+          {t("floatingChat.create")}
         </Button>
       </div>
       
@@ -404,7 +407,7 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
         ) : list.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
             <Inbox className="h-8 w-8 opacity-50" />
-            <p className="text-xs font-medium text-center">У вас пока нет<br/>открытых обращений</p>
+            <p className="text-xs font-medium text-center">{t("floatingChat.noOpenTicketsLine1")}<br/>{t("floatingChat.noOpenTicketsLine2")}</p>
           </div>
         ) : (
           list.map((t) => {
@@ -419,11 +422,11 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
                   <h4 className="font-semibold text-[13px] text-foreground line-clamp-2 leading-tight group-hover:text-primary transition-colors">{t.subject}</h4>
                   {isOpen ? (
                     <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-600 dark:text-emerald-400">
-                      <CircleDot className="h-2.5 w-2.5" /> Открыт
+                      <CircleDot className="h-2.5 w-2.5" /> {t("floatingChat.open")}
                     </span>
                   ) : (
                     <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
-                      <CircleCheck className="h-2.5 w-2.5" /> Закрыт
+                      <CircleCheck className="h-2.5 w-2.5" /> {t("floatingChat.closed")}
                     </span>
                   )}
                 </div>
@@ -440,10 +443,11 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
 }
 
 export function FloatingChat() {
+  const { t, i18n } = useTranslation();
   const { state } = useClientAuth();
   const config = useCabinetConfig();
   const token = state.token ?? null;
-  const serviceName = config?.serviceName?.trim() || "Сервис";
+  const serviceName = config?.serviceName?.trim() || t("floatingChat.serviceFallback");
   const aiChatEnabled = config?.aiChatEnabled !== false;
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -453,14 +457,14 @@ export function FloatingChat() {
     if (!aiChatEnabled && activeChat === "ai") setActiveChat("support");
   }, [aiChatEnabled, activeChat]);
 
-  const [aiChats, setAiChats] = useState<Message[]>(() => getInitialAiMessage("Сервис"));
+  const [aiChats, setAiChats] = useState<Message[]>(() => getInitialAiMessage(t("floatingChat.serviceFallback"), t("floatingChat.serviceFallback"), t("floatingChat.initialMessage")));
   useEffect(() => {
     setAiChats((prev) => {
       if (prev.length !== 1 || prev[0].id !== "a1") return prev;
-      const want = getInitialAiMessage(serviceName)[0].text;
-      return prev[0].text === want ? prev : getInitialAiMessage(serviceName);
+      const want = getInitialAiMessage(serviceName, t("floatingChat.serviceFallback"), t("floatingChat.initialMessage"))[0].text;
+      return prev[0].text === want ? prev : getInitialAiMessage(serviceName, t("floatingChat.serviceFallback"), t("floatingChat.initialMessage"));
     });
-  }, [serviceName]);
+  }, [serviceName, t, i18n.language]);
   const [aiInput, setAiInput] = useState("");
 
   const [aiUnread, setAiUnread] = useState(0);
@@ -534,8 +538,9 @@ export function FloatingChat() {
     const text = aiInput.trim();
     if (!text || !token) return;
 
-    const now = new Date();
-    const time = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const now = new Date();
+  const locale = i18n.language === "ru" ? "ru-RU" : i18n.language === "zh" ? "zh-CN" : "en-US";
+  const time = now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -562,7 +567,7 @@ export function FloatingChat() {
         id: Date.now().toString(),
         text: res.reply,
         from: "bot",
-        time: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+        time: new Date().toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }),
       };
 
       setAiChats((prev) => [...prev, replyMsg]);
@@ -570,9 +575,9 @@ export function FloatingChat() {
     } catch (e) {
       const errorMsg: Message = {
         id: Date.now().toString(),
-        text: "Произошла ошибка при обращении к AI. Пожалуйста, попробуйте позже.",
+        text: t("floatingChat.aiError"),
         from: "bot",
-        time: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+        time: new Date().toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }),
       };
       setAiChats((prev) => [...prev, errorMsg]);
       if (!isOpen || activeChat !== "ai") setAiUnread((n) => n + 1);
@@ -581,7 +586,7 @@ export function FloatingChat() {
     }
   };
 
-  const headerProps = { activeChat, setActiveChat, isExpanded, setIsExpanded, setIsOpen, aiUnread, supportUnread, showAiTab: aiChatEnabled };
+  const headerProps = { activeChat, setActiveChat, isExpanded, setIsExpanded, setIsOpen, aiUnread, supportUnread, showAiTab: aiChatEnabled, t };
 
   return (
     <>
@@ -687,7 +692,7 @@ export function FloatingChat() {
                           "text-sm text-foreground placeholder:text-muted-foreground",
                           "focus:outline-none custom-scrollbar"
                         )}
-                        placeholder="Спросите у AI..."
+                        placeholder={t("floatingChat.askAi")}
                         value={aiInput}
                         onChange={(e) => setAiInput(e.target.value)}
                         onKeyDown={(e) => {

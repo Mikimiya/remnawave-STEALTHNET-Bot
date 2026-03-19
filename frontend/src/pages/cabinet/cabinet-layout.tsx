@@ -12,14 +12,23 @@ import { useTheme, ACCENT_PALETTES, type ThemeMode, type ThemeAccent } from "@/c
 import { cn } from "@/lib/utils";
 import { FloatingChat } from "@/components/floating-chat";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useTranslation } from "react-i18next";
+import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "@/i18n";
 
 function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: currency.toUpperCase() === "USD" ? "USD" : currency.toUpperCase() === "RUB" ? "RUB" : "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+  const code = currency.toUpperCase();
+  // 按货币选择合适的 locale
+  const locale = code === "RUB" ? "ru-RU" : code === "CNY" ? "zh-CN" : "en-US";
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${amount} ${code}`;
+  }
 }
 
 function AnalyticsScripts() {
@@ -60,6 +69,7 @@ export function useCabinetMiniapp() {
 
 /** Экран ввода кода 2FA после успешной проверки пароля или Telegram */
 function Client2FAStepScreen() {
+  const { t } = useTranslation();
   const { state, submit2FACode, clearPending2FA } = useClientAuth();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,7 +79,7 @@ function Client2FAStepScreen() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!state.pending2FAToken || code.trim().length !== 6) {
-        setError("Введите 6-значный код из приложения");
+  setError(t("cabinetLayout.twoFa.codeRequired"));
         return;
       }
       setError(null);
@@ -77,7 +87,7 @@ function Client2FAStepScreen() {
       try {
         await submit2FACode(code.trim());
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Неверный код");
+  setError(err instanceof Error ? err.message : t("cabinetLayout.twoFa.invalidCode"));
       } finally {
         setLoading(false);
       }
@@ -103,8 +113,8 @@ function Client2FAStepScreen() {
             <KeyRound className="h-8 w-8" />
           </div>
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Код из приложения</h1>
-            <p className="text-sm text-muted-foreground mt-2 max-w-[280px]">Введите 6-значный код двухфакторной аутентификации для входа.</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("cabinetLayout.twoFa.title")}</h1>
+            <p className="text-sm text-muted-foreground mt-2 max-w-[280px]">{t("cabinetLayout.twoFa.description")}</p>
           </div>
           <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6">
             <div className="relative w-full">
@@ -124,10 +134,10 @@ function Client2FAStepScreen() {
             <div className="flex flex-col gap-3">
               <Button type="submit" className="w-full h-12 rounded-2xl font-bold text-base shadow-lg shadow-primary/20" disabled={loading || code.trim().length !== 6}>
                 {loading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-                Подтвердить код
+                {t("cabinetLayout.twoFa.confirm")}
               </Button>
               <Button type="button" variant="ghost" className="w-full h-10 rounded-xl text-muted-foreground" disabled={loading} onClick={clearPending2FA}>
-                Отмена
+                {t("common.cancel")}
               </Button>
             </div>
 
@@ -142,27 +152,28 @@ function Client2FAStepScreen() {
 }
 
 const ALL_NAV_ITEMS = [
-  { to: "/cabinet/dashboard", label: "Главная", icon: LayoutDashboard },
-  { to: "/cabinet/tariffs", label: "Тарифы", icon: Package },
-  { to: "/cabinet/custom-build", label: "Гибкий тариф", icon: Layers },
-  { to: "/cabinet/extra-options", label: "Опции", icon: PlusCircle },
-  { to: "/cabinet/proxy", label: "Прокси", icon: Globe },
-  { to: "/cabinet/singbox", label: "Доступы", icon: KeyRound },
-  { to: "/cabinet/referral", label: "Рефералы", icon: Users },
-  { to: "/cabinet/tickets", label: "Тикеты", icon: MessageSquare },
-  { to: "/cabinet/profile", label: "Профиль", icon: User },
+  { to: "/cabinet/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { to: "/cabinet/tariffs", labelKey: "nav.tariffs", icon: Package },
+  { to: "/cabinet/custom-build", labelKey: "nav.customBuild", icon: Layers },
+  { to: "/cabinet/extra-options", labelKey: "nav.extraOptions", icon: PlusCircle },
+  { to: "/cabinet/proxy", labelKey: "nav.proxy", icon: Globe },
+  { to: "/cabinet/singbox", labelKey: "nav.singbox", icon: KeyRound },
+  { to: "/cabinet/referral", labelKey: "nav.referral", icon: Users },
+  { to: "/cabinet/tickets", labelKey: "nav.tickets", icon: MessageSquare },
+  { to: "/cabinet/profile", labelKey: "nav.profile", icon: User },
 ];
 
 const MODE_OPTIONS: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
-  { value: "light", icon: Sun, label: "Светлая" },
-  { value: "dark", icon: Moon, label: "Тёмная" },
-  { value: "system", icon: Monitor, label: "Система" },
+  { value: "light", icon: Sun, label: "theme.modeLight" },
+  { value: "dark", icon: Moon, label: "theme.modeDark" },
+  { value: "system", icon: Monitor, label: "theme.modeSystem" },
 ];
 
 function ThemePopover() {
   const [show, setShow] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const { config: themeConfig, setMode, setAccent, resolvedMode, allowUserThemeChange } = useTheme();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!show) return;
@@ -207,7 +218,7 @@ function ThemePopover() {
         )}
       >
         <div className="mb-5">
-          <h4 className="mb-3 text-sm font-semibold tracking-tight text-foreground">Тема</h4>
+          <h4 className="mb-3 text-sm font-semibold tracking-tight text-foreground">{t("cabinetLayout.theme.title")}</h4>
           <div className="flex rounded-xl bg-muted/60 p-1 border border-border/50">
             {MODE_OPTIONS.map((opt) => {
               const isActive = themeConfig.mode === opt.value;
@@ -223,7 +234,7 @@ function ThemePopover() {
                   )}
                 >
                   <opt.icon className="h-3.5 w-3.5" />
-                  {opt.label}
+                  {t(opt.label)}
                 </button>
               );
             })}
@@ -232,7 +243,7 @@ function ThemePopover() {
 
         {allowUserThemeChange && (
           <div>
-            <h4 className="mb-3 text-sm font-semibold tracking-tight text-foreground">Цветовой акцент</h4>
+            <h4 className="mb-3 text-sm font-semibold tracking-tight text-foreground">{t("cabinetLayout.theme.accent")}</h4>
             <div className="grid grid-cols-4 gap-2">
               {(Object.entries(ACCENT_PALETTES) as [ThemeAccent, typeof ACCENT_PALETTES["default"]][]).map(([key, palette]) => {
                 const isActive = themeConfig.accent === key;
@@ -258,7 +269,7 @@ function ThemePopover() {
                       "text-[10px] font-medium tracking-tight truncate w-full text-center transition-colors",
                       isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                     )}>
-                      {palette.label}
+                      {t(palette.labelKey)}
                     </span>
                   </button>
                 );
@@ -275,12 +286,14 @@ function SettingsPopover() {
   const [show, setShow] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const { state, refreshProfile } = useClientAuth();
+  const { t, i18n } = useTranslation();
 
   const [activeLanguages, setActiveLanguages] = useState<string[]>([]);
   const [activeCurrencies, setActiveCurrencies] = useState<string[]>([]);
   const [preferredLang, setPreferredLang] = useState(state.client?.preferredLang ?? "ru");
   const [preferredCurrency, setPreferredCurrency] = useState(state.client?.preferredCurrency ?? "usd");
   const [saving, setSaving] = useState(false);
+  const defaultCurrencies = ["usd", "rub", "cny"];
 
   useEffect(() => {
     if (!show) {
@@ -294,7 +307,7 @@ function SettingsPopover() {
     api.getPublicConfig()
       .then((c) => {
         setActiveLanguages(c.activeLanguages?.length ? c.activeLanguages : ["ru", "en"]);
-        setActiveCurrencies(c.activeCurrencies?.length ? c.activeCurrencies : ["usd", "rub"]);
+        setActiveCurrencies(c.activeCurrencies?.length ? c.activeCurrencies : defaultCurrencies);
       })
       .catch(() => { });
 
@@ -313,6 +326,12 @@ function SettingsPopover() {
     try {
       await api.clientUpdateProfile(state.token, { preferredLang, preferredCurrency });
       await refreshProfile();
+      // 保存后同步 UI 语言（若 preferredLang 是支持的语言）
+      const supported = SUPPORTED_LANGUAGES.map((l) => l.code as string);
+      if (supported.includes(preferredLang)) {
+        i18n.changeLanguage(preferredLang);
+        try { localStorage.setItem("stealthnet_lang", preferredLang); } catch { /* ignore */ }
+      }
       setShow(false);
     } catch {
       // ignore
@@ -321,8 +340,14 @@ function SettingsPopover() {
     }
   }
 
+  function switchUiLang(code: SupportedLanguage) {
+    i18n.changeLanguage(code);
+    setPreferredLang(code);
+    try { localStorage.setItem("stealthnet_lang", code); } catch { /* ignore */ }
+  }
+
   const langs = activeLanguages.length ? activeLanguages : ["ru", "en"];
-  const currencies = activeCurrencies.length ? activeCurrencies : ["usd", "rub"];
+  const currencies = activeCurrencies.length ? activeCurrencies : defaultCurrencies;
 
   return (
     <div className="relative" ref={popoverRef}>
@@ -340,22 +365,27 @@ function SettingsPopover() {
             <Settings className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-base font-bold tracking-tight text-foreground truncate">Настройки</h4>
-            <p className="text-[10px] text-muted-foreground mt-[1px] uppercase tracking-wider font-semibold truncate">Язык и валюта</p>
+            <h4 className="text-base font-bold tracking-tight text-foreground truncate">{t("onboarding.step3", "Settings")}</h4>
+            <p className="text-[10px] text-muted-foreground mt-[1px] uppercase tracking-wider font-semibold truncate">{t("onboarding.language")} & {t("onboarding.currency")}</p>
           </div>
         </div>
 
         <div className="space-y-4 mb-5">
           <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground font-medium pl-1 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> Язык</label>
+            <label className="text-xs text-muted-foreground font-medium pl-1 flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5" /> {t("onboarding.language")}
+            </label>
             <GlassSelect
               value={preferredLang}
-              onChange={(v) => setPreferredLang(v)}
-              options={langs.map((l) => ({ value: l, label: l === "ru" ? "Русский" : l === "en" ? "English" : l.toUpperCase() }))}
+              onChange={(v) => switchUiLang(v as SupportedLanguage)}
+              options={langs.map((code) => {
+                const found = SUPPORTED_LANGUAGES.find((s) => s.code === code);
+                return { value: code, label: found ? `${found.flag} ${found.label}` : code.toUpperCase() };
+              })}
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground font-medium pl-1 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Валюта</label>
+            <label className="text-xs text-muted-foreground font-medium pl-1 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {t("onboarding.currency")}</label>
             <GlassSelect
               value={preferredCurrency}
               onChange={(v) => setPreferredCurrency(v)}
@@ -366,7 +396,7 @@ function SettingsPopover() {
 
         <Button onClick={handleSave} disabled={saving} className="w-full h-10 rounded-xl shadow-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-all hover:scale-[1.02] active:scale-95">
           {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
-          Сохранить
+          {t("common.save")}
         </Button>
       </div>
     </div>
@@ -393,6 +423,7 @@ function MobileCabinetShell() {
   const location = useLocation();
   const { state, logout, refreshProfile } = useClientAuth();
   const config = useCabinetConfig();
+  const { t } = useTranslation();
   const navItems = useMemo(() => resolveNavItems(config), [config?.sellOptionsEnabled, config?.showProxyEnabled, config?.showSingboxEnabled, config?.ticketsEnabled, config?.customBuildConfig]);
   const [logoError, setLogoError] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -428,7 +459,7 @@ function MobileCabinetShell() {
             <ThemePopover />
             <SettingsPopover />
             <Button variant="ghost" size="icon" className="shrink-0 bg-background/20 hover:bg-background/40 text-muted-foreground hover:text-foreground" asChild>
-              <Link to="/cabinet/login" onClick={() => logout()} title="Выйти">
+              <Link to="/cabinet/login" onClick={() => logout()} title={t("auth.logout")}>
                 <LogOut className="h-5 w-5" />
               </Link>
             </Button>
@@ -442,7 +473,7 @@ function MobileCabinetShell() {
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/60 backdrop-blur-xl pb-[env(safe-area-inset-bottom)] transition-all duration-300">
         <div className="flex items-center justify-around w-full h-[4.5rem] px-2 gap-0">
-          {visibleItems.map(({ to, label, icon: Icon }) => {
+          {visibleItems.map(({ to, labelKey, icon: Icon }) => {
             const active = location.pathname === to;
             return (
               <Link
@@ -454,7 +485,7 @@ function MobileCabinetShell() {
                 )}
               >
                 <Icon className={cn("h-5 w-5 shrink-0 transition-transform duration-300", active && "scale-110 drop-shadow-md")} />
-                <span className="text-[10px] font-medium leading-none tracking-tight truncate w-full text-center">{label}</span>
+                <span className="text-[10px] font-medium leading-none tracking-tight truncate w-full text-center">{t(labelKey)}</span>
               </Link>
             );
           })}
@@ -466,10 +497,10 @@ function MobileCabinetShell() {
                 "flex flex-col items-center justify-center gap-0.5 py-1 px-1 h-14 flex-1 min-w-0 max-w-[5rem] rounded-xl transition-all duration-300",
                 "text-muted-foreground hover:bg-foreground/5 hover:text-foreground hover:scale-105"
               )}
-              aria-label="Ещё"
+              aria-label={t("cabinetLayout.more")}
             >
               <MoreHorizontal className="h-5 w-5 shrink-0" />
-              <span className="text-[10px] font-medium leading-none tracking-tight">Ещё</span>
+              <span className="text-[10px] font-medium leading-none tracking-tight">{t("cabinetLayout.more")}</span>
             </button>
           )}
         </div>
@@ -478,10 +509,10 @@ function MobileCabinetShell() {
       <Dialog open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
         <DialogContent className="max-w-sm mx-auto rounded-2xl" showCloseButton={true}>
           <DialogHeader>
-            <DialogTitle>Меню</DialogTitle>
+            <DialogTitle>{t("cabinetLayout.menu")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-1 py-2">
-            {navItems.map(({ to, label, icon: Icon }) => {
+            {navItems.map(({ to, labelKey, icon: Icon }) => {
               const active = location.pathname === to;
               return (
                 <Link
@@ -494,7 +525,7 @@ function MobileCabinetShell() {
                   )}
                 >
                   <Icon className="h-5 w-5 shrink-0" />
-                  <span className="font-medium">{label}</span>
+                  <span className="font-medium">{t(labelKey)}</span>
                 </Link>
               );
             })}
@@ -521,6 +552,7 @@ function CabinetShell() {
   const location = useLocation();
   const { state, logout, refreshProfile } = useClientAuth();
   const config = useCabinetConfig();
+  const { t } = useTranslation();
   const navItems = useMemo(() => resolveNavItems(config), [config?.sellOptionsEnabled, config?.showProxyEnabled, config?.showSingboxEnabled, config?.ticketsEnabled, config?.customBuildConfig]);
   const isMiniapp = useIsMiniapp();
   const isMobile = useIsMobile();
@@ -568,7 +600,7 @@ function CabinetShell() {
             {serviceName ? <span className="hidden sm:inline truncate">{serviceName}</span> : null}
           </Link>
           <nav className="flex items-center gap-1 flex-wrap justify-center flex-1">
-            {visibleNav.map(({ to, label, icon: Icon }) => {
+            {visibleNav.map(({ to, labelKey, icon: Icon }) => {
               const active = location.pathname === to;
               return (
                 <Link key={to} to={to}>
@@ -581,7 +613,7 @@ function CabinetShell() {
                     )}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
-                    {label}
+                    {t(labelKey)}
                   </Button>
                 </Link>
               );
@@ -597,12 +629,12 @@ function CabinetShell() {
                   )}
                   onClick={() => setMoreOpen(!moreOpen)}
                 >
-                  Ещё
+                  {t("cabinetLayout.more")}
                   <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", moreOpen && "rotate-180")} />
                 </Button>
                 {moreOpen && (
                   <div className="absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-xl border border-border bg-card py-1.5 shadow-lg">
-                    {moreNav.map(({ to, label, icon: Icon }) => {
+                    {moreNav.map(({ to, labelKey, icon: Icon }) => {
                       const active = location.pathname === to;
                       return (
                         <Link
@@ -615,7 +647,7 @@ function CabinetShell() {
                           )}
                         >
                           <Icon className="h-4 w-4 shrink-0" />
-                          {label}
+                          {t(labelKey)}
                         </Link>
                       );
                     })}
@@ -648,7 +680,7 @@ function CabinetShell() {
                 </div>
                 <div className="grid grid-cols-[0fr] opacity-0 transition-all duration-300 group-hover:grid-cols-[1fr] group-hover:opacity-100">
                   <span className="overflow-hidden whitespace-nowrap text-sm font-medium">
-                    <span className="pr-4">Выйти</span>
+                    <span className="pr-4">{t("auth.logout")}</span>
                   </span>
                 </div>
               </Link>

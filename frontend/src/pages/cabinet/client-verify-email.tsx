@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Mail, Shield, Loader2 } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTranslation } from "react-i18next";
 
 export function ClientVerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -12,11 +13,12 @@ export function ClientVerifyEmailPage() {
   const [message, setMessage] = useState("");
   const { verifyEmail } = useClientAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!token) {
       setStatus("error");
-      setMessage("Ссылка недействительна");
+      setMessage(t("auth.invalidLink"));
       return;
     }
     verifyEmail(token)
@@ -26,9 +28,9 @@ export function ClientVerifyEmailPage() {
       })
       .catch((err) => {
         setStatus("error");
-        setMessage(err instanceof Error ? err.message : "Ссылка недействительна или истекла");
+        setMessage(err instanceof Error ? err.message : t("auth.invalidLinkExpired"));
       });
-  }, [token, verifyEmail, navigate]);
+  }, [token, verifyEmail, navigate, t]);
 
   return (
     <div className="min-h-svh flex flex-col items-center justify-center bg-gradient-to-b from-background to-muted/20 p-4">
@@ -49,17 +51,17 @@ export function ClientVerifyEmailPage() {
                 <Mail className="h-10 w-10 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-center">Подтверждение email</CardTitle>
+            <CardTitle className="text-center">{t("auth.verifyEmailTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="text-center">
             {status === "loading" && (
               <p className="flex items-center justify-center gap-2 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Проверка ссылки…
+                {t("auth.verifyingLink")}
               </p>
             )}
             {status === "ok" && (
-              <p className="text-green-600">Регистрация завершена. Перенаправление в кабинет…</p>
+              <p className="text-green-600">{t("auth.verifyEmailSuccess")}</p>
             )}
             {status === "error" && (
               <p className="text-destructive">{message}</p>

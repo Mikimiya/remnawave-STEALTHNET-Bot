@@ -17,6 +17,7 @@ import {
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 function formatMoney(amount: number, currency: string) {
   return new Intl.NumberFormat("ru-RU", {
@@ -27,14 +28,14 @@ function formatMoney(amount: number, currency: string) {
   }).format(amount);
 }
 
-function optionLabel(o: PublicSellOption): string {
-  if (o.kind === "traffic") return `+${o.trafficGb} ГБ трафика`;
-  if (o.kind === "devices") return `+${o.deviceCount} ${o.deviceCount === 1 ? "устройство" : "устройства"}`;
+function optionLabel(o: PublicSellOption, tFn: (key: string, opts?: Record<string, unknown>) => string): string {
+  if (o.kind === "traffic") return tFn("extraOptions.trafficGb", { count: o.trafficGb });
+  if (o.kind === "devices") return tFn("extraOptions.deviceCount", { count: o.deviceCount });
   if (o.kind === "servers") {
-    const traffic = (o.trafficGb ?? 0) > 0 ? ` + ${o.trafficGb} ГБ` : "";
-    return (o.name || "Доп. сервер") + traffic;
+    const traffic = (o.trafficGb ?? 0) > 0 ? ` + ${o.trafficGb} GB` : "";
+    return (o.name || tFn("extraOptions.extraServer")) + traffic;
   }
-  return "Доп. опция";
+  return tFn("extraOptions.extraOption");
 }
 
 function optionIcon(o: PublicSellOption) {
@@ -45,6 +46,7 @@ function optionIcon(o: PublicSellOption) {
 
 export function ClientExtraOptionsPage() {
   const { state, refreshProfile } = useClientAuth();
+  const { t } = useTranslation();
   const token = state.token;
   const balance = state.client?.balance ?? 0;
   const [options, setOptions] = useState<PublicSellOption[]>([]);
@@ -85,7 +87,7 @@ export function ClientExtraOptionsPage() {
       setPayModal(null);
       if (res.confirmationUrl) openPaymentInBrowser(res.confirmationUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("extraOptions.paymentCreateError"));
     } finally {
       setPayLoading(false);
     }
@@ -102,7 +104,7 @@ export function ClientExtraOptionsPage() {
       setPayModal(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("extraOptions.paymentCreateError"));
     } finally {
       setPayLoading(false);
     }
@@ -119,7 +121,7 @@ export function ClientExtraOptionsPage() {
       setPayModal(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("extraOptions.paymentCreateError"));
     } finally {
       setPayLoading(false);
     }
@@ -137,7 +139,7 @@ export function ClientExtraOptionsPage() {
       setPayModal(null);
       openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("extraOptions.paymentCreateError"));
     } finally {
       setPayLoading(false);
     }
@@ -155,7 +157,7 @@ export function ClientExtraOptionsPage() {
       setPayModal(null);
       if (res.paymentUrl) openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("extraOptions.paymentCreateError"));
     } finally {
       setPayLoading(false);
     }
@@ -164,7 +166,7 @@ export function ClientExtraOptionsPage() {
   async function startBalancePayment(option: PublicSellOption) {
     if (!token) return;
     if (balance < option.price) {
-      setPayError("Недостаточно средств на балансе");
+      setPayError(t("extraOptions.insufficientBalance"));
       return;
     }
     setPayError(null);
@@ -175,7 +177,7 @@ export function ClientExtraOptionsPage() {
       await refreshProfile();
       setPayError(null);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка оплаты с баланса");
+      setPayError(e instanceof Error ? e.message : t("extraOptions.balancePayError"));
     } finally {
       setPayLoading(false);
     }
@@ -198,9 +200,9 @@ export function ClientExtraOptionsPage() {
           <div className="flex justify-between items-center relative z-10">
              <div className="space-y-1.5">
                 <p className={cn("font-medium", isMobileOrMiniapp ? "text-sm text-muted-foreground" : "text-muted-foreground")}>
-                  {isMobileOrMiniapp ? "Итого к оплате" : "Опция:"}
+                  {isMobileOrMiniapp ? t("extraOptions.totalToPay") : t("extraOptions.option")}
                 </p>
-                {!isMobileOrMiniapp && <p className="font-bold text-foreground">{payModal.name || optionLabel(payModal)}</p>}
+                {!isMobileOrMiniapp && <p className="font-bold text-foreground">{payModal.name || optionLabel(payModal, t)}</p>}
                 {isMobileOrMiniapp && (
                    <span className="text-3xl font-black text-primary">{formatMoney(payModal.price, payModal.currency)}</span>
                 )}
@@ -216,7 +218,7 @@ export function ClientExtraOptionsPage() {
         <div className={cn("space-y-3", isMobileOrMiniapp ? "pb-24" : "")}>
           <div className="flex items-center gap-2 pt-2 pb-1">
             <Wallet className={cn("text-primary", isMobileOrMiniapp ? "h-5 w-5" : "h-4 w-4")} />
-            <span className={cn("font-bold", isMobileOrMiniapp ? "text-lg" : "text-sm")}>Способ оплаты</span>
+            <span className={cn("font-bold", isMobileOrMiniapp ? "text-lg" : "text-sm")}>{t("extraOptions.payMethod")}</span>
           </div>
 
           {payError && (
@@ -238,7 +240,7 @@ export function ClientExtraOptionsPage() {
                   <>
                   <div className="flex items-center gap-3">
                     {payLoading ? <Loader2 className="h-6 w-6 text-white animate-spin" /> : <Wallet className="h-6 w-6 text-white" />}
-                    <span className="text-base font-bold text-white">Оплатить с баланса</span>
+                    <span className="text-base font-bold text-white">{t("extraOptions.payByBalance")}</span>
                   </div>
                   <span className="text-white/80 font-mono font-medium bg-black/20 px-2 py-1 rounded-lg">
                     {formatMoney(balance, payModal.currency)}
@@ -247,7 +249,7 @@ export function ClientExtraOptionsPage() {
               ) : (
                   <>
                   {payLoading ? <Loader2 className="h-5 w-5 animate-spin relative z-10" /> : <Wallet className="h-5 w-5 relative z-10" />}
-                  <span className="text-base font-semibold relative z-10">Оплатить с баланса</span>
+                  <span className="text-base font-semibold relative z-10">{t("extraOptions.payByBalance")}</span>
                   <span className="opacity-90 font-medium ml-1 bg-black/10 px-2 py-0.5 rounded-md relative z-10">
                     ({formatMoney(balance, payModal.currency)})
                   </span>
@@ -268,14 +270,14 @@ export function ClientExtraOptionsPage() {
                      <div className="p-2 rounded-xl bg-purple-500/10">
                         {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-purple-500" /> : <CreditCard className="h-6 w-6 text-purple-500" />}
                      </div>
-                     <span className="text-base font-bold">ЮMoney / Карты</span>
+                     <span className="text-base font-bold">{t("extraOptions.yoomoney")}</span>
                      </>
                   ) : (
                      <>
                      <div className="absolute left-6 p-1.5 rounded-lg bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-purple-500" /> : <CreditCard className="h-5 w-5 text-purple-500" />}
                      </div>
-                     <span className="text-base font-medium">💳 ЮMoney</span>
+                     <span className="text-base font-medium">💳 {t("extraOptions.yoomoney")}</span>
                      </>
                   )}
                </Button>
@@ -294,14 +296,14 @@ export function ClientExtraOptionsPage() {
                      <div className="p-2 rounded-xl bg-blue-500/10">
                         {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-500" /> : <CreditCard className="h-6 w-6 text-blue-500" />}
                      </div>
-                     <span className="text-base font-bold">СБП / Карты РФ</span>
+                     <span className="text-base font-bold">{t("extraOptions.sbp")}</span>
                      </>
                   ) : (
                      <>
                      <div className="absolute left-6 p-1.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> : <CreditCard className="h-5 w-5 text-blue-500" />}
                      </div>
-                     <span className="text-base font-medium">💳 СБП / Карты РФ</span>
+                     <span className="text-base font-medium">💳 {t("extraOptions.sbp")}</span>
                      </>
                   )}
                </Button>
@@ -327,7 +329,7 @@ export function ClientExtraOptionsPage() {
                      <div className="absolute left-6 p-1.5 rounded-lg bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-yellow-500" /> : <Zap className="h-5 w-5 text-yellow-500" />}
                      </div>
-                     <span className="text-base font-medium">⚡ Crypto Bot (Криптовалюта)</span>
+                     <span className="text-base font-medium">⚡ Crypto Bot ({t("extraOptions.crypto")})</span>
                      </>
                   )}
                </Button>
@@ -353,7 +355,7 @@ export function ClientExtraOptionsPage() {
                      <div className="absolute left-6 p-1.5 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-orange-500" /> : <Zap className="h-5 w-5 text-orange-500" />}
                      </div>
-                     <span className="text-base font-medium">⚡ Heleket (Криптовалюта)</span>
+                     <span className="text-base font-medium">⚡ Heleket ({t("extraOptions.crypto")})</span>
                      </>
                   )}
                </Button>
@@ -403,12 +405,12 @@ export function ClientExtraOptionsPage() {
   if (!sellOptionsEnabled || options.length === 0) {
     return (
       <div className="space-y-6 w-full min-w-0">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Доп. опции</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{t("extraOptions.title")}</h1>
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             {!sellOptionsEnabled
-              ? "Продажа доп. опций отключена."
-              : "Дополнительные опции пока не настроены. Оформите подписку в разделе «Тарифы», затем здесь можно будет докупить трафик, устройства или серверы."}
+              ? t("extraOptions.disabled")
+              : t("extraOptions.notConfigured")}
           </CardContent>
         </Card>
       </div>
@@ -442,8 +444,8 @@ export function ClientExtraOptionsPage() {
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-sm sm:text-base font-bold truncate text-foreground">Оплата опции</h2>
-                  <p className="text-[11px] font-medium text-muted-foreground truncate">{payModal.name || optionLabel(payModal)}</p>
+                  <h2 className="text-sm sm:text-base font-bold truncate text-foreground">{t("extraOptions.payOptionTitle")}</h2>
+                  <p className="text-[11px] font-medium text-muted-foreground truncate">{payModal.name || optionLabel(payModal, t)}</p>
                 </div>
               </div>
             </div>
@@ -467,11 +469,10 @@ export function ClientExtraOptionsPage() {
                 <div className="flex-1">
                   <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground flex items-center gap-3">
                     <Layers className="h-8 w-8 text-primary" />
-                    Доп. опции
+                    {t("extraOptions.title")}
                   </h1>
                   <p className="mt-3 text-[16px] text-muted-foreground max-w-xl leading-relaxed">
-                    Не хватает трафика, нужны дополнительные устройства или серверы?
-                    Здесь вы можете прокачать вашу текущую подписку. Опции применяются моментально после оплаты.
+                    {t("extraOptions.pageDesc")}
                   </p>
                 </div>
               </div>
@@ -481,7 +482,7 @@ export function ClientExtraOptionsPage() {
               <section className="space-y-4">
                 <h2 className="flex items-center gap-2 text-lg font-semibold px-2">
                   <Wifi className="h-5 w-5 text-primary" />
-                  Дополнительный трафик
+                  {t("extraOptions.trafficSection")}
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {trafficOptions.map((opt) => (
@@ -492,8 +493,8 @@ export function ClientExtraOptionsPage() {
                             {optionIcon(opt)}
                           </div>
                           <div>
-                            <h3 className="font-bold text-lg text-foreground truncate">{opt.name || "Пакет трафика"}</h3>
-                            <p className="text-sm text-muted-foreground truncate">{optionLabel(opt)}</p>
+                            <h3 className="font-bold text-lg text-foreground truncate">{opt.name || t("extraOptions.trafficPackage")}</h3>
+                            <p className="text-sm text-muted-foreground truncate">{optionLabel(opt, t)}</p>
                           </div>
                         </div>
                         <div className="mt-auto space-y-4 pt-4 border-t border-border/50">
@@ -502,7 +503,7 @@ export function ClientExtraOptionsPage() {
                           </div>
                           <Button onClick={() => setPayModal(opt)} className="w-full gap-2 shadow-md hover:scale-[1.02] transition-transform rounded-xl h-12">
                             <CreditCard className="h-5 w-5" />
-                            Купить пакет
+                            {t("extraOptions.buyPackage")}
                           </Button>
                         </div>
                       </CardContent>
@@ -516,7 +517,7 @@ export function ClientExtraOptionsPage() {
               <section className="space-y-4">
                 <h2 className="flex items-center gap-2 text-lg font-semibold px-2">
                   <Smartphone className="h-5 w-5 text-primary" />
-                  Устройства (Слоты)
+                  {t("extraOptions.devicesSection")}
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {deviceOptions.map((opt) => (
@@ -527,8 +528,8 @@ export function ClientExtraOptionsPage() {
                             {optionIcon(opt)}
                           </div>
                           <div>
-                            <h3 className="font-bold text-lg text-foreground truncate">{opt.name || "Слоты устройств"}</h3>
-                            <p className="text-sm text-muted-foreground truncate">{optionLabel(opt)}</p>
+                            <h3 className="font-bold text-lg text-foreground truncate">{opt.name || t("extraOptions.deviceSlots")}</h3>
+                            <p className="text-sm text-muted-foreground truncate">{optionLabel(opt, t)}</p>
                           </div>
                         </div>
                         <div className="mt-auto space-y-4 pt-4 border-t border-border/50">
@@ -537,7 +538,7 @@ export function ClientExtraOptionsPage() {
                           </div>
                           <Button onClick={() => setPayModal(opt)} className="w-full gap-2 shadow-md hover:scale-[1.02] transition-transform rounded-xl h-12">
                             <CreditCard className="h-5 w-5" />
-                            Добавить устройства
+                            {t("extraOptions.addDevices")}
                           </Button>
                         </div>
                       </CardContent>
@@ -551,7 +552,7 @@ export function ClientExtraOptionsPage() {
               <section className="space-y-4">
                 <h2 className="flex items-center gap-2 text-lg font-semibold px-2">
                   <Server className="h-5 w-5 text-primary" />
-                  Дополнительные серверы
+                  {t("extraOptions.serversSection")}
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {serverOptions.map((opt) => (
@@ -562,8 +563,8 @@ export function ClientExtraOptionsPage() {
                             {optionIcon(opt)}
                           </div>
                           <div>
-                            <h3 className="font-bold text-lg text-foreground truncate">{opt.name || "Доп. сервер"}</h3>
-                            <p className="text-sm text-muted-foreground truncate">{optionLabel(opt)}</p>
+                            <h3 className="font-bold text-lg text-foreground truncate">{opt.name || t("extraOptions.extraServer")}</h3>
+                            <p className="text-sm text-muted-foreground truncate">{optionLabel(opt, t)}</p>
                           </div>
                         </div>
                         <div className="mt-auto space-y-4 pt-4 border-t border-border/50">
@@ -572,7 +573,7 @@ export function ClientExtraOptionsPage() {
                           </div>
                           <Button onClick={() => setPayModal(opt)} className="w-full gap-2 shadow-md hover:scale-[1.02] transition-transform rounded-xl h-12">
                             <CreditCard className="h-5 w-5" />
-                            Купить сервер
+                            {t("extraOptions.buyServer")}
                           </Button>
                         </div>
                       </CardContent>
@@ -593,7 +594,7 @@ export function ClientExtraOptionsPage() {
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <Shield className="h-6 w-6 text-primary" />
                 </div>
-                Оплата опции
+                {t("extraOptions.payOptionTitle")}
               </DialogTitle>
               <DialogDescription className="hidden" />
             </DialogHeader>
@@ -602,7 +603,7 @@ export function ClientExtraOptionsPage() {
 
             <DialogFooter className="mt-4 sm:justify-center border-t border-border/50 pt-4">
               <Button variant="ghost" onClick={closePayment} disabled={payLoading} className="rounded-xl hover:bg-background/50 hover:text-foreground text-muted-foreground transition-colors">
-                Отмена
+                {t("common.cancel")}
               </Button>
             </DialogFooter>
           </DialogContent>

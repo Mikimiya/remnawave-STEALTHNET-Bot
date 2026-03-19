@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +29,7 @@ function formatDate(path: string): string {
 }
 
 export function BackupPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const [creating, setCreating] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -43,11 +45,11 @@ export function BackupPage() {
   if (!token) return null;
 
   async function loadList() {
-    const t = state.accessToken;
-    if (!t) return;
+    const token = state.accessToken;
+    if (!token) return;
     setListLoading(true);
     try {
-      const res = await api.getBackupList(t);
+      const res = await api.getBackupList(token);
       setList(res.items);
     } catch {
       setList([]);
@@ -61,34 +63,34 @@ export function BackupPage() {
   }, [state.accessToken]);
 
   async function handleCreateBackup() {
-    const t = state.accessToken;
-    if (!t) return;
+    const token = state.accessToken;
+    if (!token) return;
     setError(null);
     setSuccess(null);
     setCreating(true);
     try {
-      const { blob, filename } = await api.createBackup(t);
+      const { blob, filename } = await api.createBackup(token);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-      setSuccess("Бэкап создан, сохранён на сервере и загружен.");
+      setSuccess(t("admin.backup.createSuccess"));
       await loadList();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка создания бэкапа");
+      setError(e instanceof Error ? e.message : t("admin.backup.createError"));
     } finally {
       setCreating(false);
     }
   }
 
   async function handleDownload(path: string) {
-    const t = state.accessToken;
-    if (!t) return;
+    const token = state.accessToken;
+    if (!token) return;
     setError(null);
     try {
-      const { blob, filename } = await api.downloadBackup(t, path);
+      const { blob, filename } = await api.downloadBackup(token, path);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -96,7 +98,7 @@ export function BackupPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка скачивания");
+      setError(e instanceof Error ? e.message : t("admin.backup.downloadError"));
     }
   }
 
@@ -106,18 +108,18 @@ export function BackupPage() {
   }
 
   async function handleRestoreFromServerConfirm() {
-    const t = state.accessToken;
-    if (!restoreFromPath || !t) return;
+    const token = state.accessToken;
+    if (!restoreFromPath || !token) return;
     setError(null);
     setSuccess(null);
     setRestoring(true);
     setRestoreFromPath(null);
     try {
-      const result = await api.restoreBackupFromServer(t, restoreFromPath);
+      const result = await api.restoreBackupFromServer(token, restoreFromPath);
       setSuccess(result.message);
       await loadList();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка восстановления");
+      setError(e instanceof Error ? e.message : t("admin.backup.restoreError"));
     } finally {
       setRestoring(false);
     }
@@ -129,7 +131,7 @@ export function BackupPage() {
     setSuccess(null);
     if (file) {
       if (!file.name.toLowerCase().endsWith(".sql")) {
-        setError("Выберите файл бэкапа с расширением .sql");
+        setError(t("admin.backup.sqlRequired"));
         setRestoreFile(null);
         return;
       }
@@ -139,19 +141,19 @@ export function BackupPage() {
   }
 
   async function handleRestoreConfirm() {
-    const t = state.accessToken;
-    if (!restoreFile || !t) return;
+    const token = state.accessToken;
+    if (!restoreFile || !token) return;
     setError(null);
     setSuccess(null);
     setRestoring(true);
     setShowRestoreConfirm(false);
     try {
-      const result = await api.restoreBackup(t, restoreFile);
+      const result = await api.restoreBackup(token, restoreFile);
       setSuccess(result.message);
       setRestoreFile(null);
       await loadList();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка восстановления");
+      setError(e instanceof Error ? e.message : t("admin.backup.restoreError"));
     } finally {
       setRestoring(false);
     }
@@ -160,9 +162,9 @@ export function BackupPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Бэкапы</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("admin.backup.title")}</h1>
         <p className="text-muted-foreground mt-1">
-          Создание и восстановление резервной копии базы данных. Бэкапы сохраняются на сервере по дням.
+          {t("admin.backup.subtitle")}
         </p>
       </div>
 
@@ -183,10 +185,10 @@ export function BackupPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Download className="h-5 w-5" />
-              Создать бэкап
+              {t("admin.backup.createTitle")}
             </CardTitle>
             <CardDescription>
-              Создаёт дамп БД, сохраняет его на сервере (по дням) и отдаёт файл на скачивание.
+              {t("admin.backup.createDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -194,10 +196,10 @@ export function BackupPage() {
               {creating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Создание…
+                  {t("admin.backup.creating")}
                 </>
               ) : (
-                "Создать и скачать бэкап"
+                t("admin.backup.createBtn")
               )}
             </Button>
           </CardContent>
@@ -207,10 +209,10 @@ export function BackupPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5" />
-              Восстановить из файла
+              {t("admin.backup.restoreTitle")}
             </CardTitle>
             <CardDescription>
-              Загрузить SQL-файл с компьютера. Текущие данные будут заменены.
+              {t("admin.backup.restoreDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -224,7 +226,7 @@ export function BackupPage() {
             {restoring && (
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Восстановление…
+                {t("admin.backup.restoring")}
               </p>
             )}
           </CardContent>
@@ -235,29 +237,29 @@ export function BackupPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <HardDrive className="h-5 w-5" />
-            Сохранённые на сервере
+            {t("admin.backup.savedTitle")}
           </CardTitle>
           <CardDescription>
-            Бэкапы по дням. Скачать или восстановить из выбранного.
+            {t("admin.backup.savedDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {listLoading ? (
             <p className="text-sm text-muted-foreground flex items-center gap-2 py-8">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Загрузка списка…
+              {t("admin.backup.loading")}
             </p>
           ) : list.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8">Нет сохранённых бэкапов. Создайте первый.</p>
+            <p className="text-sm text-muted-foreground py-8">{t("admin.backup.empty")}</p>
           ) : (
             <div className="rounded-md border overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="h-10 px-4 text-left font-medium">Дата</th>
-                    <th className="h-10 px-4 text-left font-medium">Файл</th>
-                    <th className="h-10 px-4 text-left font-medium">Размер</th>
-                    <th className="h-10 px-4 text-right font-medium">Действия</th>
+                    <th className="h-10 px-4 text-left font-medium">{t("admin.backup.colDate")}</th>
+                    <th className="h-10 px-4 text-left font-medium">{t("admin.backup.colFile")}</th>
+                    <th className="h-10 px-4 text-left font-medium">{t("admin.backup.colSize")}</th>
+                    <th className="h-10 px-4 text-right font-medium">{t("admin.common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -269,7 +271,7 @@ export function BackupPage() {
                       <td className="px-4 py-3 text-right space-x-2">
                         <Button variant="outline" size="sm" onClick={() => handleDownload(item.path)}>
                           <Download className="h-3.5 w-3.5 mr-1" />
-                          Скачать
+                          {t("admin.backup.download")}
                         </Button>
                         <Button
                           variant="outline"
@@ -279,7 +281,7 @@ export function BackupPage() {
                           disabled={restoring}
                         >
                           <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                          Восстановить
+                          {t("admin.backup.restore")}
                         </Button>
                       </td>
                     </tr>
@@ -294,14 +296,14 @@ export function BackupPage() {
       <Dialog open={showRestoreConfirm} onOpenChange={setShowRestoreConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Восстановить из загруженного файла?</DialogTitle>
+            <DialogTitle>{t("admin.backup.confirmUploadTitle")}</DialogTitle>
             <DialogDescription>
-              Текущие данные в базе будут заменены содержимым выбранного файла. Это действие нельзя отменить.
+              {t("admin.backup.confirmUploadDesc")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRestoreConfirm(false)}>Отмена</Button>
-            <Button variant="destructive" onClick={handleRestoreConfirm}>Восстановить</Button>
+            <Button variant="outline" onClick={() => setShowRestoreConfirm(false)}>{t("admin.common.cancel")}</Button>
+            <Button variant="destructive" onClick={handleRestoreConfirm}>{t("admin.backup.confirmBtn")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -309,15 +311,15 @@ export function BackupPage() {
       <Dialog open={!!restoreFromPath} onOpenChange={(open) => !open && setRestoreFromPath(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Восстановить из бэкапа на сервере?</DialogTitle>
+            <DialogTitle>{t("admin.backup.confirmServerTitle")}</DialogTitle>
             <DialogDescription>
-              База будет заменена выбранным бэкапом. Это действие нельзя отменить.
+              {t("admin.backup.confirmServerDesc")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRestoreFromPath(null)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setRestoreFromPath(null)}>{t("admin.common.cancel")}</Button>
             <Button variant="destructive" onClick={handleRestoreFromServerConfirm} disabled={restoring}>
-              Восстановить
+              {t("admin.backup.confirmBtn")}
             </Button>
           </DialogFooter>
         </DialogContent>

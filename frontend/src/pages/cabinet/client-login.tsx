@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -41,11 +42,12 @@ export function ClientLoginPage() {
   const [searchParams] = useSearchParams();
   const { login, registerByTelegram, loginByGoogle, loginByApple } = useClientAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   function validateEmail(value: string): string {
-    if (!value.trim()) return "Email обязателен";
+    if (!value.trim()) return t("auth.emailRequired");
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(value)) return "Введите корректный email";
+    if (!emailRegex.test(value)) return t("auth.emailInvalid");
     return "";
   }
 
@@ -156,7 +158,7 @@ export function ClientLoginPage() {
     setLoading(true);
     loginByGoogle(idToken)
       .then(() => navigate("/cabinet/dashboard", { replace: true }))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Ошибка Google"))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error")))
       .finally(() => setLoading(false));
   }, [loginByGoogle, navigate]);
 
@@ -180,7 +182,7 @@ export function ClientLoginPage() {
       url.searchParams.set("state", state);
       window.location.href = url.toString();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка Apple");
+      setError(err instanceof Error ? err.message : t("common.error"));
       setLoading(false);
     }
   }, [appleEnabled]);
@@ -196,7 +198,7 @@ export function ClientLoginPage() {
     setLoading(true);
     loginByApple(idToken)
       .then(() => navigate("/cabinet/dashboard", { replace: true }))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Ошибка Apple"))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error")))
       .finally(() => setLoading(false));
   }, [loginByApple, navigate]);
 
@@ -213,7 +215,7 @@ export function ClientLoginPage() {
       await login(email, password);
       navigate("/cabinet/dashboard", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка входа");
+      setError(err instanceof Error ? err.message : t("auth.loginError"));
     } finally {
       setLoading(false);
     }
@@ -246,8 +248,8 @@ export function ClientLoginPage() {
                 <LogIn className="h-10 w-10 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl">Вход</CardTitle>
-            <p className="text-muted-foreground text-sm">Вход в личный кабинет</p>
+            <CardTitle className="text-2xl">{t("auth.loginTitle")}</CardTitle>
+            <p className="text-muted-foreground text-sm">{t("auth.loginSubtitle")}</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -275,7 +277,7 @@ export function ClientLoginPage() {
                 {emailError && <p className="text-xs text-destructive">{emailError}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Пароль</Label>
+                <Label htmlFor="password">{t("auth.password")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -287,13 +289,13 @@ export function ClientLoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Вход…" : "Войти"}
+                {loading ? t("auth.loginLoading") : t("auth.login")}
               </Button>
               {(telegramBotUsername || googleEnabled || appleEnabled) && (
                 <div className="space-y-3">
                   <div className="relative flex items-center gap-2">
                     <div className="flex-1 border-t border-border" />
-                    <span className="text-xs text-muted-foreground px-2">или</span>
+                    <span className="text-xs text-muted-foreground px-2">{t("common.or")}</span>
                     <div className="flex-1 border-t border-border" />
                   </div>
                   {googleEnabled && googleClientId && (
@@ -302,7 +304,7 @@ export function ClientLoginPage() {
                         type="button"
                         onClick={handleGoogleLogin}
                         disabled={loading}
-                        title="Войти через Google"
+                        title={t("auth.loginViaGoogle")}
                         className={cn(
                           "h-11 w-11 shrink-0 rounded-full flex items-center justify-center",
                           "border border-border bg-muted/50 hover:bg-muted transition-colors",
@@ -322,7 +324,7 @@ export function ClientLoginPage() {
                       disabled={loading}
                     >
                       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                      Войти через Apple
+                      {t("auth.loginViaApple")}
                     </Button>
                   )}
                   {telegramBotUsername && (
@@ -331,9 +333,9 @@ export function ClientLoginPage() {
                 </div>
               )}
               <p className="text-center text-sm text-muted-foreground">
-                Нет аккаунта?{" "}
+                {t("auth.noAccount")}{" "}
                 <Link to="/cabinet/register" className="text-primary hover:underline">
-                  Зарегистрироваться
+                  {t("auth.register")}
                 </Link>
               </p>
             </form>

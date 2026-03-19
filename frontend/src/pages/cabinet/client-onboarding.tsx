@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 type Step = "welcome" | "password" | "2fa" | "done";
 
@@ -28,6 +29,7 @@ const slideVariants = {
 export function ClientOnboardingPage() {
   const { state, refreshProfile, clearNewTelegramUser } = useClientAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const token = state.token;
   const client = state.client;
 
@@ -84,11 +86,11 @@ export function ClientOnboardingPage() {
   async function handleSetPassword() {
     if (!token) return;
     if (newPassword.length < 6) {
-      setPasswordError("Минимум 6 символов");
+      setPasswordError(t("onboarding.minSixChars"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError("Пароли не совпадают");
+      setPasswordError(t("onboarding.passwordsMismatch"));
       return;
     }
     setPasswordError("");
@@ -97,7 +99,7 @@ export function ClientOnboardingPage() {
       await api.clientSetPassword(token, { newPassword });
       goTo("2fa");
     } catch (e) {
-      setPasswordError(e instanceof Error ? e.message : "Ошибка");
+      setPasswordError(e instanceof Error ? e.message : t("common.error"));
     } finally {
       setPasswordLoading(false);
     }
@@ -112,7 +114,7 @@ export function ClientOnboardingPage() {
       await refreshProfile();
       goTo("done");
     } catch (e) {
-      setTwoFaError(e instanceof Error ? e.message : "Неверный код");
+      setTwoFaError(e instanceof Error ? e.message : t("onboarding.invalidCode"));
     } finally {
       setTwoFaLoading(false);
     }
@@ -193,7 +195,7 @@ export function ClientOnboardingPage() {
                   transition={{ delay: 0.2 }}
                   className="text-3xl font-extrabold tracking-tight mb-2"
                 >
-                  Добро пожаловать!
+                  {t("onboarding.welcome")}
                 </motion.h1>
                 <motion.p
                   initial={{ opacity: 0, y: 10 }}
@@ -201,7 +203,7 @@ export function ClientOnboardingPage() {
                   transition={{ delay: 0.25 }}
                   className="text-muted-foreground mb-1"
                 >
-                  Аккаунт создан через Telegram
+                  {t("onboarding.createdViaTelegram")}
                 </motion.p>
                 {client?.telegramUsername && (
                   <motion.span
@@ -219,7 +221,7 @@ export function ClientOnboardingPage() {
                   transition={{ delay: 0.35 }}
                   className="text-sm text-muted-foreground mb-8 max-w-xs"
                 >
-                  Давайте настроим ваш аккаунт за пару шагов. Это займёт меньше минуты.
+                  {t("onboarding.setupDesc")}
                 </motion.p>
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -231,7 +233,7 @@ export function ClientOnboardingPage() {
                     className="w-full h-14 rounded-2xl text-base font-bold shadow-xl hover:scale-[1.02] transition-all gap-2"
                     onClick={() => goTo("password")}
                   >
-                    Начать
+                    {t("onboarding.start")}
                     <ChevronRight className="h-5 w-5" />
                   </Button>
                 </motion.div>
@@ -252,14 +254,14 @@ export function ClientOnboardingPage() {
                 <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary/10 border border-primary/20 mb-6">
                   <KeyRound className="h-10 w-10 text-primary" />
                 </div>
-                <h2 className="text-2xl font-extrabold tracking-tight mb-1 text-center">Создайте пароль</h2>
-                <p className="text-sm text-muted-foreground mb-6 text-center">Для входа через email и пароль</p>
+                <h2 className="text-2xl font-extrabold tracking-tight mb-1 text-center">{t("onboarding.createPassword")}</h2>
+                <p className="text-sm text-muted-foreground mb-6 text-center">{t("onboarding.createPasswordDesc")}</p>
 
                 <div className="w-full space-y-3 mb-4">
                   <div className="relative">
                     <Input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Новый пароль (мин. 6 символов)"
+                      placeholder={t("onboarding.newPasswordPlaceholder")}
                       value={newPassword}
                       onChange={e => { setNewPassword(e.target.value); setPasswordError(""); }}
                       className="h-12 rounded-xl pr-10"
@@ -275,7 +277,7 @@ export function ClientOnboardingPage() {
                   </div>
                   <Input
                     type="password"
-                    placeholder="Повторите пароль"
+                    placeholder={t("onboarding.confirmPasswordPlaceholder")}
                     value={confirmPassword}
                     onChange={e => { setConfirmPassword(e.target.value); setPasswordError(""); }}
                     className="h-12 rounded-xl"
@@ -296,14 +298,14 @@ export function ClientOnboardingPage() {
                   onClick={handleSetPassword}
                   disabled={passwordLoading || !newPassword || !confirmPassword}
                 >
-                  {passwordLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <>Далее <ChevronRight className="h-5 w-5" /></>}
+                  {passwordLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <>{t("onboarding.next")} <ChevronRight className="h-5 w-5" /></>}
                 </Button>
                 <button
                   type="button"
                   onClick={() => goTo("2fa")}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Пропустить этот шаг
+                  {t("onboarding.skipStep")}
                 </button>
               </motion.div>
             )}
@@ -322,8 +324,8 @@ export function ClientOnboardingPage() {
                 <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-orange-500/10 border border-orange-500/20 mb-6">
                   <Shield className="h-10 w-10 text-orange-500" />
                 </div>
-                <h2 className="text-2xl font-extrabold tracking-tight mb-1 text-center">Двухфакторная защита</h2>
-                <p className="text-sm text-muted-foreground mb-6 text-center max-w-xs">Дополнительная защита аккаунта — необязательно, но рекомендуем</p>
+                <h2 className="text-2xl font-extrabold tracking-tight mb-1 text-center">{t("onboarding.twoFaTitle")}</h2>
+                <p className="text-sm text-muted-foreground mb-6 text-center max-w-xs">{t("onboarding.twoFaDesc")}</p>
 
                 {twoFaSetupLoading ? (
                   <div className="flex items-center justify-center py-12">
@@ -337,7 +339,7 @@ export function ClientOnboardingPage() {
                       </div>
                     </div>
                     <div className="rounded-xl bg-muted/40 border border-border/50 p-3 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Или введите ключ вручную</p>
+                      <p className="text-xs text-muted-foreground mb-1">{t("onboarding.manualKeyHint")}</p>
                       <code className="text-sm font-mono text-primary select-all break-all">{twoFaData.secret}</code>
                     </div>
                     <Input
@@ -361,7 +363,7 @@ export function ClientOnboardingPage() {
                       onClick={handleConfirm2FA}
                       disabled={twoFaLoading || twoFaCode.length !== 6}
                     >
-                      {twoFaLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Подтвердить и завершить"}
+                      {twoFaLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : t("onboarding.confirmAndFinish")}
                     </Button>
                   </div>
                 ) : null}
@@ -371,7 +373,7 @@ export function ClientOnboardingPage() {
                   onClick={handleSkip2FA}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
                 >
-                  Пропустить, перейти в кабинет
+                  {t("onboarding.skipToCabinet")}
                 </button>
               </motion.div>
             )}
@@ -401,7 +403,7 @@ export function ClientOnboardingPage() {
                   transition={{ delay: 0.2 }}
                   className="text-3xl font-extrabold tracking-tight mb-2"
                 >
-                  Готово!
+                  {t("onboarding.allDone")}
                 </motion.h2>
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -409,7 +411,7 @@ export function ClientOnboardingPage() {
                   transition={{ delay: 0.3 }}
                   className="text-muted-foreground"
                 >
-                  Добро пожаловать в кабинет
+                  {t("onboarding.welcomeToCabinet")}
                 </motion.p>
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -418,7 +420,7 @@ export function ClientOnboardingPage() {
                   className="mt-6 flex items-center gap-2 text-sm text-muted-foreground"
                 >
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Переходим в кабинет…
+                  {t("onboarding.redirecting")}
                 </motion.div>
               </motion.div>
             )}

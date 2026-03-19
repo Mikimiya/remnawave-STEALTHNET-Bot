@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import { api, type ProxyNodeListItem, type CreateProxyNodeResponse, type ProxySlotAdminItem } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +39,7 @@ function formatBytes(s: string): string {
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString("ru-RU", {
+    return new Date(iso).toLocaleString(undefined, {
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
@@ -49,13 +50,17 @@ function formatDate(iso: string | null): string {
   }
 }
 
-function statusBadge(status: string) {
+function statusBadge(status: string, t: (key: string) => string) {
   const map: Record<string, string> = {
     ONLINE: "bg-green-500/15 text-green-700 dark:text-green-400",
     OFFLINE: "bg-muted text-muted-foreground",
     DISABLED: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
   };
-  const label = status === "ONLINE" ? "Онлайн" : status === "DISABLED" ? "Отключена" : "Офлайн";
+  const label = status === "ONLINE"
+    ? t("admin.proxy.statusOnline")
+    : status === "DISABLED"
+      ? t("admin.proxy.statusDisabled")
+      : t("admin.proxy.statusOffline");
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${map[status] ?? "bg-muted"}`}>
       {label}
@@ -88,15 +93,21 @@ type ProxyCategoryItem = {
 };
 
 function formatPrice(amount: number, currency: string) {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: currency.toUpperCase() === "RUB" ? "RUB" : "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+  const code = currency.toUpperCase();
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${amount} ${code}`;
+  }
 }
 
 export function ProxyPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const [nodes, setNodes] = useState<ProxyNodeListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,33 +183,33 @@ export function ProxyPage() {
   }
 
   async function handleDeleteCategory(id: string) {
-    if (!token || !confirm("Удалить категорию и все тарифы в ней?")) return;
+    if (!token || !confirm(t("admin.proxy.deleteCategoryConfirm"))) return;
     try {
       await api.deleteProxyCategory(token, id);
       await loadCategories();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка удаления");
+      alert(e instanceof Error ? e.message : t("admin.proxy.errorDelete"));
     }
   }
 
   async function handleDeleteTariff(id: string) {
-    if (!token || !confirm("Удалить тариф?")) return;
+    if (!token || !confirm(t("admin.proxy.deleteTariffConfirm"))) return;
     try {
       await api.deleteProxyTariff(token, id);
       await loadCategories();
       setTariffModal(null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка удаления");
+      alert(e instanceof Error ? e.message : t("admin.proxy.errorDelete"));
     }
   }
 
-  async function handleToggleTariffEnabled(t: ProxyTariffItem) {
+  async function handleToggleTariffEnabled(tariff: ProxyTariffItem) {
     if (!token) return;
     try {
-      await api.updateProxyTariff(token, t.id, { enabled: !t.enabled });
+      await api.updateProxyTariff(token, tariff.id, { enabled: !tariff.enabled });
       await loadCategories();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
+      alert(e instanceof Error ? e.message : t("admin.proxy.errorGeneric"));
     }
   }
 
@@ -229,24 +240,24 @@ export function ProxyPage() {
       await loadSlots();
       setEditSlot(null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
+      alert(e instanceof Error ? e.message : t("admin.proxy.errorGeneric"));
     } finally { setSaving(false); }
   }
 
   async function handleRevokeSlot(id: string) {
-    if (!token || !confirm("Отозвать доступ? Слот станет REVOKED.")) return;
+    if (!token || !confirm(t("admin.proxy.revokeConfirm"))) return;
     try {
       await api.updateProxySlotAdmin(token, id, { status: "REVOKED" });
       await loadSlots();
-    } catch (e) { alert(e instanceof Error ? e.message : "Ошибка"); }
+    } catch (e) { alert(e instanceof Error ? e.message : t("admin.proxy.errorGeneric")); }
   }
 
   async function handleDeleteSlot(id: string) {
-    if (!token || !confirm("Удалить слот? Это нельзя отменить.")) return;
+    if (!token || !confirm(t("admin.proxy.deleteSlotConfirm"))) return;
     try {
       await api.deleteProxySlotAdmin(token, id);
       await loadSlots();
-    } catch (e) { alert(e instanceof Error ? e.message : "Ошибка"); }
+    } catch (e) { alert(e instanceof Error ? e.message : t("admin.proxy.errorGeneric")); }
   }
 
   useEffect(() => {
@@ -340,23 +351,23 @@ cd /opt/proxy-node && docker compose up -d --build`
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Globe className="h-7 w-7 text-primary" />
-          Прокси
+          {t("admin.proxy.pageTitle")}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Ноды, категории и тарифы для продажи прокси.
+          {t("admin.proxy.pageSubtitle")}
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="nodes" className="gap-2">
-            <Server className="h-4 w-4" /> Ноды
+            <Server className="h-4 w-4" /> {t("admin.proxy.tabNodes")}
           </TabsTrigger>
           <TabsTrigger value="slots" className="gap-2">
-            <Users className="h-4 w-4" /> Слоты
+            <Users className="h-4 w-4" /> {t("admin.proxy.tabSlots")}
           </TabsTrigger>
           <TabsTrigger value="categories" className="gap-2">
-            <Layers className="h-4 w-4" /> Категории и тарифы
+            <Layers className="h-4 w-4" /> {t("admin.proxy.tabCategories")}
           </TabsTrigger>
         </TabsList>
 
@@ -366,26 +377,26 @@ cd /opt/proxy-node && docker compose up -d --build`
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
-              Нагрузка и трафик по нодам
+              {t("admin.proxy.chartTitle")}
             </CardTitle>
-            <CardDescription>Текущее состояние: трафик (↓+↑), подключения, слотов.</CardDescription>
+            <CardDescription>{t("admin.proxy.chartDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="h-64">
-                <p className="text-sm font-medium mb-2">Трафик (МБ)</p>
+                <p className="text-sm font-medium mb-2">{t("admin.proxy.chartTrafficMb")}</p>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={nodes.map((n) => ({ name: n.name || n.id.slice(0, 8), trafficMb: (Number(n.trafficInBytes) + Number(n.trafficOutBytes)) / (1024 * 1024), fill: n.status === "ONLINE" ? "#22c55e" : n.status === "DISABLED" ? "#f59e0b" : "#94a3b8" }))}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}`} />
-                    <Tooltip formatter={(v: number | undefined) => [`${(v ?? 0).toFixed(1)} МБ`, "Трафик"]} />
-                    <Bar dataKey="trafficMb" name="Трафик (МБ)" radius={[4, 4, 0, 0]} />
+                    <Tooltip formatter={(v: number | undefined) => [`${(v ?? 0).toFixed(1)} MB`, t("admin.proxy.tooltipTraffic")]} />
+                    <Bar dataKey="trafficMb" name={t("admin.proxy.chartTrafficMb")} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
               <div className="h-64">
-                <p className="text-sm font-medium mb-2">Подключения и слотов</p>
+                <p className="text-sm font-medium mb-2">{t("admin.proxy.chartConnectionsSlots")}</p>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={nodes.map((n) => ({ name: n.name || n.id.slice(0, 8), connections: n.currentConnections, slots: n.slotsCount }))}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -393,8 +404,8 @@ cd /opt/proxy-node && docker compose up -d --build`
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="connections" name="Подключения" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="slots" name="Слотов" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="connections" name={t("admin.proxy.legendConnections")} fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="slots" name={t("admin.proxy.legendSlots")} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -405,10 +416,10 @@ cd /opt/proxy-node && docker compose up -d --build`
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <CardTitle className="text-lg">Ноды</CardTitle>
+            <CardTitle className="text-lg">{t("admin.proxy.nodesTitle")}</CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => token && api.downloadProxySlotsCsv(token).catch((e) => alert(e instanceof Error ? e.message : "Ошибка"))}>
-                <Download className="h-4 w-4 mr-2" /> Экспорт слотов CSV
+              <Button variant="outline" size="sm" onClick={() => token && api.downloadProxySlotsCsv(token).catch((e) => alert(e instanceof Error ? e.message : t("admin.proxy.csvExportError")))}>
+                <Download className="h-4 w-4 mr-2" /> {t("admin.proxy.exportCsv")}
               </Button>
               <Button
                 onClick={() => {
@@ -418,32 +429,32 @@ cd /opt/proxy-node && docker compose up -d --build`
                 disabled={creating}
               >
                 {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                Добавить прокси
+                {t("admin.proxy.addProxy")}
               </Button>
             </div>
           </div>
-          <CardDescription>Список прокси-нод. Статус «Онлайн» — нода присылает heartbeat за последние 5 минут.</CardDescription>
+          <CardDescription>{t("admin.proxy.nodesDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground py-8 text-center">Загрузка…</p>
+            <p className="text-muted-foreground py-8 text-center">{t("admin.proxy.loading")}</p>
           ) : nodes.length === 0 ? (
             <p className="text-muted-foreground py-8 text-center">
-              Нет нод. Нажмите «Добавить прокси», скопируйте docker-compose на сервер и запустите контейнер.
+              {t("admin.proxy.noNodes")}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-2 font-medium">Название</th>
-                    <th className="text-left py-3 px-2 font-medium">Статус</th>
-                    <th className="text-left py-3 px-2 font-medium">Хост / порты</th>
-                    <th className="text-right py-3 px-2 font-medium">Слотов</th>
-                    <th className="text-right py-3 px-2 font-medium">Подключения</th>
-                    <th className="text-right py-3 px-2 font-medium">Трафик</th>
-                    <th className="text-left py-3 px-2 font-medium">Последний heartbeat</th>
-                    <th className="text-right py-3 px-2 font-medium w-24">Действия</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colName")}</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colStatus")}</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colHostPorts")}</th>
+                    <th className="text-right py-3 px-2 font-medium">{t("admin.proxy.colSlots")}</th>
+                    <th className="text-right py-3 px-2 font-medium">{t("admin.proxy.colConnections")}</th>
+                    <th className="text-right py-3 px-2 font-medium">{t("admin.proxy.colTraffic")}</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colLastHeartbeat")}</th>
+                    <th className="text-right py-3 px-2 font-medium w-24">{t("admin.proxy.colActions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -452,7 +463,7 @@ cd /opt/proxy-node && docker compose up -d --build`
                       <td className="py-3 px-2">
                         <span className="font-medium">{n.name || "—"}</span>
                       </td>
-                      <td className="py-3 px-2">{statusBadge(n.status)}</td>
+                      <td className="py-3 px-2">{statusBadge(n.status, t)}</td>
                       <td className="py-3 px-2 font-mono text-xs">
                         {n.publicHost ?? "—"} :{n.socksPort}/{n.httpPort}
                       </td>
@@ -464,10 +475,10 @@ cd /opt/proxy-node && docker compose up -d --build`
                       <td className="py-3 px-2 text-muted-foreground">{formatDate(n.lastSeenAt)}</td>
                       <td className="py-3 px-2 text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(n)} title="Редактировать">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(n)} title={t("admin.proxy.edit")}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setNodeToDelete(n)} title="Удалить" className="text-destructive hover:text-destructive">
+                          <Button variant="ghost" size="sm" onClick={() => setNodeToDelete(n)} title={t("admin.proxy.delete")} className="text-destructive hover:text-destructive">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -487,29 +498,29 @@ cd /opt/proxy-node && docker compose up -d --build`
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            Прокси-доступы пользователей
+            {t("admin.proxy.slotsTitle")}
           </CardTitle>
-          <CardDescription>Все выданные слоты. Можно менять логин/пароль, лимит подключений, отзывать или удалять.</CardDescription>
+          <CardDescription>{t("admin.proxy.slotsDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {slotsLoading ? (
-            <p className="text-muted-foreground py-8 text-center">Загрузка...</p>
+            <p className="text-muted-foreground py-8 text-center">{t("admin.proxy.loading")}</p>
           ) : slots.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center">Нет выданных слотов.</p>
+            <p className="text-muted-foreground py-8 text-center">{t("admin.proxy.noSlots")}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-2 font-medium">Клиент</th>
-                    <th className="text-left py-3 px-2 font-medium">Нода</th>
-                    <th className="text-left py-3 px-2 font-medium">Логин</th>
-                    <th className="text-left py-3 px-2 font-medium">Пароль</th>
-                    <th className="text-right py-3 px-2 font-medium">Лимит подкл.</th>
-                    <th className="text-right py-3 px-2 font-medium">Трафик</th>
-                    <th className="text-left py-3 px-2 font-medium">Статус</th>
-                    <th className="text-left py-3 px-2 font-medium">Истекает</th>
-                    <th className="text-right py-3 px-2 font-medium w-28">Действия</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colClient")}</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colNode")}</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colLogin")}</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colPassword")}</th>
+                    <th className="text-right py-3 px-2 font-medium">{t("admin.proxy.colConnectionLimit")}</th>
+                    <th className="text-right py-3 px-2 font-medium">{t("admin.proxy.colTraffic")}</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colStatus")}</th>
+                    <th className="text-left py-3 px-2 font-medium">{t("admin.proxy.colExpiresAt")}</th>
+                    <th className="text-right py-3 px-2 font-medium w-28">{t("admin.proxy.colActions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -525,21 +536,21 @@ cd /opt/proxy-node && docker compose up -d --build`
                       <td className="py-3 px-2 text-right text-muted-foreground text-xs">{formatBytes(s.trafficUsedBytes)}{s.trafficLimitBytes ? ` / ${formatBytes(s.trafficLimitBytes)}` : ""}</td>
                       <td className="py-3 px-2">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${s.status === "ACTIVE" ? "bg-green-500/15 text-green-700 dark:text-green-400" : s.status === "REVOKED" ? "bg-red-500/15 text-red-700 dark:text-red-400" : "bg-muted text-muted-foreground"}`}>
-                          {s.status === "ACTIVE" ? "Активен" : s.status === "REVOKED" ? "Отозван" : "Истёк"}
+                          {s.status === "ACTIVE" ? t("admin.proxy.slotActive") : s.status === "REVOKED" ? t("admin.proxy.slotRevoked") : t("admin.proxy.slotExpired")}
                         </span>
                       </td>
                       <td className="py-3 px-2 text-xs text-muted-foreground">{formatDate(s.expiresAt)}</td>
                       <td className="py-3 px-2 text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => openSlotEdit(s)} title="Редактировать">
+                          <Button variant="ghost" size="sm" onClick={() => openSlotEdit(s)} title={t("admin.proxy.edit")}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           {s.status === "ACTIVE" && (
-                            <Button variant="ghost" size="sm" onClick={() => handleRevokeSlot(s.id)} title="Отозвать" className="text-amber-600 hover:text-amber-600">
+                            <Button variant="ghost" size="sm" onClick={() => handleRevokeSlot(s.id)} title={t("admin.proxy.revoke")} className="text-amber-600 hover:text-amber-600">
                               <Ban className="h-3.5 w-3.5" />
                             </Button>
                           )}
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteSlot(s.id)} title="Удалить" className="text-destructive hover:text-destructive">
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteSlot(s.id)} title={t("admin.proxy.delete")} className="text-destructive hover:text-destructive">
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -558,20 +569,20 @@ cd /opt/proxy-node && docker compose up -d --build`
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <p className="text-muted-foreground text-sm">
-            Категории группируют тарифы (например «Прокси РФ», «Прокси EU»). В каждой категории — свои тарифы.
+            {t("admin.proxy.categoriesHint")}
           </p>
           <Button onClick={() => setCategoryModal("add")} size="sm">
-            <Plus className="h-4 w-4 mr-2" /> Добавить категорию
+            <Plus className="h-4 w-4 mr-2" /> {t("admin.proxy.addCategory")}
           </Button>
         </div>
         {categoriesLoading ? (
-          <p className="text-muted-foreground py-8 text-center">Загрузка…</p>
+          <p className="text-muted-foreground py-8 text-center">{t("admin.proxy.loading")}</p>
         ) : categories.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground mb-4">Нет категорий. Создайте категорию, затем добавьте в неё тарифы (кол-во прокси, срок, цена).</p>
+              <p className="text-muted-foreground mb-4">{t("admin.proxy.noCategories")}</p>
               <Button onClick={() => setCategoryModal("add")}>
-                <Plus className="h-4 w-4 mr-2" /> Создать категорию
+                <Plus className="h-4 w-4 mr-2" /> {t("admin.proxy.createCategory")}
               </Button>
             </CardContent>
           </Card>
@@ -587,13 +598,13 @@ cd /opt/proxy-node && docker compose up -d --build`
                     </CardTitle>
                     <div className="flex gap-2 flex-wrap">
                       <Button variant="outline" size="sm" onClick={() => setCategoryModal({ edit: cat })}>
-                        <Pencil className="h-3.5 w-3.5 mr-1" /> Изменить
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> {t("admin.proxy.editCategory")}
                       </Button>
                       <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteCategory(cat.id)}>
-                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Удалить
+                        <Trash2 className="h-3.5 w-3.5 mr-1" /> {t("admin.proxy.delete")}
                       </Button>
                       <Button size="sm" onClick={() => setTariffModal({ kind: "add", categoryId: cat.id })}>
-                        <Plus className="h-3.5 w-3.5 mr-1" /> Тариф
+                        <Plus className="h-3.5 w-3.5 mr-1" /> {t("admin.proxy.addTariff")}
                       </Button>
                     </div>
                   </div>
@@ -601,29 +612,29 @@ cd /opt/proxy-node && docker compose up -d --build`
                 <CardContent className="pt-3">
                   {cat.tariffs.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-4">
-                      Нет тарифов в этой категории. Нажмите «Тариф», чтобы добавить.
+                      {t("admin.proxy.noTariffsInCategory")}
                     </p>
                   ) : (
                     <ul className="space-y-2">
-                      {cat.tariffs.map((t) => (
-                        <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-muted/30">
+                      {cat.tariffs.map((tariff) => (
+                        <li key={tariff.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-muted/30">
                           <div className="flex items-center gap-3 flex-wrap min-w-0">
-                            <span className="font-medium truncate">{t.name}</span>
-                            <span className="text-sm text-muted-foreground">{t.proxyCount} прокси</span>
-                            <span className="text-sm text-muted-foreground">{t.durationDays} дн.</span>
-                            <span className="text-sm font-semibold text-primary">{formatPrice(t.price, t.currency)}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${t.enabled ? "bg-green-500/15 text-green-700 dark:text-green-400" : "bg-muted text-muted-foreground"}`}>
-                              {t.enabled ? "Вкл" : "Выкл"}
+                            <span className="font-medium truncate">{tariff.name}</span>
+                            <span className="text-sm text-muted-foreground">{tariff.proxyCount} {t("admin.proxy.proxyCount")}</span>
+                            <span className="text-sm text-muted-foreground">{tariff.durationDays} {t("admin.proxy.daysShort")}</span>
+                            <span className="text-sm font-semibold text-primary">{formatPrice(tariff.price, tariff.currency)}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${tariff.enabled ? "bg-green-500/15 text-green-700 dark:text-green-400" : "bg-muted text-muted-foreground"}`}>
+                              {tariff.enabled ? t("admin.proxy.enabledShort") : t("admin.proxy.disabledShort")}
                             </span>
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            <Button variant="ghost" size="sm" className="h-7" onClick={() => handleToggleTariffEnabled(t)} title={t.enabled ? "Выключить" : "Включить"}>
-                              {t.enabled ? "Выкл" : "Вкл"}
+                            <Button variant="ghost" size="sm" className="h-7" onClick={() => handleToggleTariffEnabled(tariff)} title={tariff.enabled ? t("admin.proxy.disable") : t("admin.proxy.enable")}>
+                              {tariff.enabled ? t("admin.proxy.disabledShort") : t("admin.proxy.enabledShort")}
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7" onClick={() => setTariffModal({ kind: "edit", category: cat, tariff: t })}>
+                            <Button variant="ghost" size="sm" className="h-7" onClick={() => setTariffModal({ kind: "edit", category: cat, tariff })}>
                               <Pencil className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive" onClick={() => handleDeleteTariff(t.id)}>
+                            <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive" onClick={() => handleDeleteTariff(tariff.id)}>
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
@@ -646,21 +657,21 @@ cd /opt/proxy-node && docker compose up -d --build`
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Server className="h-5 w-5" />
-              Добавить прокси-ноду
+              {t("admin.proxy.addNodeTitle")}
             </DialogTitle>
             <DialogDescription>
               {addResult
-                ? "Скопируйте docker-compose ниже на сервер. Замените URL панели, если нужно. Затем выполните: docker compose up -d"
-                : "Нажмите кнопку — будет создана запись и сгенерирован токен. Вы получите готовый docker-compose для запуска на своём сервере."}
+                ? t("admin.proxy.addNodeDescReady")
+                : t("admin.proxy.addNodeDescInit")}
             </DialogDescription>
           </DialogHeader>
           {!addResult ? (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="proxy-node-name">Название ноды</Label>
+                <Label htmlFor="proxy-node-name">{t("admin.proxy.nodeName")}</Label>
                 <Input
                   id="proxy-node-name"
-                  placeholder="Например: Нода 1 или proxy-eu"
+                  placeholder={t("admin.proxy.nodeNamePlaceholder")}
                   value={newNodeName}
                   onChange={(e) => setNewNodeName(e.target.value)}
                   className="mt-1"
@@ -668,20 +679,20 @@ cd /opt/proxy-node && docker compose up -d --build`
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={closeAddDialog}>
-                  Отмена
+                  {t("admin.proxy.cancel")}
                 </Button>
                 <Button onClick={handleAddNode} disabled={creating || !newNodeName.trim()}>
                   {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Сгенерировать токен и docker-compose
+                  {t("admin.proxy.generateCompose")}
                 </Button>
               </DialogFooter>
             </div>
           ) : (
             <div className="space-y-4">
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Команда для установки на сервере</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">{t("admin.proxy.installCommandTitle")}</p>
                 <p className="text-sm text-muted-foreground mb-2">
-                  Выполните на сервере (создаёт папку /opt/proxy-node, записывает в неё docker-compose и запускает контейнер):
+                  {t("admin.proxy.installCommandDesc")}
                 </p>
                 <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto whitespace-pre-wrap font-mono max-h-48">
                   {installScript}
@@ -693,11 +704,11 @@ cd /opt/proxy-node && docker compose up -d --build`
                   onClick={() => copyToClipboard(installScript, "script")}
                 >
                   {copied === "script" ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
-                  Копировать команду
+                  {t("admin.proxy.copyCommand")}
                 </Button>
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Токен ноды (уже подставлен в compose)</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">{t("admin.proxy.nodeTokenTitle")}</p>
                 <div className="flex gap-2">
                   <code className="flex-1 rounded-lg bg-muted px-3 py-2 text-xs break-all">{addResult.node.token}</code>
                   <Button
@@ -710,7 +721,7 @@ cd /opt/proxy-node && docker compose up -d --build`
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Docker Compose (для ручного копирования)</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">{t("admin.proxy.composeTitle")}</p>
                 <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto whitespace-pre-wrap font-mono max-h-40">
                   {composeWithUrl}
                 </pre>
@@ -721,11 +732,11 @@ cd /opt/proxy-node && docker compose up -d --build`
                   onClick={() => copyToClipboard(composeWithUrl, "compose")}
                 >
                   {copied === "compose" ? <Check className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
-                  Копировать docker-compose
+                  {t("admin.proxy.copyCompose")}
                 </Button>
               </div>
               <DialogFooter>
-                <Button onClick={closeAddDialog}>Готово</Button>
+                <Button onClick={closeAddDialog}>{t("admin.proxy.done")}</Button>
               </DialogFooter>
             </div>
           )}
@@ -735,13 +746,13 @@ cd /opt/proxy-node && docker compose up -d --build`
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Редактировать ноду</DialogTitle>
-            <DialogDescription>Измените название, статус или лимит слотов.</DialogDescription>
+            <DialogTitle>{t("admin.proxy.editNodeTitle")}</DialogTitle>
+            <DialogDescription>{t("admin.proxy.editNodeDesc")}</DialogDescription>
           </DialogHeader>
           {editingNode && (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="edit-name">Название</Label>
+                <Label htmlFor="edit-name">{t("admin.proxy.colName")}</Label>
                 <Input
                   id="edit-name"
                   value={editName}
@@ -750,47 +761,47 @@ cd /opt/proxy-node && docker compose up -d --build`
                 />
               </div>
               <div>
-                <Label htmlFor="edit-status">Статус</Label>
+                <Label htmlFor="edit-status">{t("admin.proxy.colStatus")}</Label>
                 <select
                   id="edit-status"
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value)}
                   className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 >
-                  <option value="ONLINE">Онлайн</option>
-                  <option value="OFFLINE">Офлайн</option>
-                  <option value="DISABLED">Отключена</option>
+                  <option value="ONLINE">{t("admin.proxy.statusOnline")}</option>
+                  <option value="OFFLINE">{t("admin.proxy.statusOffline")}</option>
+                  <option value="DISABLED">{t("admin.proxy.statusDisabled")}</option>
                 </select>
               </div>
               <div>
-                <Label htmlFor="edit-capacity">Макс. слотов (пусто — без лимита)</Label>
+                <Label htmlFor="edit-capacity">{t("admin.proxy.maxSlots")}</Label>
                 <Input
                   id="edit-capacity"
                   type="number"
                   min={0}
                   value={editCapacity}
                   onChange={(e) => setEditCapacity(e.target.value)}
-                  placeholder="Не ограничено"
+                  placeholder={t("admin.proxy.unlimitedPlaceholder")}
                   className="mt-1"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-socks-port">Порт SOCKS5</Label>
+                  <Label htmlFor="edit-socks-port">{t("admin.proxy.socksPort")}</Label>
                   <Input id="edit-socks-port" type="number" min={1} max={65535} value={editSocksPort} onChange={(e) => setEditSocksPort(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label htmlFor="edit-http-port">Порт HTTP</Label>
+                  <Label htmlFor="edit-http-port">{t("admin.proxy.httpPort")}</Label>
                   <Input id="edit-http-port" type="number" min={1} max={65535} value={editHttpPort} onChange={(e) => setEditHttpPort(e.target.value)} className="mt-1" />
                 </div>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>{t("admin.proxy.cancel")}</Button>
             <Button onClick={handleSaveEdit} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Сохранить
+              {t("admin.proxy.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -799,16 +810,16 @@ cd /opt/proxy-node && docker compose up -d --build`
       <Dialog open={!!nodeToDelete} onOpenChange={(open) => !open && setNodeToDelete(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Удалить ноду?</DialogTitle>
+            <DialogTitle>{t("admin.proxy.deleteNodeTitle")}</DialogTitle>
             <DialogDescription>
-              Нода «{nodeToDelete?.name || "—"}» и все её слоты будут удалены. Это действие нельзя отменить.
+              {t("admin.proxy.deleteNodeDescPrefix")} «{nodeToDelete?.name || "—"}» {t("admin.proxy.deleteNodeDescSuffix")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNodeToDelete(null)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setNodeToDelete(null)}>{t("admin.proxy.cancel")}</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Удалить
+              {t("admin.proxy.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -828,40 +839,40 @@ cd /opt/proxy-node && docker compose up -d --build`
       <Dialog open={!!editSlot} onOpenChange={(open) => !open && setEditSlot(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" /> Редактировать слот</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" /> {t("admin.proxy.editSlotTitle")}</DialogTitle>
             <DialogDescription>
-              Клиент: {editSlot?.clientEmail || editSlot?.clientTelegram || "—"} / Нода: {editSlot?.nodeName || "—"}
+              {t("admin.proxy.editSlotClient")}: {editSlot?.clientEmail || editSlot?.clientTelegram || "—"} / {t("admin.proxy.editSlotNode")}: {editSlot?.nodeName || "—"}
             </DialogDescription>
           </DialogHeader>
           {editSlot && (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="slot-login">Логин</Label>
+                <Label htmlFor="slot-login">{t("admin.proxy.colLogin")}</Label>
                 <Input id="slot-login" value={slotForm.login} onChange={(e) => setSlotForm((f) => ({ ...f, login: e.target.value }))} className="mt-1 font-mono" />
               </div>
               <div>
-                <Label htmlFor="slot-password">Пароль</Label>
+                <Label htmlFor="slot-password">{t("admin.proxy.colPassword")}</Label>
                 <Input id="slot-password" value={slotForm.password} onChange={(e) => setSlotForm((f) => ({ ...f, password: e.target.value }))} className="mt-1 font-mono" />
               </div>
               <div>
-                <Label htmlFor="slot-connlimit">Лимит подключений (пусто — без лимита)</Label>
-                <Input id="slot-connlimit" type="number" min={0} value={slotForm.connectionLimit} onChange={(e) => setSlotForm((f) => ({ ...f, connectionLimit: e.target.value }))} placeholder="Без лимита" className="mt-1" />
+                <Label htmlFor="slot-connlimit">{t("admin.proxy.connLimitHint")}</Label>
+                <Input id="slot-connlimit" type="number" min={0} value={slotForm.connectionLimit} onChange={(e) => setSlotForm((f) => ({ ...f, connectionLimit: e.target.value }))} placeholder={t("admin.proxy.noLimitPlaceholder")} className="mt-1" />
               </div>
               <div>
-                <Label htmlFor="slot-status">Статус</Label>
+                <Label htmlFor="slot-status">{t("admin.proxy.colStatus")}</Label>
                 <select id="slot-status" value={slotForm.status} onChange={(e) => setSlotForm((f) => ({ ...f, status: e.target.value }))} className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
-                  <option value="ACTIVE">Активен</option>
-                  <option value="REVOKED">Отозван</option>
-                  <option value="EXPIRED">Истёк</option>
+                  <option value="ACTIVE">{t("admin.proxy.slotActive")}</option>
+                  <option value="REVOKED">{t("admin.proxy.slotRevoked")}</option>
+                  <option value="EXPIRED">{t("admin.proxy.slotExpired")}</option>
                 </select>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditSlot(null)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setEditSlot(null)}>{t("admin.proxy.cancel")}</Button>
             <Button onClick={handleSaveSlot} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Сохранить
+              {t("admin.proxy.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -898,6 +909,7 @@ function ProxyCategoryModal({
   saving: boolean;
   setSaving: (v: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const isEdit = modal !== "add";
   const editCat = isEdit ? modal.edit : null;
   const [name, setName] = useState(editCat?.name ?? "");
@@ -918,7 +930,7 @@ function ProxyCategoryModal({
       }
       onSaved();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
+      alert(e instanceof Error ? e.message : t("admin.proxy.errorGeneric"));
     } finally {
       setSaving(false);
     }
@@ -928,28 +940,28 @@ function ProxyCategoryModal({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Редактировать категорию" : "Новая категория"}</DialogTitle>
-          <DialogDescription>Например: Прокси РФ, Прокси EU.</DialogDescription>
+          <DialogTitle>{isEdit ? t("admin.proxy.categoryModalEdit") : t("admin.proxy.categoryModalNew")}</DialogTitle>
+          <DialogDescription>{t("admin.proxy.categoryModalDesc")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit}>
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="proxy-cat-name">Название</Label>
+              <Label htmlFor="proxy-cat-name">{t("admin.proxy.colName")}</Label>
               <Input
                 id="proxy-cat-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Прокси РФ"
+                placeholder={t("admin.proxy.categoryPlaceholder")}
                 className="mt-1"
                 required
               />
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Отмена</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t("admin.proxy.cancel")}</Button>
             <Button type="submit" disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isEdit ? "Сохранить" : "Создать"}
+              {isEdit ? t("admin.proxy.save") : t("admin.proxy.create")}
             </Button>
           </DialogFooter>
         </form>
@@ -958,7 +970,7 @@ function ProxyCategoryModal({
   );
 }
 
-const CURRENCIES = [{ value: "RUB", label: "RUB" }, { value: "USD", label: "USD" }];
+const CURRENCIES = [{ value: "RUB", label: "RUB" }, { value: "USD", label: "USD" }, { value: "CNY", label: "CNY" }];
 
 function ProxyTariffModal({
   token,
@@ -979,6 +991,7 @@ function ProxyTariffModal({
   saving: boolean;
   setSaving: (v: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const isEdit = modal.kind === "edit";
   const tariff = isEdit ? modal.tariff : null;
   const categoryId = isEdit ? modal.category.id : modal.categoryId;
@@ -1022,7 +1035,7 @@ function ProxyTariffModal({
     if (!token || !name.trim()) return;
     const priceNum = parseFloat(price);
     if (isNaN(priceNum) || priceNum < 0) {
-      alert("Введите корректную цену");
+      alert(t("admin.proxy.invalidPrice"));
       return;
     }
     setSaving(true);
@@ -1051,7 +1064,7 @@ function ProxyTariffModal({
       }
       onSaved();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
+      alert(e instanceof Error ? e.message : t("admin.proxy.errorGeneric"));
     } finally {
       setSaving(false);
     }
@@ -1063,27 +1076,27 @@ function ProxyTariffModal({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Редактировать тариф" : "Новый тариф"}</DialogTitle>
+          <DialogTitle>{isEdit ? t("admin.proxy.tariffModalEdit") : t("admin.proxy.tariffModalNew")}</DialogTitle>
           <DialogDescription>
-            {cat ? `Категория: ${cat.name}` : "Тариф добавляется в выбранную категорию."}
+            {cat ? `${t("admin.proxy.categoryPrefix")} ${cat.name}` : t("admin.proxy.tariffModalDescFallback")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit}>
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="proxy-t-name">Название</Label>
+              <Label htmlFor="proxy-t-name">{t("admin.proxy.colName")}</Label>
               <Input
                 id="proxy-t-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="1 прокси 30 дней"
+                placeholder={t("admin.proxy.tariffNamePlaceholder")}
                 className="mt-1"
                 required
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="proxy-t-count">Кол-во прокси</Label>
+                <Label htmlFor="proxy-t-count">{t("admin.proxy.proxyCountLabel")}</Label>
                 <Input
                   id="proxy-t-count"
                   type="number"
@@ -1094,7 +1107,7 @@ function ProxyTariffModal({
                 />
               </div>
               <div>
-                <Label htmlFor="proxy-t-days">Срок (дней)</Label>
+                <Label htmlFor="proxy-t-days">{t("admin.proxy.durationLabel")}</Label>
                 <Input
                   id="proxy-t-days"
                   type="number"
@@ -1107,7 +1120,7 @@ function ProxyTariffModal({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="proxy-t-price">Цена</Label>
+                <Label htmlFor="proxy-t-price">{t("admin.proxy.price")}</Label>
                 <Input
                   id="proxy-t-price"
                   type="number"
@@ -1119,7 +1132,7 @@ function ProxyTariffModal({
                 />
               </div>
               <div>
-                <Label htmlFor="proxy-t-currency">Валюта</Label>
+                <Label htmlFor="proxy-t-currency">{t("admin.proxy.currency")}</Label>
                 <select
                   id="proxy-t-currency"
                   value={currency}
@@ -1134,12 +1147,12 @@ function ProxyTariffModal({
             </div>
             <div className="flex items-center gap-2">
               <Checkbox id="proxy-t-enabled" checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />
-              <Label htmlFor="proxy-t-enabled" className="cursor-pointer">Включён (отображается в боте и кабинете)</Label>
+              <Label htmlFor="proxy-t-enabled" className="cursor-pointer">{t("admin.proxy.enabledVisible")}</Label>
             </div>
             <div>
-              <Label className="mb-2 block">Ноды (только выбранные будут использоваться для этого тарифа; если пусто — все ноды)</Label>
+              <Label className="mb-2 block">{t("admin.proxy.nodesSelectionHint")}</Label>
               {nodes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Нет нод. Добавьте ноды во вкладке «Ноды».</p>
+                <p className="text-sm text-muted-foreground">{t("admin.proxy.noNodesForTariff")}</p>
               ) : (
                 <div className="max-h-40 overflow-y-auto rounded-lg border p-2 space-y-1">
                   {nodes.map((n) => (
@@ -1157,10 +1170,10 @@ function ProxyTariffModal({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Отмена</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t("admin.proxy.cancel")}</Button>
             <Button type="submit" disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isEdit ? "Сохранить" : "Создать"}
+              {isEdit ? t("admin.proxy.save") : t("admin.proxy.create")}
             </Button>
           </DialogFooter>
         </form>

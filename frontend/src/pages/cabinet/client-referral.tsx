@@ -6,6 +6,7 @@ import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { api } from "@/lib/api";
 import type { ClientReferralStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 function formatMoney(amount: number, currency: string = "usd") {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
@@ -26,6 +27,7 @@ export function ClientReferralPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState<"site" | "bot" | null>(null);
+  const { t } = useTranslation();
 
   const siteOrigin = config?.publicAppUrl?.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
   const referralLinkSite =
@@ -45,7 +47,7 @@ export function ClientReferralPage() {
     api
       .getClientReferralStats(token)
       .then(setStats)
-      .catch((e) => setError(e instanceof Error ? e.message : "Ошибка загрузки"))
+      .catch((e) => setError(e instanceof Error ? e.message : t("common.error")))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -62,7 +64,7 @@ export function ClientReferralPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[200px] gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Загрузка…</p>
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       </div>
     );
   }
@@ -85,9 +87,9 @@ export function ClientReferralPage() {
         transition={{ duration: 0.3 }}
         className="min-w-0"
       >
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">Рефералы</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">{t("referral.title")}</h1>
         <p className="text-muted-foreground text-sm mt-1 truncate">
-          Приглашайте друзей — получайте процент от их пополнений
+          {t("referral.subtitle")}
         </p>
       </motion.div>
 
@@ -104,8 +106,8 @@ export function ClientReferralPage() {
               <Percent className="w-5 h-5" />
             </div>
             <p className="text-3xl font-bold tracking-tight mb-1"><span className="text-foreground">{s.referralPercent}</span><span className="text-muted-foreground/50 ml-1 text-2xl">%</span></p>
-            <p className="text-sm text-muted-foreground font-medium">Процент</p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 opacity-70">от пополнений (1 уровень)</p>
+            <p className="text-sm text-muted-foreground font-medium">{t("referral.commissionRate")}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 opacity-70">{t("referral.level1Desc")}</p>
           </div>
         </motion.div>
 
@@ -121,8 +123,8 @@ export function ClientReferralPage() {
               <Users className="w-5 h-5" />
             </div>
             <p className="text-3xl font-bold tracking-tight mb-1 text-foreground">{s.referralCount}</p>
-            <p className="text-sm text-muted-foreground font-medium">Приглашено</p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 opacity-70">активных рефералов</p>
+            <p className="text-sm text-muted-foreground font-medium">{t("referral.invited")}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 opacity-70">{t("referral.activeReferrals")}</p>
           </div>
         </motion.div>
 
@@ -138,8 +140,8 @@ export function ClientReferralPage() {
               <Wallet className="w-5 h-5" />
             </div>
             <p className="text-3xl font-bold tracking-tight mb-1 truncate text-foreground">{formatMoney(s.totalEarnings, currency)}</p>
-            <p className="text-sm text-muted-foreground font-medium">Заработок</p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 opacity-70">зачислено на баланс</p>
+            <p className="text-sm text-muted-foreground font-medium">{t("referral.earnings")}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 opacity-70">{t("referral.credited")}</p>
           </div>
         </motion.div>
       </div>
@@ -162,8 +164,8 @@ export function ClientReferralPage() {
                   <Link2 className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-lg font-bold tracking-tight text-foreground truncate">Ваши ссылки</h3>
-                  <p className="text-xs text-muted-foreground mt-[1px] truncate">Копируйте и делитесь с друзьями</p>
+                  <h3 className="text-lg font-bold tracking-tight text-foreground truncate">{t("referral.yourLinks")}</h3>
+                  <p className="text-xs text-muted-foreground mt-[1px] truncate">{t("referral.shareLinks")}</p>
                 </div>
               </div>
 
@@ -174,7 +176,7 @@ export function ClientReferralPage() {
                       <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 shrink-0 text-muted-foreground">
                         <Globe className="w-4 h-4" />
                       </div>
-                      <div className="shrink-0 w-12 text-xs font-bold uppercase tracking-widest text-muted-foreground">Сайт</div>
+                      <div className="shrink-0 w-12 text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("common.site")}</div>
                     </div>
                     <code className="flex-1 min-w-0 truncate text-xs font-mono text-primary/80 select-all bg-background/50 px-3 py-2 rounded-xl border border-border/50">{referralLinkSite}</code>
                     <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl sm:ml-auto self-end sm:self-auto" onClick={() => copyLink("site")}>
@@ -188,7 +190,7 @@ export function ClientReferralPage() {
                       <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#0088cc]/10 text-[#0088cc] shrink-0">
                         <Send className="w-4 h-4 ml-[-2px] mt-[1px]" />
                       </div>
-                      <div className="shrink-0 w-12 text-xs font-bold uppercase tracking-widest text-muted-foreground">Бот</div>
+                      <div className="shrink-0 w-12 text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("common.bot")}</div>
                     </div>
                     <code className="flex-1 min-w-0 truncate text-xs font-mono text-primary/80 select-all bg-background/50 px-3 py-2 rounded-xl border border-border/50">{referralLinkBot}</code>
                     <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl sm:ml-auto self-end sm:self-auto" onClick={() => copyLink("bot")}>
@@ -202,7 +204,7 @@ export function ClientReferralPage() {
         ) : (
           <div className="p-6 rounded-[2rem] border border-dashed border-border/50 flex flex-col items-center justify-center text-center gap-3 bg-muted/20">
             <Link2 className="w-8 h-8 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">Реферальные ссылки пока недоступны.</p>
+            <p className="text-sm text-muted-foreground">{t("referral.noLinksYet")}</p>
           </div>
         )}
 
@@ -217,24 +219,24 @@ export function ClientReferralPage() {
               <Info className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-lg font-bold tracking-tight text-foreground truncate">Как это работает</h3>
-              <p className="text-xs text-muted-foreground mt-[1px] truncate">Правила начисления бонусов</p>
+              <h3 className="text-lg font-bold tracking-tight text-foreground truncate">{t("referral.howItWorks")}</h3>
+              <p className="text-xs text-muted-foreground mt-[1px] truncate">{t("referral.bonusRules")}</p>
             </div>
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-background/60 border border-border/50 shadow-sm">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0 font-bold">1</div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground mb-0.5">Уровень 1 <span className="text-primary font-bold ml-1">({s.referralPercent}%)</span></p>
-                <p className="text-xs text-muted-foreground leading-relaxed">Процент от пополнений тех, кто напрямую перешёл по вашей ссылке.</p>
+                <p className="text-sm font-medium text-foreground mb-0.5">{t("referral.level1Title")} <span className="text-primary font-bold ml-1">({s.referralPercent}%)</span></p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{t("referral.level1Explanation")}</p>
               </div>
             </div>
             {(s.referralPercentLevel2 ?? 0) > 0 && (
               <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-background/60 border border-border/50 shadow-sm">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0 font-bold">2</div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground mb-0.5">Уровень 2 <span className="text-primary font-bold ml-1">({s.referralPercentLevel2}%)</span></p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">Процент от пополнений рефералов ваших рефералов.</p>
+                  <p className="text-sm font-medium text-foreground mb-0.5">{t("referral.level2Title")} <span className="text-primary font-bold ml-1">({s.referralPercentLevel2}%)</span></p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{t("referral.level2Explanation")}</p>
                 </div>
               </div>
             )}
@@ -242,8 +244,8 @@ export function ClientReferralPage() {
               <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl bg-background/60 border border-border/50 shadow-sm">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0 font-bold">3</div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground mb-0.5">Уровень 3 <span className="text-primary font-bold ml-1">({s.referralPercentLevel3}%)</span></p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">Процент от пополнений рефералов второго уровня.</p>
+                  <p className="text-sm font-medium text-foreground mb-0.5">{t("referral.level3Title")} <span className="text-primary font-bold ml-1">({s.referralPercentLevel3}%)</span></p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{t("referral.level3Explanation")}</p>
                 </div>
               </div>
             )}
@@ -252,8 +254,8 @@ export function ClientReferralPage() {
                 <Wallet className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground mb-0.5">Начисление на баланс</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">Все средства автоматически зачисляются на ваш баланс и могут быть использованы для оплаты тарифов.</p>
+                <p className="text-sm font-medium text-foreground mb-0.5">{t("referral.creditedToBalance")}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{t("referral.creditedDesc")}</p>
               </div>
             </div>
           </div>

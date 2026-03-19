@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { api, type PublicConfig, type PublicTariffCategory } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,71 +38,71 @@ type LandingFeatureItem = {
 const FEATURES_STRIP: LandingFeatureItem[] = [
   {
     icon: Shield,
-    label: "Защита",
-    sub: "AES-256 шифрование",
-    desc: "Современные протоколы и аккуратная защита трафика без ощущения технарского конструктора.",
-    chips: ["Шифрование", "Стабильность"],
+    label: "",
+    sub: "",
+    desc: "",
+    chips: ["", ""],
   },
   {
     icon: Lock,
     label: "Zero-Log",
-    sub: "История не сохраняется",
-    desc: "Доступ строится вокруг приватности: без лишних следов, без визуального мусора и без тревоги за данные.",
-    chips: ["Zero-Log", "Приватность"],
+    sub: "",
+    desc: "",
+    chips: ["Zero-Log", ""],
   },
   {
     icon: Star,
-    label: "Оплата",
-    sub: "Анонимно и безопасно",
-    desc: "Карта, СБП, кошелёк и крипта собираются в один понятный сценарий оплаты без сюрпризов.",
-    chips: ["Карта / СБП", "Крипта"],
+    label: "",
+    sub: "",
+    desc: "",
+    chips: ["", ""],
   },
   {
     icon: Zap,
-    label: "Серверы",
-    sub: "Собственная инфраструктура",
-    desc: "Свои мощности и продуманная маршрутизация дают нормальную скорость и предсказуемую работу сервиса.",
-    chips: ["Скорость", "Своя сеть"],
+    label: "",
+    sub: "",
+    desc: "",
+    chips: ["", ""],
   },
   {
     icon: Smartphone,
-    label: "Установка",
-    sub: "За 30 секунд",
-    desc: "Минимум кликов до подключения: зарегистрировался, оплатил и сразу получил инструкции внутри кабинета.",
-    chips: ["Быстрый старт", "Все устройства"],
+    label: "",
+    sub: "",
+    desc: "",
+    chips: ["", ""],
   },
 ];
 
 const BENEFITS = [
   {
     icon: Zap,
-    title: "Всегда онлайн",
-    desc: "Работает стабильно даже в перегруженных сетях. Быстрый доступ с мобильного и десктопа без возни с настройками.",
+    title: "",
+    desc: "",
   },
   {
     icon: Globe,
-    title: "РФ-сервисы за границей",
-    desc: "Смотри, звони, работай и плати без лишних плясок — маршруты уже продуманы под реальные сценарии.",
+    title: "",
+    desc: "",
   },
   {
     icon: Shield,
-    title: "Без посредников",
-    desc: "Своя инфраструктура, аккуратная маршрутизация и понятный личный кабинет вместо хаоса из сторонних сервисов.",
+    title: "",
+    desc: "",
   },
   {
     icon: Lock,
-    title: "Чистая приватность",
-    desc: "Шифрование, маскировка и аккуратная архитектура без ощущения, что ты подключаешь что-то сомнительное.",
+    title: "",
+    desc: "",
   },
   {
     icon: LayoutDashboard,
-    title: "Управление в одном месте",
-    desc: "Telegram-бот, кабинет, тарифы, продление, инструкции и поддержка — всё собрано в единую систему.",
+    title: "",
+    desc: "",
   },
   {
     icon: Sparkles,
-    title: "Красиво и понятно",
-    desc: "Нормальный продуктовый опыт: от первого экрана до покупки всё выглядит премиально и читается без боли.",
+    title: "",
+    desc: "",
   },
 ];
 
@@ -115,38 +116,38 @@ const DEVICES = [
 
 const FAQ_ITEMS = [
   {
-    q: "Что такое VPN и зачем он нужен?",
-    a: "VPN шифрует трафик, помогает обходить блокировки и даёт стабильный доступ к нужным сервисам дома, в поездках и за рубежом.",
+    q: "",
+    a: "",
   },
   {
-    q: "Ведётся ли логирование подключений?",
-    a: "Нет. Сервис ориентирован на zero-log подход: без хранения истории активности и лишней привязки действий к личности.",
+    q: "",
+    a: "",
   },
   {
-    q: "Сколько устройств можно подключить?",
-    a: "Зависит от выбранного тарифа. Лимиты, срок и условия отображаются в кабинете и могут гибко настраиваться в админке.",
+    q: "",
+    a: "",
   },
   {
-    q: "Как быстро начать?",
-    a: "Регистрируешься, выбираешь тариф, оплачиваешь удобным способом и сразу получаешь доступ к инструкциям и подключению в кабинете.",
+    q: "",
+    a: "",
   },
 ];
 
 const JOURNEY_STEPS = [
   {
     icon: Sparkles,
-    title: "Выбираешь сценарий",
-    desc: "Доступны гибкие тарифы: выбери то, что подходит именно тебе, без переплат.",
+    title: "",
+    desc: "",
   },
   {
     icon: CreditCard,
-    title: "Оплачиваешь как удобно",
-    desc: "Карта, СБП, крипта — выбирай любой удобный и безопасный метод оплаты.",
+    title: "",
+    desc: "",
   },
   {
     icon: Rocket,
-    title: "Подключаешься без боли",
-    desc: "После оплаты бот или личный кабинет сразу выдадут все инструкции. Настройка за 1 минуту.",
+    title: "",
+    desc: "",
   },
 ];
 
@@ -154,25 +155,25 @@ const JOURNEY_STEPS = [
 const EXPERIENCE_PANELS = [
   {
     icon: Sparkles,
-    title: "Никаких зависаний",
-    desc: "Смотри видео в 4K, играй в игры и работай без задержек.",
+    title: "",
+    desc: "",
   },
   {
     icon: Zap,
-    title: "Мгновенное подключение",
-    desc: "Достаточно нажать одну кнопку, чтобы оказаться в защищенной сети.",
+    title: "",
+    desc: "",
   },
   {
     icon: LayoutDashboard,
-    title: "Удобный кабинет",
-    desc: "Управляй подпиской, устройствами и получай поддержку в пару кликов.",
+    title: "",
+    desc: "",
   },
 ];
 
 const TRUST_POINTS = [
-  "Современные протоколы шифрования",
-  "Строгая политика Zero-Log: мы не храним данные",
-  "Высокая пропускная способность без ограничений",
+  "",
+  "",
+  "",
 ];
 
 const SECTION_SCROLL_OFFSET = "scroll-mt-24 md:scroll-mt-28";
@@ -264,15 +265,16 @@ function getPaymentLabels(config: PublicConfig): string[] {
     }
   }
 
-  if (config.yookassaEnabled) labels.add("Карта / СБП");
-  if (config.yoomoneyEnabled) labels.add("ЮMoney");
-  if (config.cryptopayEnabled) labels.add("Крипта");
+  if (config.yookassaEnabled) labels.add("card-sbp");
+  if (config.yoomoneyEnabled) labels.add("yumoney");
+  if (config.cryptopayEnabled) labels.add("crypto");
   if (config.heleketEnabled) labels.add("Heleket");
 
   return Array.from(labels).slice(0, 4);
 }
 
 export function LandingPage({ config }: { config: PublicConfig }) {
+  const { t } = useTranslation();
   const { resolvedMode } = useTheme();
   const lc = (config as any).landingConfig;
   const [tariffs, setTariffs] = useState<{ items: PublicTariffCategory[] } | null>(null);
@@ -290,13 +292,20 @@ export function LandingPage({ config }: { config: PublicConfig }) {
       .catch(() => setTariffs({ items: [] }));
   }, [lc?.showTariffs]);
 
+  const paymentLabelMap: Record<string, string> = {
+    "card-sbp": t("landing.payments.cardSbp"),
+    yumoney: t("landing.payments.yumoney"),
+    crypto: t("landing.payments.crypto"),
+    Heleket: "Heleket",
+  };
+
   const title = lc?.heroTitle || config.serviceName || "STEALTHNET";
   const subtitle =
     lc?.heroSubtitle ||
-    "Telegram, YouTube, видеозвонки и доступ к любым сервисам в одной подписке. Без ограничений, мусора и скрытых платежей.";
-  const ctaText = lc?.heroCtaText || "Начать сейчас";
-  const heroBadge = lc?.heroBadge ?? "Приватность, скорость и доступ";
-  const heroHint = lc?.heroHint ?? "Регистрация за минуту · Оплата картой, СБП, кошельком и криптой";
+    t("landing.hero.subtitle");
+  const ctaText = lc?.heroCtaText || t("landing.hero.cta");
+  const heroBadge = lc?.heroBadge ?? t("landing.hero.badge");
+  const heroHint = lc?.heroHint ?? t("landing.hero.hint");
   const featuresList = lc?.features?.length
     ? lc.features.map((feature: { label?: string | null; sub?: string | null }, index: number) => {
       const fallback = FEATURES_STRIP[index] ?? FEATURES_STRIP[0];
@@ -309,25 +318,35 @@ export function LandingPage({ config }: { config: PublicConfig }) {
         chips: fallback.chips,
       };
     })
-    : FEATURES_STRIP;
-  const benefitsTitle = lc?.benefitsTitle ?? "Почему STEALTHNET ощущается как продукт, а не костыль";
+    : FEATURES_STRIP.map((feature, index) => ({
+      ...feature,
+      label: t(`landing.features.${index}.label`),
+      sub: t(`landing.features.${index}.sub`),
+      desc: t(`landing.features.${index}.desc`),
+      chips: [t(`landing.features.${index}.chips.0`), t(`landing.features.${index}.chips.1`)],
+    }));
+  const benefitsTitle = lc?.benefitsTitle ?? t("landing.benefits.title");
   const benefitsSubtitle =
     lc?.benefitsSubtitle ??
-    "Всё, что нужно для спокойного доступа, нормальной скорости и уверенного пользовательского опыта, уже собрано в одном месте.";
+    t("landing.benefits.subtitle");
   const benefitsList = lc?.benefits?.length
     ? lc.benefits.map((benefit: any, index: number) => ({
       icon: BENEFITS[index]?.icon ?? Sparkles,
       title: benefit.title,
       desc: benefit.desc,
     }))
-    : BENEFITS;
-  const tariffsTitle = lc?.tariffsTitle ?? "Тарифы без неприятных сюрпризов";
-  const tariffsSubtitle = lc?.tariffsSubtitle ?? "Платишь за понятный доступ, а не за хаос из скрытых ограничений.";
-  const devicesTitle = lc?.devicesTitle ?? "Работает на всех твоих устройствах";
+    : BENEFITS.map((benefit, index) => ({
+      ...benefit,
+      title: t(`landing.benefits.items.${index}.title`),
+      desc: t(`landing.benefits.items.${index}.desc`),
+    }));
+  const tariffsTitle = lc?.tariffsTitle ?? t("landing.tariffs.title");
+  const tariffsSubtitle = lc?.tariffsSubtitle ?? t("landing.tariffs.subtitle");
+  const devicesTitle = lc?.devicesTitle ?? t("landing.devices.title");
   const devicesSubtitle =
-    lc?.devicesSubtitle ?? "Один аккаунт, один кабинет и одинаково приятный опыт на ноутбуке, телефоне и планшете.";
-  const faqTitle = lc?.faqTitle ?? "Частые вопросы";
-  const faqList = lc?.faq?.length ? lc.faq : FAQ_ITEMS;
+    lc?.devicesSubtitle ?? t("landing.devices.subtitle");
+  const faqTitle = lc?.faqTitle ?? t("landing.faq.title");
+  const faqList = lc?.faq?.length ? lc.faq : FAQ_ITEMS.map((_, index) => ({ q: t(`landing.faq.items.${index}.q`), a: t(`landing.faq.items.${index}.a`) }));
 
   const paymentLabels = getPaymentLabels(config);
   const totalTariffs = tariffs?.items.reduce((sum, category) => sum + category.tariffs.length, 0) ?? 0;
@@ -344,14 +363,14 @@ export function LandingPage({ config }: { config: PublicConfig }) {
   }, [tariffs]);
 
   const heroStats = [
-    { value: `${DEVICES.length}+`, label: "платформ" },
-    { value: lc?.showTariffs ? `${totalTariffs || "∞"}` : "24/7", label: lc?.showTariffs ? "тарифов онлайн" : "доступ" },
-    { value: paymentLabels.length ? `${paymentLabels.length}+` : "4", label: "способа оплаты" },
+    { value: `${DEVICES.length}+`, label: t("landing.stats.platforms") },
+    { value: lc?.showTariffs ? `${totalTariffs || "∞"}` : "24/7", label: lc?.showTariffs ? t("landing.stats.tariffsOnline") : t("landing.stats.access") },
+    { value: paymentLabels.length ? `${paymentLabels.length}+` : "4", label: t("landing.stats.paymentMethods") },
   ];
   const navItems = [
-    { label: "Преимущества", href: "#benefits" },
-    { label: "Тарифы", href: lc?.showTariffs ? "#tariffs" : "#devices" },
-    { label: "Устройства", href: "#devices" },
+    { label: t("landing.nav.benefits"), href: "#benefits" },
+    { label: t("landing.nav.tariffs"), href: lc?.showTariffs ? "#tariffs" : "#devices" },
+    { label: t("landing.nav.devices"), href: "#devices" },
     { label: "FAQ", href: "#faq" },
   ];
 
@@ -426,7 +445,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
 
           <nav className="flex items-center gap-2 sm:gap-3">
             <Button variant="ghost" className="rounded-full px-4 text-slate-700 hover:bg-white/80 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10" asChild>
-              <Link to="/cabinet/login">Вход</Link>
+              <Link to="/cabinet/login">{t("landing.actions.login")}</Link>
             </Button>
             <Button
               className="rounded-full border px-5 text-white shadow-lg"
@@ -449,9 +468,9 @@ export function LandingPage({ config }: { config: PublicConfig }) {
               </div>
 
               <h1 className="max-w-5xl text-5xl font-black leading-[0.9] tracking-[-0.06em] text-slate-950 md:text-6xl lg:text-[5.4rem] dark:text-white">
-                Тихий доступ,
+                {t("landing.hero.titleLine1")}
                 <span className="block bg-clip-text text-transparent" style={accentTextStyle}>
-                  который выглядит дорого.
+                  {t("landing.hero.titleLine2")}
                 </span>
               </h1>
 
@@ -479,7 +498,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                   className="h-14 rounded-full border-slate-200/80 dark:border-white/12 bg-white/70 px-7 text-base text-slate-900 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl hover:bg-white dark:border-white/15 dark:bg-white/8 dark:text-white dark:hover:bg-white/12"
                   asChild
                 >
-                  <Link to="/cabinet/login">Войти в кабинет</Link>
+                  <Link to="/cabinet/login">{t("landing.actions.enterCabinet")}</Link>
                 </Button>
               </div>
 
@@ -492,12 +511,12 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                       key={label}
                       className="rounded-full border border-slate-200/60 dark:border-white/10 bg-white/90 dark:bg-white/5 px-4 py-2 text-sm text-slate-700 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/7 dark:text-slate-200"
                     >
-                      {label}
+                      {paymentLabelMap[label] ?? label}
                     </div>
                   ))
                 ) : (
                   <div className="rounded-full border border-slate-200/60 dark:border-white/10 bg-white/90 dark:bg-white/5 px-4 py-2 text-sm text-slate-700 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/7 dark:text-slate-200">
-                    Карта, СБП, крипта и быстрый старт
+                    {t("landing.hero.paymentFallback")}
                   </div>
                 )}
               </div>
@@ -548,9 +567,9 @@ export function LandingPage({ config }: { config: PublicConfig }) {
 
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">private network</p>
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">{t("landing.hero.cardEyebrow")}</p>
                     <h2 className="mt-3 text-2xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">
-                      Один доступ — все нужные сервисы под рукой
+                      {t("landing.hero.cardTitle")}
                     </h2>
                   </div>
                   <div className="rounded-2xl border p-3" style={{ borderColor: withAlpha(accentTheme.primary, 0.28), backgroundColor: withAlpha(accentTheme.primary, 0.12), color: resolvedMode === "dark" ? accentTheme.tertiary : accentTheme.primary }}>
@@ -581,7 +600,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
 
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
                   <div className="rounded-[28px] border border-slate-200/80 dark:border-white/12 bg-slate-950 px-5 py-5 text-white shadow-xl shadow-slate-950/15 dark:border-white/12 dark:bg-slate-900/90">
-                    <p className="text-xs uppercase tracking-[0.28em]" style={{ color: withAlpha(accentTheme.tertiary, 0.8) }}>от</p>
+                    <p className="text-xs uppercase tracking-[0.28em]" style={{ color: withAlpha(accentTheme.tertiary, 0.8) }}>{t("landing.hero.from")}</p>
                     <div className="mt-2 flex items-baseline gap-2">
                       <span className="text-4xl font-black tracking-[-0.05em]">
                         {lowestTariff ? lowestTariff.tariff.price : "∞"}
@@ -592,17 +611,17 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                     </div>
                     <p className="mt-2 text-sm text-slate-300/90">
                       {lowestTariff
-                        ? `${lowestTariff.tariff.name} · ${lowestTariff.tariff.durationDays} дней доступа`
-                        : "Тарифы и условия подтягиваются из админки автоматически"}
+                        ? `${lowestTariff.tariff.name} · ${lowestTariff.tariff.durationDays} ${t("landing.tariffs.daysAccess")}`
+                        : t("landing.tariffs.adminAuto")}
                     </p>
                   </div>
 
                   <div className="rounded-[28px] border border-slate-200/80 dark:border-white/12 bg-white/95 dark:bg-white/5 p-5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/6">
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">быстрый старт</p>
+                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">{t("landing.quickStart.eyebrow")}</p>
                     <ul className="mt-3 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-                      <li className="flex items-start gap-3"><Check className="mt-0.5 h-4 w-4" style={{ color: accentTheme.primary }} />Регистрация и вход через кабинет без лишней бюрократии</li>
-                      <li className="flex items-start gap-3"><Check className="mt-0.5 h-4 w-4" style={{ color: accentTheme.primary }} />Моментальное получение тарифов, способов оплаты и инструкций</li>
-                      <li className="flex items-start gap-3"><Check className="mt-0.5 h-4 w-4" style={{ color: accentTheme.primary }} />Поддержка, оферта и контакты доступны прямо на лендинге</li>
+                      <li className="flex items-start gap-3"><Check className="mt-0.5 h-4 w-4" style={{ color: accentTheme.primary }} />{t("landing.quickStart.items.0")}</li>
+                      <li className="flex items-start gap-3"><Check className="mt-0.5 h-4 w-4" style={{ color: accentTheme.primary }} />{t("landing.quickStart.items.1")}</li>
+                      <li className="flex items-start gap-3"><Check className="mt-0.5 h-4 w-4" style={{ color: accentTheme.primary }} />{t("landing.quickStart.items.2")}</li>
                     </ul>
                   </div>
                 </div>
@@ -610,11 +629,11 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                 <div className="mt-4 rounded-[28px] border border-slate-200/80 dark:border-white/12 p-5 backdrop-blur-xl dark:border-white/10" style={accentGlowStyle}>
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">ощущение продукта</p>
-                      <p className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">Не просто VPN, а аккуратно собранный сервис с человеческим UX</p>
+                      <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">{t("landing.productFeel.eyebrow")}</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{t("landing.productFeel.title")}</p>
                     </div>
                     <Button className="h-12 rounded-full px-5 text-white" style={primaryButtonStyle} asChild>
-                      <Link to={lc.showTariffs ? "#tariffs" : "/cabinet/register"}>{lc.showTariffs ? "Смотреть тарифы" : "Начать"}</Link>
+                      <Link to={lc.showTariffs ? "#tariffs" : "/cabinet/register"}>{lc.showTariffs ? t("landing.actions.viewTariffs") : t("landing.getStarted")}</Link>
                     </Button>
                   </div>
                 </div>
@@ -628,21 +647,21 @@ export function LandingPage({ config }: { config: PublicConfig }) {
             <div className="overflow-hidden rounded-[34px] border border-slate-200/60 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/6 md:p-8">
               <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
                 <div className="max-w-2xl">
-                  <p className="text-xs uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400">премиальный доступ</p>
+                  <p className="text-xs uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400">{t("landing.sections.premiumAccess")}</p>
                   <h2 className="mt-4 text-3xl font-black tracking-[-0.04em] text-slate-950 md:text-4xl dark:text-white">
-                    Всё для твоего комфорта и безопасности в сети
+                    {t("landing.sections.comfortTitle")}
                   </h2>
                 </div>
                 <div className="rounded-full border border-slate-200/70 dark:border-white/10 bg-white/85 dark:bg-white/8 px-4 py-2 text-sm text-slate-600 backdrop-blur-xl dark:text-slate-300">
-                  стабильность · скорость · безопасность
+                  {t("landing.sections.comfortPill")}
                 </div>
               </div>
 
               <div className="mt-7 grid gap-4 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                 <div className="rounded-[30px] border border-slate-200/80 dark:border-white/12 bg-slate-950 p-5 text-white shadow-xl shadow-slate-950/15 dark:border-white/12 dark:bg-slate-900/90">
-                  <p className="text-xs uppercase tracking-[0.28em]" style={{ color: withAlpha(accentTheme.tertiary, 0.78) }}>главные принципы</p>
+                  <p className="text-xs uppercase tracking-[0.28em]" style={{ color: withAlpha(accentTheme.tertiary, 0.78) }}>{t("landing.trust.eyebrow")}</p>
                   <p className="mt-4 text-2xl font-black leading-tight tracking-[-0.04em]">
-                    Мы строим сервис, которому доверяют. Без компромиссов в скорости.
+                    {t("landing.trust.title")}
                   </p>
                   <div className="mt-6 space-y-4">
                     {TRUST_POINTS.map((point) => (
@@ -732,7 +751,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
           <motion.div {...fadeUp} className="mx-auto max-w-3xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/60 dark:border-white/10 bg-white/80 dark:bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-600 backdrop-blur-xl dark:border-white/10 dark:bg-white/7 dark:text-slate-300">
               <Sparkles className="h-4 w-4" style={{ color: accentTheme.primary }} />
-              Почему мы
+              {t("landing.benefits.eyebrow")}
             </div>
             <h2 className="mt-5 text-3xl font-black tracking-[-0.04em] text-slate-950 md:text-5xl dark:text-white">
               {benefitsTitle}
@@ -748,12 +767,12 @@ export function LandingPage({ config }: { config: PublicConfig }) {
               className="overflow-hidden rounded-[34px] border border-slate-200/60 dark:border-white/10 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-2xl md:p-8"
               style={resolvedMode === "dark" ? darkPanelStyle : accentGlowStyle}
             >
-              <p className="text-xs uppercase tracking-[0.32em] text-slate-500 dark:text-slate-300">технологии</p>
+              <p className="text-xs uppercase tracking-[0.32em] text-slate-500 dark:text-slate-300">{t("landing.technology.eyebrow")}</p>
               <h3 className="mt-4 max-w-md text-3xl font-black tracking-[-0.04em] text-slate-950 dark:text-white md:text-4xl">
-                Продуманная инфраструктура для твоей свободы.
+                {t("landing.technology.title")}
               </h3>
               <p className="mt-5 max-w-lg text-sm leading-7 text-slate-600 dark:text-slate-300 md:text-base">
-                Мы используем только современные протоколы и мощные серверы, чтобы обеспечить максимальную скорость и стабильность соединения в любых условиях.
+                {t("landing.technology.desc")}
               </p>
 
               <div className="mt-8 space-y-4">
@@ -826,7 +845,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                   <p className="mt-4 text-sm leading-7 text-slate-200 md:text-base">{tariffsSubtitle}</p>
                 </div>
                 <div className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm backdrop-blur-xl" style={{ color: withAlpha(accentTheme.tertiary, 0.95) }}>
-                  {tariffs === null ? "Загружаем тарифы…" : `${tariffs.items.length} категорий · ${totalTariffs} вариантов`}
+                  {tariffs === null ? t("landing.tariffs.loading") : `${tariffs.items.length} ${t("landing.tariffs.categories")} · ${totalTariffs} ${t("landing.tariffs.variants")}`}
                 </div>
               </div>
 
@@ -854,10 +873,10 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                           </div>
                           <div>
                             <h3 className="text-xl font-bold text-white">{category.name}</h3>
-                            <p className="text-sm text-slate-300">Подбирай вариант под свой сценарий — от базового доступа до долгого спокойного использования.</p>
+                            <p className="text-sm text-slate-300">{t("landing.tariffs.categoryDesc")}</p>
                           </div>
                         </div>
-                        <div className="text-sm text-slate-300">{category.tariffs.length} тарифов в категории</div>
+                        <div className="text-sm text-slate-300">{category.tariffs.length} {t("landing.tariffs.inCategory")}</div>
                       </div>
 
                       <div className="grid gap-4 lg:grid-cols-3">
@@ -874,11 +893,11 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                                   {tariff.description ? (
                                     <p className="mt-2 text-sm leading-6 text-slate-300">{tariff.description}</p>
                                   ) : (
-                                    <p className="mt-2 text-sm leading-6 text-slate-400">Чистый доступ без лишних ограничений и путаницы.</p>
+                                    <p className="mt-2 text-sm leading-6 text-slate-400">{t("landing.tariffs.cleanAccess")}</p>
                                   )}
                                 </div>
                                 <div className="rounded-full border px-3 py-1 text-xs uppercase tracking-[0.24em]" style={{ borderColor: withAlpha(accentTheme.primary, 0.3), backgroundColor: withAlpha(accentTheme.primary, 0.12), color: withAlpha(accentTheme.tertiary, 0.95) }}>
-                                  {tariff.durationDays} дн.
+                                  {tariff.durationDays} {t("landing.tariffs.shortDays")}
                                 </div>
                               </div>
 
@@ -888,18 +907,18 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                                   <span className="pb-1 text-sm uppercase text-slate-300">{tariff.currency}</span>
                                 </div>
                                 {monthlyPrice && (
-                                  <p className="mt-2 text-sm" style={{ color: withAlpha(accentTheme.tertiary, 0.9) }}>≈ {monthlyPrice} {tariff.currency.toUpperCase()}/мес</p>
+                                  <p className="mt-2 text-sm" style={{ color: withAlpha(accentTheme.tertiary, 0.9) }}>≈ {monthlyPrice} {tariff.currency.toUpperCase()}/{t("landing.tariffs.perMonth")}</p>
                                 )}
                               </div>
 
                               <div className="mt-6 space-y-3 text-sm text-slate-300">
-                                <div className="flex items-center gap-3"><Check className="h-4 w-4" style={{ color: accentTheme.tertiary }} />Подключение через личный кабинет</div>
-                                <div className="flex items-center gap-3"><Check className="h-4 w-4" style={{ color: accentTheme.tertiary }} />Поддержка и инструкции внутри сервиса</div>
-                                <div className="flex items-center gap-3"><Check className="h-4 w-4" style={{ color: accentTheme.tertiary }} />Автоматическая активация после оплаты</div>
+                                <div className="flex items-center gap-3"><Check className="h-4 w-4" style={{ color: accentTheme.tertiary }} />{t("landing.tariffs.features.0")}</div>
+                                <div className="flex items-center gap-3"><Check className="h-4 w-4" style={{ color: accentTheme.tertiary }} />{t("landing.tariffs.features.1")}</div>
+                                <div className="flex items-center gap-3"><Check className="h-4 w-4" style={{ color: accentTheme.tertiary }} />{t("landing.tariffs.features.2")}</div>
                               </div>
 
                               <Button className="mt-6 h-12 rounded-full text-white" style={primaryButtonStyle} asChild>
-                                <Link to="/cabinet/register">Выбрать тариф</Link>
+                                <Link to="/cabinet/register">{t("landing.actions.chooseTariff")}</Link>
                               </Button>
                             </div>
                           );
@@ -910,7 +929,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                 </div>
               ) : (
                 <div className="mt-8 rounded-[30px] border border-white/12 bg-white/7 p-8 text-center text-slate-300 backdrop-blur-xl">
-                  Тарифы пока не опубликованы, но лендинг уже готов — контент подтянется автоматически из админки.
+                  {t("landing.tariffs.empty")}
                 </div>
               )}
             </motion.div>
@@ -929,11 +948,11 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                   <div className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl" style={{ backgroundColor: withAlpha(accentTheme.primary, 0.25) }} />
                   <div className="relative flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.28em] text-slate-400">device cockpit</p>
-                      <p className="mt-2 text-lg font-semibold">Один аккаунт, много устройств, ноль ощущения хаоса</p>
+                      <p className="text-xs uppercase tracking-[0.28em] text-slate-400">{t("landing.devices.cockpitEyebrow")}</p>
+                      <p className="mt-2 text-lg font-semibold">{t("landing.devices.cockpitTitle")}</p>
                     </div>
                     <div className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs uppercase tracking-[0.24em] text-slate-200">
-                      synced
+                      {t("landing.devices.synced")}
                     </div>
                   </div>
 
@@ -953,7 +972,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                           </div>
                           <div>
                             <p className="font-medium text-white">{name}</p>
-                            <p className="text-xs uppercase tracking-[0.22em] text-slate-400">native flow</p>
+                            <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{t("landing.devices.nativeFlow")}</p>
                           </div>
                         </div>
                       </motion.div>
@@ -962,25 +981,25 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                 </div>
 
                 <div className="rounded-[28px] border border-slate-200/80 dark:border-white/12 bg-white/95 dark:bg-white/5 p-5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/6">
-                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">универсальность</p>
-                  <p className="mt-3 text-lg font-semibold text-slate-950 dark:text-white">Одинаково приятный опыт на десктопе, телефоне и планшете</p>
-                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">Один аккаунт для всех твоих устройств. Подключай что угодно и когда угодно.</p>
+                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">{t("landing.devices.universalEyebrow")}</p>
+                  <p className="mt-3 text-lg font-semibold text-slate-950 dark:text-white">{t("landing.devices.universalTitle")}</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">{t("landing.devices.universalDesc")}</p>
                 </div>
 
                 <div className="rounded-[28px] border border-slate-200/80 dark:border-white/12 p-5 backdrop-blur-xl dark:border-white/10" style={accentGlowStyle}>
-                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">быстрая настройка</p>
-                  <p className="mt-3 text-lg font-semibold text-slate-950 dark:text-white">Установка займет меньше минуты</p>
-                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">Нажал, оплатил, получил доступ. Подробные инструкции помогут сделать всё быстро.</p>
+                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">{t("landing.devices.setupEyebrow")}</p>
+                  <p className="mt-3 text-lg font-semibold text-slate-950 dark:text-white">{t("landing.devices.setupTitle")}</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">{t("landing.devices.setupDesc")}</p>
                 </div>
               </div>
             </motion.div>
 
             <motion.div {...fadeUp} transition={{ duration: 0.6, ease: "easeOut", delay: 0.05 }} className="rounded-[32px] border border-slate-200/60 dark:border-white/10 p-6 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] md:p-8 dark:border-white/10" style={darkPanelStyle}>
-              <p className="text-xs uppercase tracking-[0.32em]" style={{ color: withAlpha(accentTheme.tertiary, 0.8) }}>быстрый старт</p>
-              <h3 className="mt-4 text-3xl font-black tracking-[-0.04em] md:text-4xl">Премиальный сервис без технической боли</h3>
+              <p className="text-xs uppercase tracking-[0.32em]" style={{ color: withAlpha(accentTheme.tertiary, 0.8) }}>{t("landing.quickStart.eyebrow")}</p>
+              <h3 className="mt-4 text-3xl font-black tracking-[-0.04em] md:text-4xl">{t("landing.quickStart.title")}</h3>
               <div className="mt-6 space-y-4 text-sm leading-7 text-slate-300 md:text-base">
-                <p>Один вход, одна подписка и понятные шаги: зарегистрировался, оплатил, подключил нужное устройство и забыл про блокировки.</p>
-                <p>Наша цель — предоставить инструмент, который просто работает. Всегда, везде и на любом устройстве.</p>
+                <p>{t("landing.quickStart.paragraphs.0")}</p>
+                <p>{t("landing.quickStart.paragraphs.1")}</p>
               </div>
 
               <div className="mt-8 space-y-4">
@@ -1008,7 +1027,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
               </div>
 
               <Button className="mt-8 h-13 rounded-full px-6 text-white" style={primaryButtonStyle} asChild>
-                <Link to="/cabinet/register">Открыть кабинет и подключиться</Link>
+                <Link to="/cabinet/register">{t("landing.actions.openCabinet")}</Link>
               </Button>
             </motion.div>
           </div>
@@ -1022,18 +1041,18 @@ export function LandingPage({ config }: { config: PublicConfig }) {
           >
             <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
               <div>
-                <p className="text-xs uppercase tracking-[0.32em] text-slate-500" style={resolvedMode === "dark" ? { color: withAlpha(accentTheme.tertiary, 0.75) } : undefined}>как это работает</p>
+                <p className="text-xs uppercase tracking-[0.32em] text-slate-500" style={resolvedMode === "dark" ? { color: withAlpha(accentTheme.tertiary, 0.75) } : undefined}>{t("landing.howItWorks.eyebrow")}</p>
                 <h2 className="mt-4 text-3xl font-black tracking-[-0.04em] text-slate-950 md:text-4xl dark:text-white">
-                  От первого визита до безопасного интернета — всего пара шагов
+                  {t("landing.howItWorks.title")}
                 </h2>
                 <p className="mt-4 text-sm leading-7 text-slate-600 dark:text-slate-300 md:text-base">
-                  Мы сделали всё, чтобы процесс подключения был максимально простым и понятным. Никаких сложных инструкций и лишних действий.
+                  {t("landing.howItWorks.desc")}
                 </p>
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
                 <div className="rounded-[28px] border border-slate-200/80 dark:border-white/12 bg-white/85 dark:bg-white/5 p-5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/6">
-                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">narrative</p>
+                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">{t("landing.howItWorks.narrative")}</p>
                   <div className="mt-5 space-y-5">
                     {JOURNEY_STEPS.map(({ title: stepTitle }, index) => (
                       <div key={stepTitle} className="flex gap-4">
@@ -1068,8 +1087,8 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                   ))}
 
                   <div className="rounded-[28px] border border-slate-200/80 dark:border-white/12 p-5 shadow-sm backdrop-blur-xl dark:border-white/10 sm:col-span-2" style={accentGlowStyle}>
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">прозрачность</p>
-                    <p className="mt-3 text-2xl font-semibold text-slate-950 dark:text-white">Честные условия без скрытых платежей и ограничений скорости.</p>
+                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">{t("landing.transparency.eyebrow")}</p>
+                    <p className="mt-3 text-2xl font-semibold text-slate-950 dark:text-white">{t("landing.transparency.title")}</p>
                     <div className="mt-6 flex flex-wrap gap-4">
                       {heroStats.map((item) => (
                         <div key={item.label} className="rounded-full border border-slate-200/80 dark:border-white/12 bg-white/80 dark:bg-white/8 px-6 py-3 text-base text-slate-700 backdrop-blur-xl dark:text-slate-200 shadow-sm">
@@ -1116,10 +1135,10 @@ export function LandingPage({ config }: { config: PublicConfig }) {
 
           <motion.aside {...fadeUp} transition={{ duration: 0.6, ease: "easeOut", delay: 0.05 }} className="space-y-5">
             <div className="rounded-[32px] border border-slate-200/60 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/6">
-              <p className="text-xs uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400">контакты</p>
-              <h3 className="mt-4 text-2xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">Нужна помощь или детали?</h3>
+              <p className="text-xs uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400">{t("landing.contacts.eyebrow")}</p>
+              <h3 className="mt-4 text-2xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">{t("landing.contacts.title")}</h3>
               <p className="mt-4 text-sm leading-7 text-slate-600 dark:text-slate-400">
-                Все ссылки и тексты здесь тоже управляются из админки, так что лендинг остаётся живой частью продукта, а не отдельной картинкой.
+                {t("landing.contacts.desc")}
               </p>
 
               {lc.contacts ? (
@@ -1128,13 +1147,13 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                   dangerouslySetInnerHTML={{ __html: lc.contacts.replace(/\n/g, "<br />") }}
                 />
               ) : (
-                <p className="mt-5 text-sm text-slate-500 dark:text-slate-400">Контакты пока не заполнены в админке.</p>
+                <p className="mt-5 text-sm text-slate-500 dark:text-slate-400">{t("landing.contacts.empty")}</p>
               )}
             </div>
 
             <div className="rounded-[32px] border border-slate-200/60 dark:border-white/10 p-6 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] dark:border-white/10" style={darkPanelStyle}>
-              <p className="text-xs uppercase tracking-[0.32em]" style={{ color: withAlpha(accentTheme.tertiary, 0.8) }}>legal</p>
-              <h3 className="mt-4 text-2xl font-black tracking-[-0.04em]">Документы и прозрачность</h3>
+              <p className="text-xs uppercase tracking-[0.32em]" style={{ color: withAlpha(accentTheme.tertiary, 0.8) }}>{t("landing.legal.eyebrow")}</p>
+              <h3 className="mt-4 text-2xl font-black tracking-[-0.04em]">{t("landing.legal.title")}</h3>
 
               <div className="mt-6 flex flex-col gap-3">
                 {lc.offerLink && (
@@ -1144,7 +1163,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                     rel="noopener noreferrer"
                     className="rounded-full border border-white/12 bg-white/7 px-4 py-3 text-sm text-slate-100 transition-colors hover:bg-white/12"
                   >
-                    Оферта
+                    {t("landing.legal.offer")}
                   </a>
                 )}
                 {lc.privacyLink && (
@@ -1154,11 +1173,11 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                     rel="noopener noreferrer"
                     className="rounded-full border border-white/12 bg-white/7 px-4 py-3 text-sm text-slate-100 transition-colors hover:bg-white/12"
                   >
-                    Политика конфиденциальности
+                    {t("landing.legal.privacy")}
                   </a>
                 )}
                 {!lc.offerLink && !lc.privacyLink && (
-                  <p className="text-sm text-slate-400">Юридические ссылки ещё не заполнены, но место под них уже готово.</p>
+                  <p className="text-sm text-slate-400">{t("landing.legal.empty")}</p>
                 )}
               </div>
             </div>
@@ -1176,12 +1195,12 @@ export function LandingPage({ config }: { config: PublicConfig }) {
 
             <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-3xl">
-                <p className="text-xs uppercase tracking-[0.34em]" style={{ color: withAlpha(accentTheme.tertiary, 0.75) }}>{lc?.readyToConnectEyebrow ?? "ready to connect"}</p>
+                <p className="text-xs uppercase tracking-[0.34em]" style={{ color: withAlpha(accentTheme.tertiary, 0.75) }}>{lc?.readyToConnectEyebrow ?? t("landing.cta.eyebrow")}</p>
                 <h2 className="mt-4 text-3xl font-black tracking-[-0.04em] md:text-5xl">
-                  {lc?.readyToConnectTitle ?? "Если честно — теперь это уже не \"лендинг\", а витрина продукта."}
+                  {lc?.readyToConnectTitle ?? t("landing.cta.title")}
                 </h2>
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200 md:text-base">
-                  {lc?.readyToConnectDesc ?? "Весь контент продолжает жить в админке, а визуально страница наконец ощущается как сервис, за который не стыдно брать деньги."}
+                  {lc?.readyToConnectDesc ?? t("landing.cta.desc")}
                 </p>
               </div>
 
@@ -1190,7 +1209,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
                   <Link to="/cabinet/register">{ctaText}</Link>
                 </Button>
                 <Button variant="outline" className="h-13 rounded-full border-white/20 bg-white/8 px-6 text-white hover:bg-white/12" asChild>
-                  <Link to="/cabinet/login">У меня уже есть аккаунт</Link>
+                  <Link to="/cabinet/login">{t("landing.actions.haveAccount")}</Link>
                 </Button>
               </div>
             </div>
@@ -1206,14 +1225,14 @@ export function LandingPage({ config }: { config: PublicConfig }) {
               {lc.footerText ? (
                 <span dangerouslySetInnerHTML={{ __html: lc.footerText.replace(/\n/g, "<br />") }} />
               ) : (
-                `© ${new Date().getFullYear()} ${config.serviceName || title}. Все права защищены.`
+                t("landing.footer.rights", { year: new Date().getFullYear(), service: config.serviceName || title })
               )}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 md:justify-end">
             <Button variant="ghost" className="rounded-full text-slate-700 hover:bg-white/80 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10" asChild>
-              <Link to="/cabinet/login">Вход</Link>
+              <Link to="/cabinet/login">{t("landing.actions.login")}</Link>
             </Button>
             <Button className="rounded-full text-white" style={primaryButtonStyle} asChild>
               <Link to="/cabinet/register">{ctaText}</Link>
@@ -1226,6 +1245,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
 }
 
 export function LandingPageWrapper() {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -1243,7 +1263,7 @@ export function LandingPageWrapper() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-        <div className="text-slate-400">Загрузка...</div>
+        <div className="text-slate-400">{t("landing.states.loading")}</div>
       </div>
     );
   }
@@ -1251,7 +1271,7 @@ export function LandingPageWrapper() {
   if (!config) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-        <div className="text-slate-400">Ошибка загрузки конфигурации</div>
+        <div className="text-slate-400">{t("landing.states.configError")}</div>
       </div>
     );
   }

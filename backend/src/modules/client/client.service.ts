@@ -72,6 +72,7 @@ const SYSTEM_CONFIG_KEYS = [
   "heleket_merchant_id", "heleket_api_key",
   "groq_api_key", "groq_model", "groq_fallback_1", "groq_fallback_2", "groq_fallback_3", "ai_system_prompt",
   "bot_buttons", "bot_buttons_per_row", "bot_back_label", "bot_menu_texts", "bot_menu_line_visibility", "bot_inner_button_styles",
+  "bot_menu_texts_en", "bot_menu_texts_zh", "bot_menu_texts_ru", // 多语言菜单文本覆盖：key格式 bot_menu_texts_[lang]
   "bot_tariffs_text", "bot_tariffs_fields", "bot_payment_text",
   "bot_emojis", // JSON: { "TRIAL": { "unicode": "🎁", "tgEmojiId": "..." }, "PACKAGE": ... } — эмодзи кнопок/текста, TG ID для премиум
   "category_emojis", // JSON: { "ordinary": "📦", "premium": "⭐" } — эмодзи категорий по коду
@@ -306,6 +307,37 @@ function parseBotMenuTexts(raw: string | undefined): Required<BotMenuTexts> {
   }
 }
 
+/**
+ * 按用户语言选取菜单文本，fallback 链：preferredLang → defaultLang → DEFAULT_BOT_MENU_TEXTS
+ * config 来自 getSystemConfig()
+ */
+export function getLocalizedBotMenuTexts(
+  config: { botMenuTexts: Required<BotMenuTexts>; botMenuTextsEn?: Record<string, string> | null; botMenuTextsZh?: Record<string, string> | null; botMenuTextsRu?: Record<string, string> | null; defaultLanguage?: string },
+  preferredLang: string
+): Required<BotMenuTexts> {
+  const lang = (preferredLang || "ru").toLowerCase().slice(0, 5).trim();
+  const langMap: Record<string, Record<string, string> | null | undefined> = {
+    en: config.botMenuTextsEn,
+    zh: config.botMenuTextsZh,
+    ru: config.botMenuTextsRu,
+  };
+  // 1. 精确匹配语言覆盖文本
+  const specific = langMap[lang];
+  if (specific && typeof specific === "object" && Object.keys(specific).length > 0) {
+    return { ...DEFAULT_BOT_MENU_TEXTS, ...config.botMenuTexts, ...specific };
+  }
+  // 2. fallback：默认语言的覆盖文本
+  const defLang = (config.defaultLanguage || "ru").toLowerCase().slice(0, 5);
+  if (defLang !== lang) {
+    const defSpecific = langMap[defLang];
+    if (defSpecific && typeof defSpecific === "object" && Object.keys(defSpecific).length > 0) {
+      return { ...DEFAULT_BOT_MENU_TEXTS, ...config.botMenuTexts, ...defSpecific };
+    }
+  }
+  // 3. 最终 fallback：通用 botMenuTexts
+  return config.botMenuTexts;
+}
+
 function parseBotTariffsText(raw: string | undefined): string {
   if (!raw || !raw.trim()) return DEFAULT_BOT_TARIFFS_TEXT;
   return raw;
@@ -408,7 +440,7 @@ export async function getSystemConfig() {
   });
   const map = Object.fromEntries(settings.map((s: { key: string; value: string }) => [s.key, s.value]));
   const activeLangs = (map.active_languages || "ru,en").split(",").map((s: string) => s.trim());
-  const activeCurrs = (map.active_currencies || "usd,rub").split(",").map((s: string) => s.trim());
+  const activeCurrs = (map.active_currencies || "usd,rub,cny").split(",").map((s: string) => s.trim());
   return {
     activeLanguages: activeLangs,
     activeCurrencies: activeCurrs,
@@ -482,6 +514,10 @@ export async function getSystemConfig() {
     botEmojis: parseBotEmojis(map.bot_emojis),
     botBackLabel: (map.bot_back_label || "◀️ В меню").trim() || "◀️ В меню",
     botMenuTexts: parseBotMenuTexts(map.bot_menu_texts),
+    // 多语言菜单文本：bot_menu_texts_[lang]，未设置时为 null（fallback 到默认 botMenuTexts）
+    botMenuTextsEn: parseBotMenuTexts(map.bot_menu_texts_en) || null,
+    botMenuTextsZh: parseBotMenuTexts(map.bot_menu_texts_zh) || null,
+    botMenuTextsRu: parseBotMenuTexts(map.bot_menu_texts_ru) || null,
     botMenuLineVisibility: parseBotMenuLineVisibility(map.bot_menu_line_visibility),
     botInnerButtonStyles: parseBotInnerButtonStyles(map.bot_inner_button_styles),
     botTariffsText: parseBotTariffsText(map.bot_tariffs_text),
@@ -861,6 +897,12 @@ export async function getPublicConfig() {
     resolvedBotMenuTexts,
     menuTextCustomEmojiIds,
     botEmojis,
+    // 多语言菜单文本（按语言 key 覆盖，前端/Bot 按 preferredLang 选取）
+    botMenuTextsLocales: {
+      ru: (full as any).botMenuTextsRu ?? null,
+      en: (full as any).botMenuTextsEn ?? null,
+      zh: (full as any).botMenuTextsZh ?? null,
+    },
     botInnerButtonStyles: full.botInnerButtonStyles ?? DEFAULT_BOT_INNER_BUTTON_STYLES,
     botTariffsText: full.botTariffsText ?? DEFAULT_BOT_TARIFFS_TEXT,
     botTariffsFields: full.botTariffsFields ?? DEFAULT_BOT_TARIFF_LINE_FIELDS,

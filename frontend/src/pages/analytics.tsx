@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,10 +43,10 @@ import {
 const COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#14b8a6", "#f97316", "#84cc16"];
 
 function fmt(n: number) {
-  return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n);
 }
 function fmtDec(n: number) {
-  return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(n);
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(n);
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -94,6 +95,7 @@ interface AnalyticsData {
 }
 
 export function AnalyticsPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const token = state.accessToken;
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -113,7 +115,7 @@ export function AnalyticsPage() {
   }
 
   if (!data) {
-    return <p className="text-sm text-destructive py-8">Ошибка загрузки аналитики</p>;
+    return <p className="text-sm text-destructive py-8">{t("admin.analytics.loadError")}</p>;
   }
 
   const s = data.summary;
@@ -123,27 +125,27 @@ export function AnalyticsPage() {
   const refCreditsWeekly = aggregateByWeek(data.refCreditsSeries);
 
   // Combine promo acts + usages for chart
-  const promoWeekly = aggregateByWeekTwo(data.promoActsSeries, data.promoUsagesSeries, "Промо-ссылки", "Промокоды");
+  const promoWeekly = aggregateByWeekTwo(data.promoActsSeries, data.promoUsagesSeries);
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Аналитика</h1>
-        <p className="text-muted-foreground mt-1">Полная статистика по всем направлениям</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("admin.analytics.title")}</h1>
+        <p className="text-muted-foreground mt-1">{t("admin.analytics.subtitle")}</p>
       </div>
 
       {/* ═══ ОСНОВНЫЕ МЕТРИКИ ═══ */}
       <section>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
-          Основные метрики
+          {t("admin.analytics.sectionMain")}
         </h2>
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-          <MetricCard icon={DollarSign} label="Поступления" value={fmt(s.totalRevenue)} sub="с платёжек, без оплаты с баланса" color="text-green-500" />
-          <MetricCard icon={DollarSign} label="Поступления 7 дн." value={fmt(s.rev7)} sub={`${s.cnt7} платежей`} color="text-green-500" />
-          <MetricCard icon={DollarSign} label="Поступления 30 дн." value={fmt(s.rev30)} sub={`${s.cnt30} платежей`} color="text-green-500" />
-          <MetricCard icon={ShoppingCart} label="Платежей с платёжек" value={fmt(s.totalPayments)} sub={`${s.paymentsPending} ожидают`} color="text-blue-500" />
-          <MetricCard icon={Target} label="Средний чек" value={fmtDec(s.avgCheck)} color="text-indigo-500" />
+          <MetricCard icon={DollarSign} label={t("admin.analytics.revenue")} value={fmt(s.totalRevenue)} sub={t("admin.analytics.revenueSub")} color="text-green-500" />
+          <MetricCard icon={DollarSign} label={t("admin.analytics.revenue7d")} value={fmt(s.rev7)} sub={`${s.cnt7} ${t("admin.analytics.paymentsCount")}`} color="text-green-500" />
+          <MetricCard icon={DollarSign} label={t("admin.analytics.revenue30d")} value={fmt(s.rev30)} sub={`${s.cnt30} ${t("admin.analytics.paymentsCount")}`} color="text-green-500" />
+          <MetricCard icon={ShoppingCart} label={t("admin.analytics.paymentsFromGateways")} value={fmt(s.totalPayments)} sub={`${s.paymentsPending} ${t("admin.analytics.pendingPayments")}`} color="text-blue-500" />
+          <MetricCard icon={Target} label={t("admin.analytics.avgCheck")} value={fmtDec(s.avgCheck)} color="text-indigo-500" />
         </div>
       </section>
 
@@ -151,18 +153,18 @@ export function AnalyticsPage() {
       <section>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" />
-          Клиенты
+          {t("admin.analytics.sectionClients")}
         </h2>
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-          <MetricCard icon={Users} label="Всего клиентов" value={fmt(s.totalClients)} sub={`${s.activeClients} с подпиской`} color="text-blue-500" />
-          <MetricCard icon={UserPlus} label="Новые 24ч / 7д / 30д" value={`${s.clientsNew24h} / ${s.clientsNew7d} / ${s.clientsNew30d}`} color="text-cyan-500" />
-          <MetricCard icon={Bot} label="Только бот" value={fmt(s.botClients)} color="text-violet-500" />
-          <MetricCard icon={Globe} label="Только сайт" value={fmt(s.siteClients)} color="text-orange-500" />
-          <MetricCard icon={Users} label="Бот + Сайт" value={fmt(s.bothClients)} color="text-emerald-500" />
-          <MetricCard icon={Wallet} label="Общий баланс" value={fmtDec(s.totalBalance)} color="text-amber-500" />
-          <MetricCard icon={Percent} label="Платящих" value={`${s.payingClients} (${s.payingPercent}%)`} color="text-rose-500" />
-          <MetricCard icon={DollarSign} label="ARPU" value={fmtDec(s.arpu)} sub="доход / клиент" color="text-indigo-500" />
-          <MetricCard icon={Award} label="По рефералу" value={fmt(s.withReferrer)} sub={`${s.totalClients > 0 ? Math.round((s.withReferrer / s.totalClients) * 100) : 0}% от всех`} color="text-pink-500" />
+          <MetricCard icon={Users} label={t("admin.analytics.totalClients")} value={fmt(s.totalClients)} sub={`${s.activeClients} ${t("admin.analytics.subscribedClients")}`} color="text-blue-500" />
+          <MetricCard icon={UserPlus} label={t("admin.analytics.newClientsPeriods")} value={`${s.clientsNew24h} / ${s.clientsNew7d} / ${s.clientsNew30d}`} color="text-cyan-500" />
+          <MetricCard icon={Bot} label={t("admin.analytics.botOnly")} value={fmt(s.botClients)} color="text-violet-500" />
+          <MetricCard icon={Globe} label={t("admin.analytics.siteOnly")} value={fmt(s.siteClients)} color="text-orange-500" />
+          <MetricCard icon={Users} label={t("admin.analytics.botAndSite")} value={fmt(s.bothClients)} color="text-emerald-500" />
+          <MetricCard icon={Wallet} label={t("admin.analytics.totalBalance")} value={fmtDec(s.totalBalance)} color="text-amber-500" />
+          <MetricCard icon={Percent} label={t("admin.analytics.payingClients")} value={`${s.payingClients} (${s.payingPercent}%)`} color="text-rose-500" />
+          <MetricCard icon={DollarSign} label={t("admin.analytics.arpu")} value={fmtDec(s.arpu)} sub={t("admin.analytics.arpuSub")} color="text-indigo-500" />
+          <MetricCard icon={Award} label={t("admin.analytics.referredClients")} value={fmt(s.withReferrer)} sub={`${s.totalClients > 0 ? Math.round((s.withReferrer / s.totalClients) * 100) : 0}% ${t("admin.analytics.referredClientsSub")}`} color="text-pink-500" />
         </div>
       </section>
 
@@ -170,15 +172,15 @@ export function AnalyticsPage() {
       <section>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Zap className="h-5 w-5 text-primary" />
-          Триалы
+          {t("admin.analytics.sectionTrials")}
         </h2>
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-          <MetricCard icon={Zap} label="Всего триалов" value={fmt(s.trialUsedCount)} color="text-yellow-500" />
+          <MetricCard icon={Zap} label={t("admin.analytics.totalTrials")} value={fmt(s.trialUsedCount)} color="text-yellow-500" />
           <MetricCard
             icon={s.trialConversionRate > 20 ? ArrowUpRight : ArrowDownRight}
-            label="Конверсия триал → покупка"
+            label={t("admin.analytics.trialConversion")}
             value={`${s.trialConversionRate}%`}
-            sub={`${s.trialToPaid} из ${s.trialUsedCount}`}
+            sub={`${s.trialToPaid} ${t("admin.analytics.trialConversionSub")} ${s.trialUsedCount}`}
             color={s.trialConversionRate > 20 ? "text-green-500" : "text-orange-500"}
           />
         </div>
@@ -188,7 +190,7 @@ export function AnalyticsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
 
         {/* Доход по неделям */}
-        <ChartCard title="Доход по неделям (90 дн.)" icon={TrendingUp}>
+  <ChartCard title={t("admin.analytics.chartRevenueWeekly")} icon={TrendingUp}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={revenueWeekly}>
               <defs>
@@ -200,40 +202,40 @@ export function AnalyticsPage() {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} className="text-muted-foreground" />
               <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
-              <Tooltip formatter={(v) => [fmt(Number(v ?? 0)), "Доход"]} />
+              <Tooltip formatter={(v) => [fmt(Number(v ?? 0)), t("admin.analytics.tooltipRevenue")]} />
               <Area type="monotone" dataKey="value" stroke="#6366f1" fillOpacity={1} fill="url(#revGrad)" />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
         {/* Новые пользователи */}
-        <ChartCard title="Новые пользователи по неделям (90 дн.)" icon={UserPlus}>
+  <ChartCard title={t("admin.analytics.chartUsersWeekly")} icon={UserPlus}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={clientsWeekly}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} className="text-muted-foreground" />
               <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" allowDecimals={false} />
-              <Tooltip formatter={(v) => [Number(v ?? 0), "Пользователей"]} />
+              <Tooltip formatter={(v) => [Number(v ?? 0), t("admin.analytics.tooltipUsers")]} />
               <Bar dataKey="value" fill="#22c55e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
         {/* Триалы по неделям */}
-        <ChartCard title="Триалы по неделям (90 дн.)" icon={Zap}>
+  <ChartCard title={t("admin.analytics.chartTrialsWeekly")} icon={Zap}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={trialsWeekly}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} className="text-muted-foreground" />
               <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" allowDecimals={false} />
-              <Tooltip formatter={(v) => [Number(v ?? 0), "Триалов"]} />
+              <Tooltip formatter={(v) => [Number(v ?? 0), t("admin.analytics.tooltipTrials")]} />
               <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
         {/* Реферальные выплаты по неделям */}
-        <ChartCard title="Реферальные выплаты по неделям (90 дн.)" icon={Award}>
+  <ChartCard title={t("admin.analytics.chartReferralWeekly")} icon={Award}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={refCreditsWeekly}>
               <defs>
@@ -245,36 +247,36 @@ export function AnalyticsPage() {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} className="text-muted-foreground" />
               <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
-              <Tooltip formatter={(v) => [fmtDec(Number(v ?? 0)), "Выплаты"]} />
+              <Tooltip formatter={(v) => [fmtDec(Number(v ?? 0)), t("admin.analytics.tooltipReferralPayouts")]} />
               <Area type="monotone" dataKey="value" stroke="#ec4899" fillOpacity={1} fill="url(#refGrad)" />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
         {/* Промо активации (ссылки + коды) */}
-        <ChartCard title="Промо активации по неделям (90 дн.)" icon={Gift}>
+  <ChartCard title={t("admin.analytics.chartPromoWeekly")} icon={Gift}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={promoWeekly}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} className="text-muted-foreground" />
               <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="v1" name="Промо-ссылки" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-              <Line type="monotone" dataKey="v2" name="Промокоды" stroke="#06b6d4" strokeWidth={2} dot={false} />
+              <Bar dataKey="v1" name={t("admin.analytics.promoLinksLegend")} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              <Line type="monotone" dataKey="v2" name={t("admin.analytics.promoCodesLegend")} stroke="#06b6d4" strokeWidth={2} dot={false} />
               <Legend />
             </ComposedChart>
           </ResponsiveContainer>
         </ChartCard>
 
         {/* Источники клиентов — пирог */}
-        <ChartCard title="Источники клиентов" icon={Users}>
+        <ChartCard title={t("admin.analytics.chartClientSources")} icon={Users}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={[
-                  { name: "Только бот", value: s.botClients },
-                  { name: "Только сайт", value: s.siteClients },
-                  { name: "Бот + сайт", value: s.bothClients },
+                  { name: t("admin.analytics.sourceBotOnly"), value: s.botClients },
+                  { name: t("admin.analytics.sourceSiteOnly"), value: s.siteClients },
+                  { name: t("admin.analytics.sourceBotAndSite"), value: s.bothClients },
                 ].filter((d) => d.value > 0)}
                 dataKey="value"
                 nameKey="name"
@@ -287,14 +289,14 @@ export function AnalyticsPage() {
                   <Cell key={i} fill={c} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v) => [Number(v ?? 0), "Клиентов"]} />
+              <Tooltip formatter={(v) => [Number(v ?? 0), t("admin.analytics.tooltipClients")]} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
 
         {/* Доход по провайдерам */}
-        <ChartCard title="Доход по способам оплаты (90 дн.)" icon={Tag}>
+  <ChartCard title={t("admin.analytics.chartPaymentProviders")} icon={Tag}>
           {data.providerSeries.length === 0 ? (
             <NoData />
           ) : (
@@ -313,7 +315,7 @@ export function AnalyticsPage() {
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v) => [fmt(Number(v ?? 0)), "Сумма"]} />
+                <Tooltip formatter={(v) => [fmt(Number(v ?? 0)), t("admin.analytics.tooltipAmount")]} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -321,7 +323,7 @@ export function AnalyticsPage() {
         </ChartCard>
 
         {/* Топ тарифов */}
-        <ChartCard title="Топ тарифов по доходу (90 дн.)" icon={ShoppingCart}>
+  <ChartCard title={t("admin.analytics.chartTopTariffs")} icon={ShoppingCart}>
           {data.topTariffs.length === 0 ? (
             <NoData />
           ) : (
@@ -330,8 +332,8 @@ export function AnalyticsPage() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={130} />
-                <Tooltip formatter={(v: any) => [fmt(Number(v ?? 0)), "Доход"]} />
-                <Bar dataKey="revenue" fill="#6366f1" name="Доход" radius={[0, 4, 4, 0]} />
+                <Tooltip formatter={(v: any) => [fmt(Number(v ?? 0)), t("admin.analytics.tooltipRevenue")]} />
+                <Bar dataKey="revenue" fill="#6366f1" name={t("admin.analytics.tooltipRevenue")} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -342,10 +344,10 @@ export function AnalyticsPage() {
       <section>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Target className="h-5 w-5 text-primary" />
-          Источники трафика (UTM)
+          {t("admin.analytics.sectionTraffic")}
         </h2>
         {!data.campaignsStats?.length ? (
-          <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">Нет данных по источникам. Используйте ссылки с utm_source, utm_campaign или бот с start=c_источник_кампания</CardContent></Card>
+          <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">{t("admin.analytics.noTrafficData")}</CardContent></Card>
         ) : (
           <Card>
             <CardContent className="p-0">
@@ -353,12 +355,12 @@ export function AnalyticsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Источник</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Кампания</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Регистрации</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Триалы</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Платежи</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Доход</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colSource")}</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colCampaign")}</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colRegistrations")}</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colTrials")}</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colPayments")}</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colRevenue")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -384,10 +386,10 @@ export function AnalyticsPage() {
       <section>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Award className="h-5 w-5 text-primary" />
-          Топ рефералов
+          {t("admin.analytics.sectionTopReferrers")}
         </h2>
         {data.topReferrers.length === 0 ? (
-          <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">Нет данных</CardContent></Card>
+          <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">{t("admin.analytics.noData")}</CardContent></Card>
         ) : (
           <Card>
             <CardContent className="p-0">
@@ -396,13 +398,13 @@ export function AnalyticsPage() {
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">#</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Реферер</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Рефералов</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Заработок</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colReferrer")}</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colReferrals")}</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colEarnings")}</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground">L1</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground">L2</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground">L3</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Начислений</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t("admin.analytics.colCredits")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -430,32 +432,32 @@ export function AnalyticsPage() {
       <section>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Gift className="h-5 w-5 text-primary" />
-          Промо-статистика
+          {t("admin.analytics.sectionPromo")}
         </h2>
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 mb-4">
-          <MetricCard icon={Gift} label="Промо-ссылки активаций" value={fmt(s.promoActivations)} color="text-violet-500" />
-          <MetricCard icon={Tag} label="Промокоды использований" value={fmt(s.promoCodeUsages)} color="text-cyan-500" />
-          <MetricCard icon={Percent} label="Реферальные выплаты" value={fmtDec(s.totalReferralPaid)} color="text-pink-500" />
+          <MetricCard icon={Gift} label={t("admin.analytics.promoLinksActivations")} value={fmt(s.promoActivations)} color="text-violet-500" />
+          <MetricCard icon={Tag} label={t("admin.analytics.promoCodeUsages")} value={fmt(s.promoCodeUsages)} color="text-cyan-500" />
+          <MetricCard icon={Percent} label={t("admin.analytics.referralPayouts")} value={fmtDec(s.totalReferralPaid)} color="text-pink-500" />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Промо-ссылки */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Промо-ссылки (топ 10)</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("admin.analytics.promoLinksTop")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {data.promoGroupStats.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">Нет данных</p>
+                <p className="text-sm text-muted-foreground text-center py-8">{t("admin.analytics.noData")}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">Название</th>
-                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">Код</th>
-                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Активаций</th>
-                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Лимит</th>
+                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">{t("admin.analytics.colName")}</th>
+                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">{t("admin.analytics.colCode")}</th>
+                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">{t("admin.analytics.colActivations")}</th>
+                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">{t("admin.analytics.colLimit")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -464,7 +466,7 @@ export function AnalyticsPage() {
                           <td className="px-4 py-2">{g.name}</td>
                           <td className="px-4 py-2 font-mono text-xs">{g.code}</td>
                           <td className="px-4 py-2 text-right font-medium">{g.activations}</td>
-                          <td className="px-4 py-2 text-right text-muted-foreground">{g.maxActivations || "∞"}</td>
+                          <td className="px-4 py-2 text-right text-muted-foreground">{g.maxActivations || t("admin.analytics.unlimited")}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -477,20 +479,20 @@ export function AnalyticsPage() {
           {/* Промокоды */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Промокоды (топ 10)</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("admin.analytics.promoCodesTop")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {data.promoCodeStats.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">Нет данных</p>
+                <p className="text-sm text-muted-foreground text-center py-8">{t("admin.analytics.noData")}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">Код</th>
-                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">Тип</th>
-                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Использований</th>
-                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Лимит</th>
+                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">{t("admin.analytics.colCode")}</th>
+                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">{t("admin.analytics.colType")}</th>
+                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">{t("admin.analytics.colUsages")}</th>
+                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">{t("admin.analytics.colLimit")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -501,11 +503,11 @@ export function AnalyticsPage() {
                             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                               c.type === "DISCOUNT" ? "bg-green-500/15 text-green-700 dark:text-green-400" : "bg-blue-500/15 text-blue-700 dark:text-blue-400"
                             }`}>
-                              {c.type === "DISCOUNT" ? "Скидка" : "Дни"}
+                              {c.type === "DISCOUNT" ? t("admin.analytics.discountType") : t("admin.analytics.daysType")}
                             </span>
                           </td>
                           <td className="px-4 py-2 text-right font-medium">{c.usages}</td>
-                          <td className="px-4 py-2 text-right text-muted-foreground">{c.maxUses || "∞"}</td>
+                          <td className="px-4 py-2 text-right text-muted-foreground">{c.maxUses || t("admin.analytics.unlimited")}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -558,7 +560,8 @@ function ChartCard({ title, icon: Icon, children }: { title: string; icon: React
 }
 
 function NoData() {
-  return <p className="text-sm text-muted-foreground py-8 text-center h-72 flex items-center justify-center">Нет данных</p>;
+  const { t } = useTranslation();
+  return <p className="text-sm text-muted-foreground py-8 text-center h-72 flex items-center justify-center">{t("admin.analytics.noData")}</p>;
 }
 
 // ─── Утилиты ───
@@ -582,8 +585,6 @@ function aggregateByWeek(series: { date: string; value: number }[]): { label: st
 function aggregateByWeekTwo(
   s1: { date: string; value: number }[],
   s2: { date: string; value: number }[],
-  _name1: string,
-  _name2: string,
 ): { label: string; v1: number; v2: number }[] {
   const weeks: { label: string; v1: number; v2: number }[] = [];
   let w1 = 0, w2 = 0, weekStart = "";

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import { api } from "@/lib/api";
 import type {
@@ -40,16 +41,17 @@ interface Squad {
   name?: string;
 }
 
-function formatTraffic(bytes: string | number): string {
+function formatTraffic(bytes: string | number, noLimitLabel: string): string {
   const b = typeof bytes === "string" ? parseInt(bytes, 10) : bytes;
-  if (!b || b <= 0) return "Без лимита";
+  if (!b || b <= 0) return noLimitLabel;
   const gb = b / (1024 * 1024 * 1024);
-  if (gb >= 1) return `${gb.toFixed(gb % 1 === 0 ? 0 : 1)} ГБ`;
+  if (gb >= 1) return `${gb.toFixed(gb % 1 === 0 ? 0 : 1)} GB`;
   const mb = b / (1024 * 1024);
-  return `${mb.toFixed(0)} МБ`;
+  return `${mb.toFixed(0)} MB`;
 }
 
 export function PromoPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const token = state.accessToken!;
 
@@ -99,7 +101,7 @@ export function PromoPage() {
       setSquads(Array.isArray(list) ? list.map((s: { uuid?: string; name?: string }) => ({ uuid: s.uuid ?? "", name: s.name })) : []);
       setBotUsername((settings as AdminSettings)?.telegramBotUsername?.replace(/^@/, "") ?? "");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      setError(e instanceof Error ? e.message : t("admin.promo.errorLoad"));
     } finally {
       setLoading(false);
     }
@@ -146,20 +148,20 @@ export function PromoPage() {
       setShowForm(false);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка сохранения");
+      alert(e instanceof Error ? e.message : t("admin.promo.errorSave"));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Удалить промо-группу? Все активации будут удалены.")) return;
+    if (!confirm(t("admin.promo.deleteConfirm"))) return;
     try {
       await api.deletePromoGroup(token, id);
       if (detail?.id === id) setDetail(null);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка удаления");
+      alert(e instanceof Error ? e.message : t("admin.promo.errorDelete"));
     }
   };
 
@@ -168,7 +170,7 @@ export function PromoPage() {
       await api.updatePromoGroup(token, g.id, { isActive: !g.isActive });
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
+      alert(e instanceof Error ? e.message : t("admin.promo.errorLoad"));
     }
   };
 
@@ -178,7 +180,7 @@ export function PromoPage() {
       const d = await api.getPromoGroup(token, id);
       setDetail(d);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка загрузки");
+      alert(e instanceof Error ? e.message : t("admin.promo.errorLoad"));
     } finally {
       setDetailLoading(false);
     }
@@ -222,17 +224,17 @@ export function PromoPage() {
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => setDetail(null)}>
-            <ChevronLeft className="h-4 w-4 mr-1" /> Назад
+            <ChevronLeft className="h-4 w-4 mr-1" /> {t("admin.promo.back")}
           </Button>
           <h1 className="text-2xl font-bold tracking-tight">{detail.name}</h1>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${detail.isActive ? "bg-green-500/15 text-green-600" : "bg-red-500/15 text-red-600"}`}>
-            {detail.isActive ? "Активна" : "Неактивна"}
+            {detail.isActive ? t("admin.promo.active") : t("admin.promo.inactive")}
           </span>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Код</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("admin.promo.code")}</CardTitle></CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 <code className="text-lg font-mono font-bold">{detail.code}</code>
@@ -243,7 +245,7 @@ export function PromoPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Активации</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("admin.promo.activations")}</CardTitle></CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">
                 {detail.activationsCount}
@@ -252,13 +254,13 @@ export function PromoPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Подписка</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("admin.promo.subscription")}</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm">{detail.durationDays} дн. • {formatTraffic(detail.trafficLimitBytes)} • {detail.deviceLimit ?? "∞"} устр.</p>
+              <p className="text-sm">{detail.durationDays} {t("admin.promo.days")} • {formatTraffic(detail.trafficLimitBytes, t("admin.promo.noLimit"))} • {detail.deviceLimit ?? "∞"} {t("admin.promo.devices")}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Сквад</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("admin.promo.squad")}</CardTitle></CardHeader>
             <CardContent>
               <p className="text-sm font-medium">{getSquadName(detail.squadUuid)}</p>
             </CardContent>
@@ -268,7 +270,7 @@ export function PromoPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Link2 className="h-4 w-4" /> Ссылка для бота
+              <Link2 className="h-4 w-4" /> {t("admin.promo.botLink")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -284,21 +286,21 @@ export function PromoPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" /> Активации ({detail.activations.length})
+              <Users className="h-4 w-4" /> {t("admin.promo.activations")} ({detail.activations.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {detail.activations.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Ещё никто не активировал этот промокод.</p>
+              <p className="text-sm text-muted-foreground">{t("admin.promo.noActivations")}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-muted-foreground">
-                      <th className="py-2 px-2 font-medium">Клиент</th>
-                      <th className="py-2 px-2 font-medium">Telegram</th>
-                      <th className="py-2 px-2 font-medium">Remna UUID</th>
-                      <th className="py-2 px-2 font-medium">Дата активации</th>
+                      <th className="py-2 px-2 font-medium">{t("admin.promo.colClient")}</th>
+                      <th className="py-2 px-2 font-medium">{t("admin.promo.colTelegram")}</th>
+                      <th className="py-2 px-2 font-medium">{t("admin.promo.colRemna")}</th>
+                      <th className="py-2 px-2 font-medium">{t("admin.promo.colDate")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -307,7 +309,7 @@ export function PromoPage() {
                         <td className="py-2 px-2">{a.client.email || a.client.id.slice(0, 8)}</td>
                         <td className="py-2 px-2">{a.client.telegramUsername ? `@${a.client.telegramUsername}` : a.client.telegramId || "—"}</td>
                         <td className="py-2 px-2 font-mono text-xs">{a.client.remnawaveUuid?.slice(0, 12) || "—"}</td>
-                        <td className="py-2 px-2">{new Date(a.createdAt).toLocaleString("ru-RU")}</td>
+                        <td className="py-2 px-2">{new Date(a.createdAt).toLocaleString(undefined)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -324,11 +326,11 @@ export function PromoPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Промо-ссылки</h1>
-          <p className="text-muted-foreground text-sm mt-1">Создавайте промо-ссылки для раздачи бесплатных подписок через бота.</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("admin.promo.title")}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t("admin.promo.subtitle")}</p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" /> Создать
+          <Plus className="h-4 w-4 mr-2" /> {t("admin.promo.create")}
         </Button>
       </div>
 
@@ -336,8 +338,8 @@ export function PromoPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Link2 className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">Нет промо-групп</h3>
-            <p className="text-sm text-muted-foreground mt-1">Создайте первую промо-ссылку для раздачи подписок.</p>
+            <h3 className="text-lg font-medium">{t("admin.promo.empty")}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{t("admin.promo.emptyDesc")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -350,17 +352,17 @@ export function PromoPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-base">{g.name}</h3>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${g.isActive ? "bg-green-500/15 text-green-600" : "bg-red-500/15 text-red-600"}`}>
-                        {g.isActive ? "Активна" : "Неактивна"}
+                        {g.isActive ? t("admin.promo.active") : t("admin.promo.inactive")}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                       <span className="font-mono">{g.code}</span>
                       <span>•</span>
-                      <span>{g.durationDays} дн.</span>
+                      <span>{g.durationDays} {t("admin.promo.days")}</span>
                       <span>•</span>
-                      <span>{formatTraffic(g.trafficLimitBytes)}</span>
+                      <span>{formatTraffic(g.trafficLimitBytes, t("admin.promo.noLimit"))}</span>
                       <span>•</span>
-                      <span>{g.deviceLimit ?? "∞"} устр.</span>
+                      <span>{g.deviceLimit ?? "∞"} {t("admin.promo.devices")}</span>
                       <span>•</span>
                       <span>{getSquadName(g.squadUuid)}</span>
                     </div>
@@ -368,23 +370,23 @@ export function PromoPage() {
                       <Users className="h-3.5 w-3.5 text-muted-foreground" />
                       <span className="font-medium">{g.activationsCount}</span>
                       {g.maxActivations > 0 && <span className="text-muted-foreground">/ {g.maxActivations}</span>}
-                      <span className="text-muted-foreground">активаций</span>
+                      <span className="text-muted-foreground">{t("admin.promo.activationsOf")}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Копировать ссылку" onClick={() => copyLink(g.code)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t("admin.promo.copyLink")} onClick={() => copyLink(g.code)}>
                       {copiedCode === g.code ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Подробнее" onClick={() => openDetail(g.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t("admin.promo.details")} onClick={() => openDetail(g.id)}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title={g.isActive ? "Деактивировать" : "Активировать"} onClick={() => handleToggleActive(g)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={g.isActive ? t("admin.promo.deactivate") : t("admin.promo.activate")} onClick={() => handleToggleActive(g)}>
                       {g.isActive ? <ToggleRight className="h-4 w-4 text-green-500" /> : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Редактировать" onClick={() => openEdit(g)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t("admin.common.edit")} onClick={() => openEdit(g)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Удалить" onClick={() => handleDelete(g.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title={t("admin.common.delete")} onClick={() => handleDelete(g.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -399,27 +401,27 @@ export function PromoPage() {
       <Dialog open={showForm} onOpenChange={(open) => !open && setShowForm(false)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Редактировать" : "Создать"} промо-группу</DialogTitle>
-            <DialogDescription className="sr-only">Форма промо-группы</DialogDescription>
+            <DialogTitle>{editingId ? t("admin.promo.formTitleEdit") : t("admin.promo.formTitleNew")}</DialogTitle>
+            <DialogDescription className="sr-only">{t("admin.promo.formTitleNew")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Название</Label>
+              <Label>{t("admin.promo.formName")}</Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Промо для блогера X"
+                placeholder={t("admin.promo.formNamePlaceholder")}
                 className="mt-1"
               />
             </div>
             <div>
-              <Label>Сквад</Label>
+              <Label>{t("admin.promo.formSquad")}</Label>
               <select
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={form.squadUuid}
                 onChange={(e) => setForm((f) => ({ ...f, squadUuid: e.target.value }))}
               >
-                <option value="">Выберите сквад</option>
+                <option value="">{t("admin.promo.formSquadSelect")}</option>
                 {squads.map((s) => (
                   <option key={s.uuid} value={s.uuid}>{s.name || s.uuid}</option>
                 ))}
@@ -427,7 +429,7 @@ export function PromoPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Дней подписки</Label>
+                <Label>{t("admin.promo.formDays")}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -437,7 +439,7 @@ export function PromoPage() {
                 />
               </div>
               <div>
-                <Label>Макс. активаций (0 = ∞)</Label>
+                <Label>{t("admin.promo.formMaxAct")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -449,7 +451,7 @@ export function PromoPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Трафик (ГБ, 0 = без лимита)</Label>
+                <Label>{t("admin.promo.formTraffic")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -459,7 +461,7 @@ export function PromoPage() {
                 />
               </div>
               <div>
-                <Label>Лимит устройств (пусто = ∞)</Label>
+                <Label>{t("admin.promo.formDeviceLimit")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -477,13 +479,13 @@ export function PromoPage() {
                 className="rounded"
                 id="promo-active"
               />
-              <Label htmlFor="promo-active">Активна</Label>
+              <Label htmlFor="promo-active">{t("admin.promo.formActiveLabel")}</Label>
             </div>
             <DialogFooter className="mt-4">
-              <Button variant="outline" onClick={() => setShowForm(false)}>Отмена</Button>
+              <Button variant="outline" onClick={() => setShowForm(false)}>{t("admin.common.cancel")}</Button>
               <Button onClick={handleSave} disabled={saving || !form.name.trim() || !form.squadUuid}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {editingId ? "Сохранить" : "Создать"}
+                {editingId ? t("admin.common.save") : t("admin.promo.create")}
               </Button>
             </DialogFooter>
           </div>

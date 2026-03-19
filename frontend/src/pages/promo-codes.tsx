@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import { api } from "@/lib/api";
 import type {
@@ -41,17 +42,18 @@ interface Squad {
   name?: string;
 }
 
-function formatTraffic(bytes: string | number | null): string {
-  if (!bytes) return "Без лимита";
+function formatTraffic(bytes: string | number | null, noLimitLabel: string): string {
+  if (!bytes) return noLimitLabel;
   const b = typeof bytes === "string" ? parseInt(bytes, 10) : bytes;
-  if (!b || b <= 0) return "Без лимита";
+  if (!b || b <= 0) return noLimitLabel;
   const gb = b / (1024 * 1024 * 1024);
-  if (gb >= 1) return `${gb.toFixed(gb % 1 === 0 ? 0 : 1)} ГБ`;
+  if (gb >= 1) return `${gb.toFixed(gb % 1 === 0 ? 0 : 1)} GB`;
   const mb = b / (1024 * 1024);
-  return `${mb.toFixed(0)} МБ`;
+  return `${mb.toFixed(0)} MB`;
 }
 
 export function PromoCodesPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const token = state.accessToken!;
 
@@ -95,7 +97,7 @@ export function PromoCodesPage() {
       const list = res?.response?.internalSquads ?? (Array.isArray(res?.response) ? res.response : []);
       setSquads(Array.isArray(list) ? list.map((s: { uuid?: string; name?: string }) => ({ uuid: s.uuid ?? "", name: s.name })) : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      setError(e instanceof Error ? e.message : t("admin.promoCodes.errorLoad"));
     } finally {
       setLoading(false);
     }
@@ -155,20 +157,20 @@ export function PromoCodesPage() {
       setShowForm(false);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка сохранения");
+      alert(e instanceof Error ? e.message : t("admin.promoCodes.errorSave"));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Удалить промокод? Все данные об использованиях будут удалены.")) return;
+    if (!confirm(t("admin.promoCodes.deleteConfirm"))) return;
     try {
       await api.deletePromoCode(token, id);
       if (detail?.id === id) setDetail(null);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка удаления");
+      alert(e instanceof Error ? e.message : t("admin.promoCodes.errorDelete"));
     }
   };
 
@@ -177,7 +179,7 @@ export function PromoCodesPage() {
       await api.updatePromoCode(token, c.id, { isActive: !c.isActive });
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
+      alert(e instanceof Error ? e.message : t("admin.promoCodes.errorLoad"));
     }
   };
 
@@ -186,7 +188,7 @@ export function PromoCodesPage() {
       const d = await api.getPromoCode(token, id);
       setDetail(d);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка загрузки");
+      alert(e instanceof Error ? e.message : t("admin.promoCodes.errorLoad"));
     }
   };
 
@@ -202,7 +204,7 @@ export function PromoCodesPage() {
     return s?.name || uuid.slice(0, 8) + "…";
   };
 
-  const typeLabel = (type: string) => type === "DISCOUNT" ? "Скидка" : "Бесплатные дни";
+  const typeLabel = (type: string) => type === "DISCOUNT" ? t("admin.promoCodes.typeDiscount") : t("admin.promoCodes.typeFreeDays");
   const typeBadgeClass = (type: string) => type === "DISCOUNT" ? "bg-blue-500/15 text-blue-600" : "bg-purple-500/15 text-purple-600";
 
   if (loading) {
@@ -227,20 +229,20 @@ export function PromoCodesPage() {
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => setDetail(null)}>
-            <ChevronLeft className="h-4 w-4 mr-1" /> Назад
+            <ChevronLeft className="h-4 w-4 mr-1" /> {t("admin.promoCodes.back")}
           </Button>
           <h1 className="text-2xl font-bold tracking-tight">{detail.name}</h1>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeBadgeClass(detail.type)}`}>
             {typeLabel(detail.type)}
           </span>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${detail.isActive ? "bg-green-500/15 text-green-600" : "bg-red-500/15 text-red-600"}`}>
-            {detail.isActive ? "Активен" : "Неактивен"}
+            {detail.isActive ? t("admin.promoCodes.active") : t("admin.promoCodes.inactive")}
           </span>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Код</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("admin.promoCodes.code")}</CardTitle></CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 <code className="text-lg font-mono font-bold">{detail.code}</code>
@@ -251,7 +253,7 @@ export function PromoCodesPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Использования</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("admin.promoCodes.usages")}</CardTitle></CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">
                 {detail.usagesCount}
@@ -260,23 +262,23 @@ export function PromoCodesPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Параметры</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("admin.promoCodes.params")}</CardTitle></CardHeader>
             <CardContent>
               {detail.type === "DISCOUNT" ? (
                 <p className="text-sm">
                   {detail.discountPercent ? `${detail.discountPercent}%` : ""}
                   {detail.discountPercent && detail.discountFixed ? " + " : ""}
-                  {detail.discountFixed ? `${detail.discountFixed} фикс.` : ""}
+                  {detail.discountFixed ? `${detail.discountFixed} ${t("admin.promoCodes.fixed")}` : ""}
                 </p>
               ) : (
-                <p className="text-sm">{detail.durationDays} дн. • {formatTraffic(detail.trafficLimitBytes)} • {detail.deviceLimit ?? "∞"} устр.</p>
+                <p className="text-sm">{detail.durationDays} {t("admin.promoCodes.days")} • {formatTraffic(detail.trafficLimitBytes, t("admin.promoCodes.noLimit"))} • {detail.deviceLimit ?? "∞"} {t("admin.promoCodes.devices")}</p>
               )}
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Истекает</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("admin.promoCodes.expires")}</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm">{detail.expiresAt ? new Date(detail.expiresAt).toLocaleDateString("ru-RU") : "Бессрочно"}</p>
+              <p className="text-sm">{detail.expiresAt ? new Date(detail.expiresAt).toLocaleDateString(undefined) : t("admin.promoCodes.never")}</p>
             </CardContent>
           </Card>
         </div>
@@ -284,21 +286,21 @@ export function PromoCodesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" /> Использования ({detail.usages.length})
+              <Users className="h-4 w-4" /> {t("admin.promoCodes.usages")} ({detail.usages.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {detail.usages.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Промокод ещё не использовался.</p>
+              <p className="text-sm text-muted-foreground">{t("admin.promoCodes.noUsages")}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-muted-foreground">
-                      <th className="py-2 px-2 font-medium">Клиент</th>
-                      <th className="py-2 px-2 font-medium">Telegram</th>
-                      <th className="py-2 px-2 font-medium">Remna UUID</th>
-                      <th className="py-2 px-2 font-medium">Дата</th>
+                      <th className="py-2 px-2 font-medium">{t("admin.promoCodes.colClient")}</th>
+                      <th className="py-2 px-2 font-medium">{t("admin.promoCodes.colTelegram")}</th>
+                      <th className="py-2 px-2 font-medium">{t("admin.promoCodes.colRemna")}</th>
+                      <th className="py-2 px-2 font-medium">{t("admin.promoCodes.colDate")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -307,7 +309,7 @@ export function PromoCodesPage() {
                         <td className="py-2 px-2">{u.client.email || u.client.id.slice(0, 8)}</td>
                         <td className="py-2 px-2">{u.client.telegramUsername ? `@${u.client.telegramUsername}` : u.client.telegramId || "—"}</td>
                         <td className="py-2 px-2 font-mono text-xs">{u.client.remnawaveUuid?.slice(0, 12) || "—"}</td>
-                        <td className="py-2 px-2">{new Date(u.createdAt).toLocaleString("ru-RU")}</td>
+                        <td className="py-2 px-2">{new Date(u.createdAt).toLocaleString(undefined)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -324,11 +326,11 @@ export function PromoCodesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Промокоды</h1>
-          <p className="text-muted-foreground text-sm mt-1">Промокоды на скидку при оплате или бесплатные дни подписки.</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("admin.promoCodes.title")}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t("admin.promoCodes.subtitle")}</p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" /> Создать
+          <Plus className="h-4 w-4 mr-2" /> {t("admin.promoCodes.create")}
         </Button>
       </div>
 
@@ -336,8 +338,8 @@ export function PromoCodesPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Tag className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">Нет промокодов</h3>
-            <p className="text-sm text-muted-foreground mt-1">Создайте первый промокод.</p>
+            <h3 className="text-lg font-medium">{t("admin.promoCodes.empty")}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{t("admin.promoCodes.emptyDesc")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -353,7 +355,7 @@ export function PromoCodesPage() {
                         {typeLabel(c.type)}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.isActive ? "bg-green-500/15 text-green-600" : "bg-red-500/15 text-red-600"}`}>
-                        {c.isActive ? "Активен" : "Неактивен"}
+                        {c.isActive ? t("admin.promoCodes.active") : t("admin.promoCodes.inactive")}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
@@ -362,17 +364,17 @@ export function PromoCodesPage() {
                       {c.type === "DISCOUNT" ? (
                         <span>
                           {c.discountPercent ? <><Percent className="h-3 w-3 inline" /> {c.discountPercent}%</> : null}
-                          {c.discountFixed ? ` ${c.discountFixed} фикс.` : ""}
+                          {c.discountFixed ? ` ${c.discountFixed} ${t("admin.promoCodes.fixed")}` : ""}
                         </span>
                       ) : (
                         <span>
-                          <Gift className="h-3 w-3 inline" /> {c.durationDays} дн. • {formatTraffic(c.trafficLimitBytes)} • {c.deviceLimit ?? "∞"} устр. • {getSquadName(c.squadUuid)}
+                          <Gift className="h-3 w-3 inline" /> {c.durationDays} {t("admin.promoCodes.days")} • {formatTraffic(c.trafficLimitBytes, t("admin.promoCodes.noLimit"))} • {c.deviceLimit ?? "∞"} {t("admin.promoCodes.devices")} • {getSquadName(c.squadUuid)}
                         </span>
                       )}
                       {c.expiresAt && (
                         <>
                           <span>•</span>
-                          <span>до {new Date(c.expiresAt).toLocaleDateString("ru-RU")}</span>
+                          <span>{t("admin.promoCodes.until")} {new Date(c.expiresAt).toLocaleDateString(undefined)}</span>
                         </>
                       )}
                     </div>
@@ -380,23 +382,23 @@ export function PromoCodesPage() {
                       <Users className="h-3.5 w-3.5 text-muted-foreground" />
                       <span className="font-medium">{c.usagesCount}</span>
                       {c.maxUses > 0 && <span className="text-muted-foreground">/ {c.maxUses}</span>}
-                      <span className="text-muted-foreground">использований</span>
+                      <span className="text-muted-foreground">{t("admin.promoCodes.usagesOf")}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Копировать код" onClick={() => copyCode(c.code)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t("admin.promoCodes.copyCode")} onClick={() => copyCode(c.code)}>
                       {copiedCode === c.code ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Подробнее" onClick={() => openDetail(c.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t("admin.promoCodes.details")} onClick={() => openDetail(c.id)}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title={c.isActive ? "Деактивировать" : "Активировать"} onClick={() => handleToggleActive(c)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={c.isActive ? t("admin.promoCodes.deactivate") : t("admin.promoCodes.activate")} onClick={() => handleToggleActive(c)}>
                       {c.isActive ? <ToggleRight className="h-4 w-4 text-green-500" /> : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Редактировать" onClick={() => openEdit(c)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t("admin.common.edit")} onClick={() => openEdit(c)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Удалить" onClick={() => handleDelete(c.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title={t("admin.common.delete")} onClick={() => handleDelete(c.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -411,13 +413,13 @@ export function PromoCodesPage() {
       <Dialog open={showForm} onOpenChange={(open) => !open && setShowForm(false)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Редактировать" : "Создать"} промокод</DialogTitle>
-            <DialogDescription className="sr-only">Форма промокода</DialogDescription>
+            <DialogTitle>{editingId ? t("admin.promoCodes.formTitleEdit") : t("admin.promoCodes.formTitleNew")}</DialogTitle>
+            <DialogDescription className="sr-only">{t("admin.promoCodes.formTitleNew")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {!editingId && (
               <div>
-                <Label>Код промокода</Label>
+                <Label>{t("admin.promoCodes.formCode")}</Label>
                 <Input
                   value={form.code}
                   onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase().replace(/\s/g, "") }))}
@@ -427,30 +429,30 @@ export function PromoCodesPage() {
               </div>
             )}
             <div>
-              <Label>Название / описание</Label>
+              <Label>{t("admin.promoCodes.formName")}</Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Летняя акция -20%"
+                placeholder={t("admin.promoCodes.formNamePlaceholder")}
                 className="mt-1"
               />
             </div>
             <div>
-              <Label>Тип</Label>
+              <Label>{t("admin.promoCodes.formType")}</Label>
               <select
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={form.type}
                 onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "DISCOUNT" | "FREE_DAYS" }))}
               >
-                <option value="DISCOUNT">Скидка</option>
-                <option value="FREE_DAYS">Бесплатные дни</option>
+                <option value="DISCOUNT">{t("admin.promoCodes.typeDiscount")}</option>
+                <option value="FREE_DAYS">{t("admin.promoCodes.typeFreeDays")}</option>
               </select>
             </div>
 
             {form.type === "DISCOUNT" && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Скидка %</Label>
+                  <Label>{t("admin.promoCodes.formDiscountPct")}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -462,7 +464,7 @@ export function PromoCodesPage() {
                   />
                 </div>
                 <div>
-                  <Label>Фикс. скидка (валюта)</Label>
+                  <Label>{t("admin.promoCodes.formDiscountFixed")}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -478,13 +480,13 @@ export function PromoCodesPage() {
             {form.type === "FREE_DAYS" && (
               <>
                 <div>
-                  <Label>Сквад</Label>
+                  <Label>{t("admin.promoCodes.formSquad")}</Label>
                   <select
                     className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     value={form.squadUuid ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, squadUuid: e.target.value || null }))}
                   >
-                    <option value="">Выберите сквад</option>
+                    <option value="">{t("admin.promoCodes.formSquadSelect")}</option>
                     {squads.map((s) => (
                       <option key={s.uuid} value={s.uuid}>{s.name || s.uuid}</option>
                     ))}
@@ -492,7 +494,7 @@ export function PromoCodesPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Дней подписки</Label>
+                    <Label>{t("admin.promoCodes.formDays")}</Label>
                     <Input
                       type="number"
                       min={1}
@@ -502,7 +504,7 @@ export function PromoCodesPage() {
                     />
                   </div>
                   <div>
-                    <Label>Трафик (ГБ, 0 = без лимита)</Label>
+                    <Label>{t("admin.promoCodes.formTraffic")}</Label>
                     <Input
                       type="number"
                       min={0}
@@ -513,7 +515,7 @@ export function PromoCodesPage() {
                   </div>
                 </div>
                 <div>
-                  <Label>Лимит устройств (пусто = без лимита)</Label>
+                  <Label>{t("admin.promoCodes.formDeviceLimit")}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -527,7 +529,7 @@ export function PromoCodesPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Макс. использований (0 = ∞)</Label>
+                <Label>{t("admin.promoCodes.formMaxUses")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -537,7 +539,7 @@ export function PromoCodesPage() {
                 />
               </div>
               <div>
-                <Label>Макс. на клиента</Label>
+                <Label>{t("admin.promoCodes.formMaxPerClient")}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -549,7 +551,7 @@ export function PromoCodesPage() {
             </div>
 
             <div>
-              <Label>Истекает (пусто = бессрочно)</Label>
+              <Label>{t("admin.promoCodes.formExpires")}</Label>
               <Input
                 type="date"
                 value={form.expiresAt ? form.expiresAt.split("T")[0] : ""}
@@ -566,14 +568,14 @@ export function PromoCodesPage() {
                 className="rounded"
                 id="code-active"
               />
-              <Label htmlFor="code-active">Активен</Label>
+              <Label htmlFor="code-active">{t("admin.promoCodes.formActiveLabel")}</Label>
             </div>
 
             <DialogFooter className="mt-4">
-              <Button variant="outline" onClick={() => setShowForm(false)}>Отмена</Button>
+              <Button variant="outline" onClick={() => setShowForm(false)}>{t("admin.common.cancel")}</Button>
               <Button onClick={handleSave} disabled={saving || !form.name.trim() || (!editingId && !form.code.trim())}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {editingId ? "Сохранить" : "Создать"}
+                {editingId ? t("admin.common.save") : t("admin.promoCodes.create")}
               </Button>
             </DialogFooter>
           </div>

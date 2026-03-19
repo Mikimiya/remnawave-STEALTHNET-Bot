@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import { api } from "@/lib/api";
 import type {
@@ -51,12 +52,13 @@ const BYTES_PER_GB = 1024 * 1024 * 1024;
 const CURRENCIES = [
   { value: "usd", label: "USD" },
   { value: "rub", label: "RUB" },
+  { value: "cny", label: "CNY" },
 ];
 
 function formatTraffic(bytes: number | null): string {
   if (bytes == null) return "—";
-  if (bytes >= BYTES_PER_GB) return `${(bytes / BYTES_PER_GB).toFixed(1)} ГБ`;
-  return `${(bytes / (1024 * 1024)).toFixed(0)} МБ`;
+  if (bytes >= BYTES_PER_GB) return `${(bytes / BYTES_PER_GB).toFixed(1)} GB`;
+  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
 }
 
 function formatPrice(amount: number, currency: string): string {
@@ -91,6 +93,7 @@ function SortableCategoryCard({
   formatPrice: (amount: number, currency: string) => string;
   formatTraffic: (bytes: number | null) => string;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: cat.id,
   });
@@ -114,7 +117,7 @@ function SortableCategoryCard({
               className="flex h-9 w-9 shrink-0 cursor-grab active:cursor-grabbing items-center justify-center rounded-lg bg-muted/80 text-muted-foreground hover:bg-muted"
               {...attributes}
               {...listeners}
-              title="Перетащите для изменения порядка"
+              title={t("admin.tariffs.dragTitle")}
             >
               <GripVertical className="h-5 w-5" />
             </span>
@@ -124,23 +127,23 @@ function SortableCategoryCard({
             {cat.name}
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="sm" className="rounded-lg" onClick={onEditCategory} title="Редактировать категорию">
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={onEditCategory} title={t("admin.tariffs.editCategory")}>
               <Pencil className="h-3.5 w-3.5 mr-1" />
-              Изменить
+              {t("admin.tariffs.editCategory")}
             </Button>
             <Button
               variant="outline"
               size="sm"
               className="rounded-lg text-destructive hover:text-destructive"
               onClick={onDeleteCategory}
-              title="Удалить категорию"
+              title={t("admin.tariffs.deleteCategory")}
             >
               <Trash2 className="h-3.5 w-3.5 mr-1" />
-              Удалить
+              {t("admin.tariffs.deleteCategory")}
             </Button>
             <Button size="sm" className="rounded-lg shadow-sm" onClick={onAddTariff}>
               <Plus className="h-3.5 w-3.5 mr-1" />
-              Тариф
+              {t("admin.tariffs.addTariff")}
             </Button>
           </div>
         </div>
@@ -148,7 +151,7 @@ function SortableCategoryCard({
       <CardContent>
         {cat.tariffs.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">
-            Нет тарифов. Нажмите «Тариф», чтобы добавить (название, срок в днях, сквады, лимит трафика и устройств).
+            {t("admin.tariffs.emptyTariffs")}
           </p>
         ) : (
           <DndContext
@@ -157,16 +160,16 @@ function SortableCategoryCard({
             onDragEnd={onTariffDragEnd}
           >
             <SortableContext
-              items={cat.tariffs.map((t) => t.id)}
+              items={cat.tariffs.map((tr) => tr.id)}
               strategy={verticalListSortingStrategy}
             >
               <ul className="space-y-2">
-                {cat.tariffs.map((t) => (
+                {cat.tariffs.map((tr) => (
                   <SortableTariffRow
-                    key={t.id}
-                    tariff={t}
-                    onEdit={() => onEditTariff(t)}
-                    onDelete={() => onDeleteTariff(t.id)}
+                    key={tr.id}
+                    tariff={tr}
+                    onEdit={() => onEditTariff(tr)}
+                    onDelete={() => onDeleteTariff(tr.id)}
                     formatPrice={formatPrice}
                     formatTraffic={formatTraffic}
                   />
@@ -181,7 +184,7 @@ function SortableCategoryCard({
 }
 
 function SortableTariffRow({
-  tariff: t,
+  tariff: tariffItem,
   onEdit,
   onDelete,
   formatPrice,
@@ -193,8 +196,9 @@ function SortableTariffRow({
   formatPrice: (amount: number, currency: string) => string;
   formatTraffic: (bytes: number | null) => string;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: t.id,
+    id: tariffItem.id,
   });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -211,40 +215,40 @@ function SortableTariffRow({
           className="flex h-8 w-8 shrink-0 cursor-grab active:cursor-grabbing items-center justify-center rounded-lg bg-muted/80 text-muted-foreground hover:bg-muted"
           {...attributes}
           {...listeners}
-          title="Перетащите для изменения порядка"
+          title={t("admin.tariffs.dragTitle")}
         >
           <GripVertical className="h-4 w-4" />
         </span>
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
           <CreditCard className="h-4 w-4" />
         </span>
-        <span className="font-medium">{t.name}</span>
-        {t.description?.trim() ? (
-          <span className="text-muted-foreground text-sm max-w-[200px] truncate" title={t.description}>
-            {t.description}
+        <span className="font-medium">{tariffItem.name}</span>
+        {tariffItem.description?.trim() ? (
+          <span className="text-muted-foreground text-sm max-w-[200px] truncate" title={tariffItem.description}>
+            {tariffItem.description}
           </span>
         ) : null}
-        <span className="text-muted-foreground text-sm">{t.durationDays} дн.</span>
+        <span className="text-muted-foreground text-sm">{tariffItem.durationDays} {t("admin.tariffs.days")}</span>
         <span className="font-semibold text-primary">
-          {formatPrice(t.price ?? 0, t.currency ?? "usd")}
+          {formatPrice(tariffItem.price ?? 0, tariffItem.currency ?? "usd")}
         </span>
-        <span className="text-muted-foreground text-sm">сквадов: {t.internalSquadUuids.length}</span>
-        <span className="text-muted-foreground text-sm">трафик: {formatTraffic(t.trafficLimitBytes)}</span>
-        {t.deviceLimit != null && (
-          <span className="text-muted-foreground text-sm">устройств: {t.deviceLimit}</span>
+        <span className="text-muted-foreground text-sm">{t("admin.tariffs.squadsCount")}: {tariffItem.internalSquadUuids.length}</span>
+        <span className="text-muted-foreground text-sm">{t("admin.tariffs.trafficLabel")}: {formatTraffic(tariffItem.trafficLimitBytes)}</span>
+        {tariffItem.deviceLimit != null && (
+          <span className="text-muted-foreground text-sm">{t("admin.tariffs.devicesLabel")}: {tariffItem.deviceLimit}</span>
         )}
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="rounded-lg h-8" onClick={onEdit} title="Редактировать">
+        <Button variant="outline" size="sm" className="rounded-lg h-8" onClick={onEdit} title={t("admin.tariffs.editCategory")}>
           <Pencil className="h-3.5 w-3.5 mr-1" />
-          Изменить
+          {t("admin.tariffs.editCategory")}
         </Button>
         <Button
           variant="outline"
           size="sm"
           className="rounded-lg h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
           onClick={onDelete}
-          title="Удалить"
+          title={t("admin.tariffs.deleteCategory")}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -254,6 +258,7 @@ function SortableTariffRow({
 }
 
 export function TariffsPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const token = state.accessToken ?? null;
 
@@ -288,7 +293,7 @@ export function TariffsPage() {
       const list = res?.response?.internalSquads ?? (Array.isArray(res?.response) ? res.response : []);
       setSquads(Array.isArray(list) ? list.map((s) => ({ uuid: s.uuid ?? "", name: s.name })) : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      setError(e instanceof Error ? e.message : t("admin.tariffs.errorLoad"));
     } finally {
       setLoading(false);
     }
@@ -299,23 +304,23 @@ export function TariffsPage() {
   }, [token]);
 
   const handleDeleteCategory = async (id: string) => {
-    if (!token || !confirm("Удалить категорию и все тарифы в ней?")) return;
+    if (!token || !confirm(t("admin.tariffs.deleteCategoryConfirm"))) return;
     try {
       await api.deleteTariffCategory(token, id);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка удаления");
+      setError(e instanceof Error ? e.message : t("admin.tariffs.errorDelete"));
     }
   };
 
   const handleDeleteTariff = async (id: string) => {
-    if (!token || !confirm("Удалить тариф?")) return;
+    if (!token || !confirm(t("admin.tariffs.deleteTariffConfirm"))) return;
     try {
       await api.deleteTariff(token, id);
       await load();
       setTariffModal(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка удаления");
+      setError(e instanceof Error ? e.message : t("admin.tariffs.errorDelete"));
     }
   };
 
@@ -339,7 +344,7 @@ export function TariffsPage() {
         )
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка сохранения порядка");
+      setError(e instanceof Error ? e.message : t("admin.tariffs.errorOrder"));
       load();
     }
   };
@@ -363,12 +368,12 @@ export function TariffsPage() {
     if (!token) return;
     try {
       await Promise.all(
-        reordered.map((t, index) =>
-          api.updateTariff(token, t.id, { sortOrder: index })
+        reordered.map((tr, index) =>
+          api.updateTariff(token, tr.id, { sortOrder: index })
         )
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка сохранения порядка");
+      setError(e instanceof Error ? e.message : t("admin.tariffs.errorOrder"));
       load();
     }
   };
@@ -385,14 +390,14 @@ export function TariffsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Тарифы</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("admin.tariffs.title")}</h1>
           <p className="text-muted-foreground mt-1">
-            Категории тарифов и тарифы с указанием срока (1–360 дней), сквадов и лимитов
+            {t("admin.tariffs.subtitle")}
           </p>
         </div>
         <Button onClick={() => setCategoryModal("add")} className="rounded-xl shadow-sm shrink-0">
           <Plus className="h-4 w-4 mr-2" />
-          Добавить категорию
+          {t("admin.tariffs.addCategory")}
         </Button>
       </div>
 
@@ -406,7 +411,7 @@ export function TariffsPage() {
         <Card className="border-amber-500/50 bg-amber-500/5">
           <CardContent className="pt-6">
             <p className="text-sm text-amber-700 dark:text-amber-400">
-              Remna API не настроен. Сквады для тарифов подтягиваются из Remna — настройте REMNA_API_URL и REMNA_ADMIN_TOKEN в бэкенде.
+              {t("admin.tariffs.remnaWarning")}
             </p>
           </CardContent>
         </Card>
@@ -416,12 +421,12 @@ export function TariffsPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-muted-foreground text-center py-8">
-              Нет категорий. Создайте категорию тарифов, затем добавьте в неё тарифы (1–360 дней, сквады, лимиты).
+              {t("admin.tariffs.emptyCategories")}
             </p>
             <div className="flex justify-center">
               <Button onClick={() => setCategoryModal("add")}>
                 <Plus className="h-4 w-4 mr-2" />
-                Создать категорию
+                {t("admin.tariffs.createCategory")}
               </Button>
             </div>
           </CardContent>
@@ -505,6 +510,7 @@ function CategoryModal({
   saving: boolean;
   setSaving: (v: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const isEdit = modal !== "add";
   const editCat = isEdit ? (modal as { edit: TariffCategoryWithTariffs }).edit : null;
   const [name, setName] = useState(editCat?.name ?? "");
@@ -543,35 +549,35 @@ function CategoryModal({
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Редактировать категорию" : "Новая категория"}</DialogTitle>
-          <DialogDescription className="sr-only">Форма категории</DialogDescription>
+          <DialogTitle>{isEdit ? t("admin.tariffs.catModalTitleEdit") : t("admin.tariffs.catModalTitleNew")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("admin.tariffs.catModalTitleNew")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit}>
-          <Label htmlFor="cat-name">Название категории</Label>
+          <Label htmlFor="cat-name">{t("admin.tariffs.catNameLabel")}</Label>
           <Input
             id="cat-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Например: Базовый"
+            placeholder={t("admin.tariffs.catNamePlaceholder")}
             className="mt-1 mb-4"
             required
           />
-          <Label htmlFor="cat-emoji" className="mt-2 block">Эмодзи (по коду)</Label>
+          <Label htmlFor="cat-emoji" className="mt-2 block">{t("admin.tariffs.catEmojiLabel")}</Label>
           <select
             id="cat-emoji"
             value={emojiKey}
             onChange={(e) => setEmojiKey(e.target.value)}
             className="mt-1 mb-4 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
-            <option value="">— без эмодзи —</option>
+            <option value="">{t("admin.tariffs.catEmojiNone")}</option>
             <option value="ordinary">ordinary — 📦</option>
             <option value="premium">premium — ⭐</option>
           </select>
           <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={onClose}>Отмена</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t("admin.common.cancel")}</Button>
             <Button type="submit" disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isEdit ? "Сохранить" : "Создать"}
+              {isEdit ? t("admin.common.save") : t("admin.common.create")}
             </Button>
           </DialogFooter>
         </form>
@@ -597,6 +603,7 @@ function TariffModal({
   saving: boolean;
   setSaving: (v: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const isEdit = modal.kind === "edit";
   const tariff = isEdit ? modal.tariff : null;
   const categoryId = isEdit ? modal.category.id : modal.categoryId;
@@ -658,10 +665,10 @@ function TariffModal({
   const selectedSquadsList = squads.filter((s) => selectedSquadUuids.includes(s.uuid));
   const squadsTriggerLabel =
     selectedSquadUuids.length === 0
-      ? "Выберите сквады…"
+      ? t("admin.tariffs.squadsPlaceholder")
       : selectedSquadUuids.length === 1
-        ? selectedSquadsList[0]?.name || selectedSquadsList[0]?.uuid || "1 сквад"
-        : `Выбрано: ${selectedSquadUuids.length}`;
+        ? selectedSquadsList[0]?.name || selectedSquadsList[0]?.uuid || "1"
+        : t("admin.tariffs.squadsSelected", { n: selectedSquadUuids.length });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -713,35 +720,35 @@ function TariffModal({
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Редактировать тариф" : "Новый тариф"}</DialogTitle>
-          <DialogDescription className="sr-only">Форма тарифа</DialogDescription>
+          <DialogTitle>{isEdit ? t("admin.tariffs.tariffModalTitleEdit") : t("admin.tariffs.tariffModalTitleNew")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("admin.tariffs.tariffModalTitleNew")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <Label htmlFor="tariff-name">Название</Label>
+            <Label htmlFor="tariff-name">{t("admin.tariffs.tariffNameLabel")}</Label>
             <Input
               id="tariff-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Например: 30 дней, 1 год"
+              placeholder={t("admin.tariffs.tariffNamePlaceholder")}
               required
               className="mt-1"
             />
           </div>
           <div>
-            <Label htmlFor="tariff-desc">Описание (необязательно)</Label>
+            <Label htmlFor="tariff-desc">{t("admin.tariffs.tariffDescLabel")}</Label>
             <textarea
               id="tariff-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Краткое описание тарифа для клиентов"
+              placeholder={t("admin.tariffs.tariffDescPlaceholder")}
               rows={3}
               maxLength={5000}
               className="mt-1 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
           <div>
-            <Label htmlFor="tariff-days">Срок (дней)</Label>
+            <Label htmlFor="tariff-days">{t("admin.tariffs.tariffDaysLabel")}</Label>
             <Input
               id="tariff-days"
               type="number"
@@ -754,7 +761,7 @@ function TariffModal({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="tariff-price">Цена</Label>
+              <Label htmlFor="tariff-price">{t("admin.tariffs.tariffPriceLabel")}</Label>
               <Input
                 id="tariff-price"
                 type="number"
@@ -766,7 +773,7 @@ function TariffModal({
               />
             </div>
             <div>
-              <Label htmlFor="tariff-currency">Валюта</Label>
+              <Label htmlFor="tariff-currency">{t("admin.tariffs.tariffCurrencyLabel")}</Label>
               <select
                 id="tariff-currency"
                 value={currency}
@@ -782,11 +789,11 @@ function TariffModal({
             </div>
           </div>
           <div ref={squadsRef} className="relative">
-            <Label>Сквады (Remna)</Label>
-            <p className="text-xs text-muted-foreground mb-1.5 mt-1">Один или несколько внутренних сквадов</p>
+            <Label>{t("admin.tariffs.squadsLabel")}</Label>
+            <p className="text-xs text-muted-foreground mb-1.5 mt-1">{t("admin.tariffs.squadsHint")}</p>
             {squads.length === 0 ? (
               <div className="flex h-10 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
-                Список сквадов пуст или Remna не настроен
+                {t("admin.tariffs.squadsEmpty")}
               </div>
             ) : (
               <>
@@ -832,7 +839,7 @@ function TariffModal({
             )}
           </div>
           <div>
-            <Label htmlFor="tariff-traffic">Лимит трафика (ГБ)</Label>
+            <Label htmlFor="tariff-traffic">{t("admin.tariffs.trafficLimitLabel")}</Label>
             <Input
               id="tariff-traffic"
               type="number"
@@ -840,28 +847,28 @@ function TariffModal({
               step={0.1}
               value={trafficGb}
               onChange={(e) => setTrafficGb(e.target.value)}
-              placeholder="Не ограничено"
+              placeholder={t("admin.tariffs.trafficLimitPlaceholder")}
               className="mt-1"
             />
-            <p className="text-xs text-muted-foreground mt-1">1 ГБ = 1024³ байт (ГиБ). В Remna передаётся лимит в байтах.</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("admin.tariffs.trafficHint")}</p>
           </div>
           <div>
-            <Label htmlFor="tariff-devices">Лимит устройств</Label>
+            <Label htmlFor="tariff-devices">{t("admin.tariffs.deviceLimitLabel")}</Label>
             <Input
               id="tariff-devices"
               type="number"
               min={0}
               value={deviceLimit}
               onChange={(e) => setDeviceLimit(e.target.value)}
-              placeholder="Не ограничено"
+              placeholder={t("admin.tariffs.deviceLimitPlaceholder")}
               className="mt-1"
             />
           </div>
           <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={onClose}>Отмена</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t("admin.common.cancel")}</Button>
             <Button type="submit" disabled={saving || selectedSquadUuids.length === 0}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isEdit ? "Сохранить" : "Создать"}
+              {isEdit ? t("admin.common.save") : t("admin.common.create")}
             </Button>
           </DialogFooter>
         </form>

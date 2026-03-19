@@ -5,18 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Download, ChevronLeft, ChevronRight, DollarSign, ShoppingCart, Filter } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 function formatDate(s: string | null) {
   if (!s) return "—";
   try {
-    return new Date(s).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    return new Date(s).toLocaleString(undefined, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   } catch {
     return s;
   }
 }
 
 function formatMoney(n: number) {
-  return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(n);
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(n);
 }
 
 interface SaleItem {
@@ -45,16 +46,17 @@ interface SalesData {
 }
 
 const PROVIDERS = [
-  { value: "", label: "Все" },
-  { value: "balance", label: "Баланс" },
+  { value: "", labelKey: "providerAll" },
+  { value: "balance", labelKey: "providerBalance" },
   { value: "platega", label: "Platega" },
-  { value: "yoomoney_form", label: "ЮMoney" },
-  { value: "yookassa", label: "ЮKassa" },
+  { value: "yoomoney_form", labelKey: "providerYoomoney" },
+  { value: "yookassa", labelKey: "providerYookassa" },
 ];
 
 export function SalesReportPage() {
   const { state } = useAuth();
   const token = state.accessToken;
+  const { t } = useTranslation();
   const [data, setData] = useState<SalesData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -93,7 +95,7 @@ export function SalesReportPage() {
 
   function exportCSV() {
     if (!data?.items.length) return;
-    const header = "Дата;Заказ;Клиент;Telegram;Тариф;Сумма;Валюта;Провайдер";
+    const header = "Date;Order;Client;Telegram;Plan;Amount;Currency;Provider";
     const rows = data.items.map((r) =>
       [
         formatDate(r.paidAt),
@@ -122,12 +124,12 @@ export function SalesReportPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Отчёты продаж</h1>
-          <p className="text-muted-foreground mt-1">Все оплаченные платежи и пополнения</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("admin.salesReport.title")}</h1>
+          <p className="text-muted-foreground mt-1">{t("admin.salesReport.subtitle")}</p>
         </div>
         <Button variant="outline" className="gap-2 shrink-0" onClick={exportCSV} disabled={!data?.items.length}>
           <Download className="h-4 w-4" />
-          Экспорт CSV
+          {t("admin.salesReport.exportCsv")}
         </Button>
       </div>
 
@@ -140,7 +142,7 @@ export function SalesReportPage() {
                 <DollarSign className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Общая сумма (фильтр)</p>
+                <p className="text-xs text-muted-foreground">{t("admin.salesReport.totalAmount")}</p>
                 <p className="text-xl font-bold">{formatMoney(data.totalAmount)}</p>
               </div>
             </CardContent>
@@ -151,7 +153,7 @@ export function SalesReportPage() {
                 <ShoppingCart className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Количество (фильтр)</p>
+                <p className="text-xs text-muted-foreground">{t("admin.salesReport.totalCount")}</p>
                 <p className="text-xl font-bold">{data.totalCount}</p>
               </div>
             </CardContent>
@@ -162,8 +164,8 @@ export function SalesReportPage() {
                 <Filter className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Показано</p>
-                <p className="text-xl font-bold">{data.items.length} из {data.total}</p>
+                <p className="text-xs text-muted-foreground">{t("admin.salesReport.shown")}</p>
+                <p className="text-xl font-bold">{data.items.length} {t("admin.salesReport.shownOf")} {data.total}</p>
               </div>
             </CardContent>
           </Card>
@@ -173,32 +175,32 @@ export function SalesReportPage() {
       {/* Фильтры */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Фильтры</CardTitle>
+          <CardTitle className="text-sm font-medium">{t("admin.salesReport.filterTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3 items-end">
             <div>
-              <label className="text-xs text-muted-foreground">Дата от</label>
+              <label className="text-xs text-muted-foreground">{t("admin.salesReport.dateFrom")}</label>
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Дата до</label>
+              <label className="text-xs text-muted-foreground">{t("admin.salesReport.dateTo")}</label>
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Способ оплаты</label>
+              <label className="text-xs text-muted-foreground">{t("admin.salesReport.payMethod")}</label>
               <select
                 className="flex h-9 w-40 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
               >
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
+                  <option key={p.value} value={p.value}>{"labelKey" in p ? t(`admin.salesReport.${p.labelKey}`) : p.label}</option>
                 ))}
               </select>
             </div>
-            <Button size="sm" onClick={applyFilters}>Применить</Button>
-            <Button size="sm" variant="ghost" onClick={() => { setDateFrom(""); setDateTo(""); setProvider(""); setPage(1); }}>Сбросить</Button>
+            <Button size="sm" onClick={applyFilters}>{t("admin.salesReport.applyFilters")}</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setDateFrom(""); setDateTo(""); setProvider(""); setPage(1); }}>{t("admin.salesReport.resetFilters")}</Button>
           </div>
         </CardContent>
       </Card>
@@ -211,18 +213,18 @@ export function SalesReportPage() {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : !data?.items.length ? (
-            <p className="text-sm text-muted-foreground text-center py-16">Нет данных</p>
+            <p className="text-sm text-muted-foreground text-center py-16">{t("admin.salesReport.noData")}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Дата</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Клиент</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Тариф</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">Сумма</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Способ</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Заказ</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colDate")}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colClient")}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colTariff")}</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colAmount")}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colMethod")}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colOrder")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -246,7 +248,7 @@ export function SalesReportPage() {
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                           r.provider === "balance" ? "bg-blue-500/15 text-blue-700 dark:text-blue-400" : r.provider === "yoomoney" || r.provider === "yoomoney_form" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400" : r.provider === "yookassa" ? "bg-violet-500/15 text-violet-700 dark:text-violet-400" : r.provider === "heleket" ? "bg-teal-500/15 text-teal-700 dark:text-teal-400" : "bg-green-500/15 text-green-700 dark:text-green-400"
                         }`}>
-                          {r.provider === "balance" ? "Баланс" : r.provider === "platega" ? "Platega" : r.provider === "yoomoney" || r.provider === "yoomoney_form" ? "ЮMoney" : r.provider === "yookassa" ? "ЮKassa" : r.provider === "heleket" ? "Heleket" : r.provider}
+                          {r.provider === "balance" ? t("admin.salesReport.providerBalance") : r.provider}
                         </span>
                       </td>
                       <td className="px-4 py-3">

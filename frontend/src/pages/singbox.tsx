@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import {
   api,
@@ -33,7 +34,7 @@ function formatBytes(s: string): string {
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString("ru-RU", {
+    return new Date(iso).toLocaleString(undefined, {
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
@@ -44,13 +45,17 @@ function formatDate(iso: string | null): string {
   }
 }
 
-function statusBadge(status: string) {
+function statusBadge(status: string, t: (key: string) => string) {
   const map: Record<string, string> = {
     ONLINE: "bg-green-500/15 text-green-700 dark:text-green-400",
     OFFLINE: "bg-muted text-muted-foreground",
     DISABLED: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
   };
-  const label = status === "ONLINE" ? "Онлайн" : status === "DISABLED" ? "Отключена" : "Офлайн";
+  const label = status === "ONLINE"
+    ? t("admin.singbox.statusOnline")
+    : status === "DISABLED"
+      ? t("admin.singbox.statusDisabled")
+      : t("admin.singbox.statusOffline");
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${map[status] ?? "bg-muted"}`}>
       {label}
@@ -61,6 +66,7 @@ function statusBadge(status: string) {
 const PROTOCOLS = ["VLESS", "SHADOWSOCKS", "TROJAN", "HYSTERIA2"] as const;
 
 export function SingboxPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const [nodes, setNodes] = useState<SingboxNodeListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,19 +169,19 @@ export function SingboxPage() {
       setCategoryModal(null);
       setCategoryForm({ name: "", sortOrder: "0" });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
+      alert(e instanceof Error ? e.message : t("admin.singbox.errorGeneric"));
     } finally {
       setSavingCat(false);
     }
   }
 
   async function handleDeleteCategory(id: string) {
-    if (!token || !confirm("Удалить категорию и все тарифы в ней?")) return;
+    if (!token || !confirm(t("admin.singbox.deleteCategoryConfirm"))) return;
     try {
       await api.deleteSingboxCategory(token, id);
       await loadCategories();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка удаления");
+      alert(e instanceof Error ? e.message : t("admin.singbox.errorDelete"));
     }
   }
 
@@ -209,20 +215,20 @@ export function SingboxPage() {
       setTariffModal(null);
       setTariffForm({ name: "", categoryId: "", slotCount: "1", durationDays: "30", trafficLimitBytes: "", price: "", currency: "rub", sortOrder: "0", enabled: true });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
+      alert(e instanceof Error ? e.message : t("admin.singbox.errorGeneric"));
     } finally {
       setSavingTariff(false);
     }
   }
 
   async function handleDeleteTariff(id: string) {
-    if (!token || !confirm("Удалить тариф?")) return;
+    if (!token || !confirm(t("admin.singbox.deleteTariffConfirm"))) return;
     try {
       await api.deleteSingboxTariff(token, id);
       await loadCategories();
       setTariffModal(null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка удаления");
+      alert(e instanceof Error ? e.message : t("admin.singbox.errorDelete"));
     }
   }
 
@@ -241,7 +247,7 @@ export function SingboxPage() {
       setAddResult(res);
       await loadNodes();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка создания");
+      alert(e instanceof Error ? e.message : t("admin.singbox.errorCreate"));
     } finally {
       setCreating(false);
     }
@@ -280,7 +286,7 @@ export function SingboxPage() {
         setDetailNode(updated);
       }
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
+      alert(e instanceof Error ? e.message : t("admin.singbox.errorGeneric"));
     } finally {
       setSaving(false);
     }
@@ -295,7 +301,7 @@ export function SingboxPage() {
       if (detailId === nodeToDelete.id) setDetailId(null);
       setNodeToDelete(null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка удаления");
+      alert(e instanceof Error ? e.message : t("admin.singbox.errorDelete"));
     } finally {
       setDeleting(false);
     }
@@ -337,13 +343,13 @@ export function SingboxPage() {
     setConfigError(null);
     const trimmed = configJson.trim();
     if (!trimmed) {
-      setConfigError("Конфиг не может быть пустым");
+      setConfigError(t("admin.singbox.configEmpty"));
       return;
     }
     try {
       JSON.parse(trimmed);
     } catch (e) {
-      setConfigError("Невалидный JSON: " + (e instanceof Error ? e.message : ""));
+      setConfigError(`${t("admin.singbox.configInvalid")} ${e instanceof Error ? e.message : ""}`.trim());
       return;
     }
     setConfigSaving(true);
@@ -354,14 +360,14 @@ export function SingboxPage() {
       setDetailNode(updated);
       await loadNodes();
     } catch (e) {
-      setConfigError(e instanceof Error ? e.message : "Ошибка сохранения");
+      setConfigError(e instanceof Error ? e.message : t("admin.singbox.errorSave"));
     } finally {
       setConfigSaving(false);
     }
   }
 
   function formatPrice(amount: number, currency: string) {
-    return new Intl.NumberFormat("ru-RU", {
+    return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency: currency.toUpperCase() === "RUB" ? "RUB" : "USD",
       minimumFractionDigits: 0,
@@ -375,16 +381,16 @@ export function SingboxPage() {
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Server className="h-6 w-6" />
-            Sing-box
+            {t("admin.singbox.pageTitle")}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Ноды VLESS / Shadowsocks / Trojan / Hysteria2. Категории и тарифы для продажи доступов.
+            {t("admin.singbox.pageSubtitle")}
           </p>
         </div>
         {activeTab === "nodes" && (
           <Button onClick={() => { setAddOpen(true); setAddResult(null); setNewNodeName(""); setNewNodeProtocol("VLESS"); setNewNodePort("443"); }}>
             <Plus className="h-4 w-4 mr-2" />
-            Добавить ноду
+            {t("admin.singbox.addNode")}
           </Button>
         )}
       </div>
@@ -393,15 +399,15 @@ export function SingboxPage() {
         <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="nodes" className="flex items-center gap-1.5">
             <Server className="h-4 w-4" />
-            Ноды
+            {t("admin.singbox.tabNodes")}
           </TabsTrigger>
           <TabsTrigger value="categories" className="flex items-center gap-1.5">
             <Layers className="h-4 w-4" />
-            Категории
+            {t("admin.singbox.tabCategories")}
           </TabsTrigger>
           <TabsTrigger value="tariffs" className="flex items-center gap-1.5">
             <Tag className="h-4 w-4" />
-            Тарифы
+            {t("admin.singbox.tabTariffs")}
           </TabsTrigger>
         </TabsList>
 
@@ -414,12 +420,12 @@ export function SingboxPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Ноды</CardTitle>
-              <CardDescription>Список sing-box нод</CardDescription>
+              <CardTitle>{t("admin.singbox.nodesTitle")}</CardTitle>
+              <CardDescription>{t("admin.singbox.nodesDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               {nodes.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Нод пока нет. Нажмите «Добавить ноду».</p>
+                <p className="text-muted-foreground text-sm">{t("admin.singbox.noNodes")}</p>
               ) : (
                 <ul className="space-y-2">
                   {nodes.map((n) => (
@@ -433,13 +439,13 @@ export function SingboxPage() {
                       <div className="flex items-center gap-2 min-w-0">
                         <Server className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <span className="font-medium truncate">{n.name || n.id.slice(0, 8)}</span>
-                        {statusBadge(n.status)}
+                        {statusBadge(n.status, t)}
                         <span className="text-xs text-muted-foreground">{n.protocol}</span>
                         {n.hasCustomConfig && (
-                          <span title="Есть кастомный конфиг"><FileJson className="h-3.5 w-3.5 text-muted-foreground" /></span>
+                          <span title={t("admin.singbox.hasCustomConfig")}><FileJson className="h-3.5 w-3.5 text-muted-foreground" /></span>
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground">{n.slotsCount} сл.</span>
+                      <span className="text-xs text-muted-foreground">{n.slotsCount} {t("admin.singbox.slotsShort")}</span>
                     </li>
                   ))}
                 </ul>
@@ -449,14 +455,14 @@ export function SingboxPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Детали ноды</CardTitle>
+              <CardTitle>{t("admin.singbox.nodeDetailsTitle")}</CardTitle>
               <CardDescription>
-                {detailId ? (detailLoading ? "Загрузка…" : "Клик по ноде — детали и конфиг") : "Выберите ноду"}
+                {detailId ? (detailLoading ? t("admin.singbox.nodeDetailsLoading") : t("admin.singbox.nodeDetailsHint")) : t("admin.singbox.nodeSelectPrompt")}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {!detailId ? (
-                <p className="text-muted-foreground text-sm">Выберите ноду из списка слева.</p>
+                <p className="text-muted-foreground text-sm">{t("admin.singbox.nodeSelectLeft")}</p>
               ) : detailLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -465,51 +471,51 @@ export function SingboxPage() {
                 <div className="space-y-4">
                   <div className="grid gap-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Название</span>
+                      <span className="text-muted-foreground">{t("admin.singbox.fieldName")}</span>
                       <span>{detailNode.name || "—"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Статус</span>
-                      {statusBadge(detailNode.status)}
+                      <span className="text-muted-foreground">{t("admin.singbox.fieldStatus")}</span>
+                      {statusBadge(detailNode.status, t)}
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Хост</span>
+                      <span className="text-muted-foreground">{t("admin.singbox.fieldHost")}</span>
                       <span className="font-mono text-xs">{detailNode.publicHost || "—"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Порт / протокол</span>
+                      <span className="text-muted-foreground">{t("admin.singbox.fieldPortProtocol")}</span>
                       <span>{detailNode.port} / {detailNode.protocol}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Последний heartbeat</span>
+                      <span className="text-muted-foreground">{t("admin.singbox.fieldLastHeartbeat")}</span>
                       <span>{formatDate(detailNode.lastSeenAt)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Трафик</span>
+                      <span className="text-muted-foreground">{t("admin.singbox.fieldTraffic")}</span>
                       <span>↓ {formatBytes(detailNode.trafficInBytes)} ↑ {formatBytes(detailNode.trafficOutBytes)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Слотов</span>
+                      <span className="text-muted-foreground">{t("admin.singbox.fieldSlots")}</span>
                       <span>{detailNode.slots.length}</span>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={openConfigEditor}>
                       <FileJson className="h-4 w-4 mr-1" />
-                      Редактировать конфиг (JSON)
+                      {t("admin.singbox.editConfig")}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openEdit({ ...detailNode, slotsCount: detailNode.slots.length, hasCustomConfig: !!detailNode.customConfigJson } as SingboxNodeListItem)}>
                       <Pencil className="h-4 w-4 mr-1" />
-                      Изменить ноду
+                      {t("admin.singbox.editNode")}
                     </Button>
                     <Button variant="outline" size="sm" className="text-destructive" onClick={() => setNodeToDelete({ ...detailNode, slotsCount: detailNode.slots.length, hasCustomConfig: !!detailNode.customConfigJson } as SingboxNodeListItem)}>
                       <Trash2 className="h-4 w-4 mr-1" />
-                      Удалить
+                      {t("admin.singbox.delete")}
                     </Button>
                   </div>
                   {detailNode.slots.length > 0 && (
                     <div>
-                      <Label className="text-muted-foreground">Слоты</Label>
+                      <Label className="text-muted-foreground">{t("admin.singbox.slotsLabel")}</Label>
                       <ul className="mt-1 rounded border divide-y text-sm">
                         {detailNode.slots.map((s) => (
                           <li key={s.id} className="px-3 py-2 flex justify-between items-center">
@@ -522,7 +528,7 @@ export function SingboxPage() {
                   )}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm">Не удалось загрузить ноду.</p>
+                <p className="text-muted-foreground text-sm">{t("admin.singbox.nodeLoadFailed")}</p>
               )}
             </CardContent>
           </Card>
@@ -534,26 +540,26 @@ export function SingboxPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Категории</CardTitle>
-                <CardDescription>Группы тарифов для магазина доступов</CardDescription>
+                <CardTitle>{t("admin.singbox.categoriesTitle")}</CardTitle>
+                <CardDescription>{t("admin.singbox.categoriesDesc")}</CardDescription>
               </div>
               <Button onClick={() => { setCategoryModal("add"); setCategoryForm({ name: "", sortOrder: "0" }); }}>
                 <Plus className="h-4 w-4 mr-2" />
-                Добавить
+                {t("admin.singbox.add")}
               </Button>
             </CardHeader>
             <CardContent>
               {categoriesLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
               ) : categories.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Нет категорий. Добавьте категорию, затем тарифы.</p>
+                <p className="text-muted-foreground text-sm">{t("admin.singbox.noCategories")}</p>
               ) : (
                 <ul className="space-y-3">
                   {categories.map((c) => (
                     <li key={c.id} className="rounded-lg border p-3 flex items-center justify-between">
                       <span className="font-medium">{c.name}</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{c.tariffs.length} тарифов</span>
+                        <span className="text-xs text-muted-foreground">{c.tariffs.length} {t("admin.singbox.tariffsCount")}</span>
                         <Button variant="outline" size="sm" onClick={() => { setCategoryModal({ edit: c }); setCategoryForm({ name: c.name, sortOrder: String(c.sortOrder) }); }}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -573,55 +579,55 @@ export function SingboxPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Тарифы</CardTitle>
-                <CardDescription>Тарифы по категориям. Клиенты покупают по singboxTariffId.</CardDescription>
+                <CardTitle>{t("admin.singbox.tariffsTitle")}</CardTitle>
+                <CardDescription>{t("admin.singbox.tariffsDesc")}</CardDescription>
               </div>
               <Button
                 onClick={() => {
-                  if (categories.length === 0) { alert("Сначала добавьте категорию"); return; }
+                  if (categories.length === 0) { alert(t("admin.singbox.addCategoryFirst")); return; }
                   setTariffModal({ kind: "add", categoryId: categories[0]!.id });
                   setTariffForm({ name: "", categoryId: categories[0]!.id, slotCount: "1", durationDays: "30", trafficLimitBytes: "", price: "", currency: "rub", sortOrder: "0", enabled: true });
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Добавить тариф
+                {t("admin.singbox.addTariff")}
               </Button>
             </CardHeader>
             <CardContent>
               {categoriesLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
               ) : categories.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Добавьте категорию во вкладке «Категории».</p>
+                <p className="text-muted-foreground text-sm">{t("admin.singbox.addCategoryOnTab")}</p>
               ) : (
                 <div className="space-y-4">
                   {categories.map((cat) => (
                     <div key={cat.id}>
                       <h3 className="font-medium text-sm text-muted-foreground mb-2">{cat.name}</h3>
                       {cat.tariffs.length === 0 ? (
-                        <p className="text-sm text-muted-foreground ml-2">Нет тарифов</p>
+                        <p className="text-sm text-muted-foreground ml-2">{t("admin.singbox.noTariffs")}</p>
                       ) : (
                         <ul className="space-y-2">
-                          {cat.tariffs.map((t) => (
-                            <li key={t.id} className="rounded border p-3 flex items-center justify-between">
+                          {cat.tariffs.map((tariff) => (
+                            <li key={tariff.id} className="rounded border p-3 flex items-center justify-between">
                               <div>
-                                <span className="font-medium">{t.name}</span>
+                                <span className="font-medium">{tariff.name}</span>
                                 <span className="text-xs text-muted-foreground ml-2">
-                                  {t.slotCount} сл. · {t.durationDays} дн. · {formatPrice(t.price, t.currency)}
-                                  {t.trafficLimitBytes ? ` · ${formatBytes(t.trafficLimitBytes)}` : ""}
+                                  {tariff.slotCount} {t("admin.singbox.slotsShort")} · {tariff.durationDays} {t("admin.singbox.daysShort")} · {formatPrice(tariff.price, tariff.currency)}
+                                  {tariff.trafficLimitBytes ? ` · ${formatBytes(tariff.trafficLimitBytes)}` : ""}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
-                                {!t.enabled && <span className="text-xs text-amber-600">Выкл</span>}
+                                {!tariff.enabled && <span className="text-xs text-amber-600">{t("admin.singbox.disabledShort")}</span>}
                                 <Button variant="outline" size="sm" onClick={() => {
-                                  setTariffModal({ kind: "edit", tariff: { ...t, categoryId: cat.id, categoryName: cat.name, sortOrder: 0 } as SingboxTariffListItem });
+                                  setTariffModal({ kind: "edit", tariff: { ...tariff, categoryId: cat.id, categoryName: cat.name, sortOrder: 0 } as SingboxTariffListItem });
                                   setTariffForm({
-                                    name: t.name, categoryId: cat.id, slotCount: String(t.slotCount), durationDays: String(t.durationDays),
-                                    trafficLimitBytes: t.trafficLimitBytes ? String(Math.round(Number(t.trafficLimitBytes) / (1024 ** 3))) : "", price: String(t.price), currency: t.currency.toLowerCase(), sortOrder: "0", enabled: t.enabled,
+                                    name: tariff.name, categoryId: cat.id, slotCount: String(tariff.slotCount), durationDays: String(tariff.durationDays),
+                                    trafficLimitBytes: tariff.trafficLimitBytes ? String(Math.round(Number(tariff.trafficLimitBytes) / (1024 ** 3))) : "", price: String(tariff.price), currency: tariff.currency.toLowerCase(), sortOrder: "0", enabled: tariff.enabled,
                                   });
                                 }}>
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDeleteTariff(t.id)}>
+                                <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDeleteTariff(tariff.id)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
@@ -642,13 +648,13 @@ export function SingboxPage() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Добавить sing-box ноду</DialogTitle>
-            <DialogDescription>Заполните параметры. После создания скопируйте docker-compose на сервер.</DialogDescription>
+            <DialogTitle>{t("admin.singbox.addNodeTitle")}</DialogTitle>
+            <DialogDescription>{t("admin.singbox.addNodeDesc")}</DialogDescription>
           </DialogHeader>
           {!addResult ? (
             <div className="space-y-4 py-4">
               <div className="grid gap-2">
-                <Label>Название</Label>
+                <Label>{t("admin.singbox.fieldName")}</Label>
                 <Input
                   value={newNodeName}
                   onChange={(e) => setNewNodeName(e.target.value)}
@@ -656,7 +662,7 @@ export function SingboxPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Протокол</Label>
+                <Label>{t("admin.singbox.protocol")}</Label>
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
                   value={newNodeProtocol}
@@ -668,7 +674,7 @@ export function SingboxPage() {
                 </select>
               </div>
               <div className="grid gap-2">
-                <Label>Порт</Label>
+                <Label>{t("admin.singbox.port")}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -678,27 +684,27 @@ export function SingboxPage() {
                 />
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setAddOpen(false)}>Отмена</Button>
+                <Button variant="outline" onClick={() => setAddOpen(false)}>{t("admin.singbox.cancel")}</Button>
                 <Button onClick={handleAddNode} disabled={creating}>
                   {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Создать
+                  {t("admin.singbox.create")}
                 </Button>
               </DialogFooter>
             </div>
           ) : (
             <div className="space-y-4 py-4">
-              <p className="text-sm text-green-600 dark:text-green-400">Нода создана. Скопируйте docker-compose на сервер и выполните <code className="rounded bg-muted px-1">docker compose up -d --build</code>.</p>
+              <p className="text-sm text-green-600 dark:text-green-400">{t("admin.singbox.nodeCreated")} <code className="rounded bg-muted px-1">docker compose up -d --build</code>.</p>
               <div className="grid gap-2">
-                <Label>Docker Compose</Label>
+                <Label>{t("admin.singbox.dockerCompose")}</Label>
                 <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-all">{addResult.dockerCompose}</pre>
                 <Button variant="outline" size="sm" onClick={copyCompose}>
                   {copied === "compose" ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                  Копировать
+                  {copied === "compose" ? t("admin.singbox.copied") : t("admin.singbox.copy")}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">{addResult.instructions}</p>
               <DialogFooter>
-                <Button onClick={() => { setAddOpen(false); setAddResult(null); }}>Закрыть</Button>
+                <Button onClick={() => { setAddOpen(false); setAddResult(null); }}>{t("admin.singbox.close")}</Button>
               </DialogFooter>
             </div>
           )}
@@ -709,16 +715,16 @@ export function SingboxPage() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Изменить ноду</DialogTitle>
+            <DialogTitle>{t("admin.singbox.editNodeTitle")}</DialogTitle>
           </DialogHeader>
           {editingNode && (
             <div className="space-y-4 py-4">
               <div className="grid gap-2">
-                <Label>Название</Label>
+                <Label>{t("admin.singbox.fieldName")}</Label>
                 <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
               </div>
               <div className="grid gap-2">
-                <Label>Протокол</Label>
+                <Label>{t("admin.singbox.protocol")}</Label>
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
                   value={editProtocol}
@@ -730,12 +736,12 @@ export function SingboxPage() {
                 </select>
               </div>
               <div className="grid gap-2">
-                <Label>Порт</Label>
+                <Label>{t("admin.singbox.port")}</Label>
                 <Input type="number" min={1} max={65535} value={editPort} onChange={(e) => setEditPort(e.target.value)} />
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setEditOpen(false)}>Отмена</Button>
-                <Button onClick={handleSaveEdit} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Сохранить</Button>
+                <Button variant="outline" onClick={() => setEditOpen(false)}>{t("admin.singbox.cancel")}</Button>
+                <Button onClick={handleSaveEdit} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} {t("admin.singbox.save")}</Button>
               </DialogFooter>
             </div>
           )}
@@ -746,19 +752,19 @@ export function SingboxPage() {
       <Dialog open={categoryModal !== null} onOpenChange={(open) => !open && setCategoryModal(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{categoryModal === "add" ? "Добавить категорию" : "Изменить категорию"}</DialogTitle>
+            <DialogTitle>{categoryModal === "add" ? t("admin.singbox.addCategoryTitle") : t("admin.singbox.editCategoryTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid gap-2">
-              <Label>Название</Label>
+              <Label>{t("admin.singbox.fieldName")}</Label>
               <Input
                 value={categoryForm.name}
                 onChange={(e) => setCategoryForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Например: Доступы VLESS"
+                placeholder={t("admin.singbox.categoryPlaceholder")}
               />
             </div>
             <div className="grid gap-2">
-              <Label>Порядок (sortOrder)</Label>
+              <Label>{t("admin.singbox.sortOrder")}</Label>
               <Input
                 type="number"
                 value={categoryForm.sortOrder}
@@ -767,10 +773,10 @@ export function SingboxPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCategoryModal(null)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setCategoryModal(null)}>{t("admin.singbox.cancel")}</Button>
             <Button onClick={handleSaveCategory} disabled={savingCat || !categoryForm.name.trim()}>
               {savingCat ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Сохранить
+              {t("admin.singbox.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -780,11 +786,11 @@ export function SingboxPage() {
       <Dialog open={tariffModal !== null} onOpenChange={(open) => !open && setTariffModal(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{tariffModal?.kind === "add" ? "Добавить тариф" : "Изменить тариф"}</DialogTitle>
+            <DialogTitle>{tariffModal?.kind === "add" ? t("admin.singbox.addTariffTitle") : t("admin.singbox.editTariffTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid gap-2">
-              <Label>Категория</Label>
+              <Label>{t("admin.singbox.category")}</Label>
               <select
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
                 value={tariffForm.categoryId}
@@ -797,30 +803,30 @@ export function SingboxPage() {
               </select>
             </div>
             <div className="grid gap-2">
-              <Label>Название</Label>
-              <Input value={tariffForm.name} onChange={(e) => setTariffForm((f) => ({ ...f, name: e.target.value }))} placeholder="Тариф 1" />
+              <Label>{t("admin.singbox.fieldName")}</Label>
+              <Input value={tariffForm.name} onChange={(e) => setTariffForm((f) => ({ ...f, name: e.target.value }))} placeholder={t("admin.singbox.tariffPlaceholder")} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="grid gap-2">
-                <Label>Слотов</Label>
+                <Label>{t("admin.singbox.slots")}</Label>
                 <Input type="number" min={1} value={tariffForm.slotCount} onChange={(e) => setTariffForm((f) => ({ ...f, slotCount: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Дней</Label>
+                <Label>{t("admin.singbox.days")}</Label>
                 <Input type="number" min={1} value={tariffForm.durationDays} onChange={(e) => setTariffForm((f) => ({ ...f, durationDays: e.target.value }))} />
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Лимит трафика (ГБ), пусто — без лимита</Label>
+              <Label>{t("admin.singbox.trafficLimitGb")}</Label>
               <Input value={tariffForm.trafficLimitBytes} onChange={(e) => setTariffForm((f) => ({ ...f, trafficLimitBytes: e.target.value }))} placeholder="5" />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="grid gap-2">
-                <Label>Цена</Label>
+                <Label>{t("admin.singbox.price")}</Label>
                 <Input type="number" min={0} step={0.01} value={tariffForm.price} onChange={(e) => setTariffForm((f) => ({ ...f, price: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Валюта</Label>
+                <Label>{t("admin.singbox.currency")}</Label>
                 <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={tariffForm.currency} onChange={(e) => setTariffForm((f) => ({ ...f, currency: e.target.value }))}>
                   <option value="rub">RUB</option>
                   <option value="usd">USD</option>
@@ -829,14 +835,14 @@ export function SingboxPage() {
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="tariff-enabled" checked={tariffForm.enabled} onChange={(e) => setTariffForm((f) => ({ ...f, enabled: e.target.checked }))} className="rounded border-input" />
-              <Label htmlFor="tariff-enabled">Включён (доступен к покупке)</Label>
+              <Label htmlFor="tariff-enabled">{t("admin.singbox.enabledForPurchase")}</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTariffModal(null)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setTariffModal(null)}>{t("admin.singbox.cancel")}</Button>
             <Button onClick={handleSaveTariff} disabled={savingTariff || !tariffForm.name.trim()}>
               {savingTariff ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Сохранить
+              {t("admin.singbox.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -846,13 +852,13 @@ export function SingboxPage() {
       <Dialog open={!!nodeToDelete} onOpenChange={(open) => !open && setNodeToDelete(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Удалить ноду?</DialogTitle>
-            <DialogDescription>Все слоты на этой ноде будут удалены. Это нельзя отменить.</DialogDescription>
+            <DialogTitle>{t("admin.singbox.deleteNodeTitle")}</DialogTitle>
+            <DialogDescription>{t("admin.singbox.deleteNodeDesc")}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNodeToDelete(null)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setNodeToDelete(null)}>{t("admin.singbox.cancel")}</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Удалить
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} {t("admin.singbox.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -862,9 +868,9 @@ export function SingboxPage() {
       <Dialog open={configOpen} onOpenChange={setConfigOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Конфиг sing-box (JSON)</DialogTitle>
+            <DialogTitle>{t("admin.singbox.configTitle")}</DialogTitle>
             <DialogDescription>
-              Инбаунд с тегом <code className="rounded bg-muted px-1">stealthnet-in</code> — в него агент подставит пользователей из слотов. Остальное можно менять свободно.
+              {t("admin.singbox.configDesc")} <code className="rounded bg-muted px-1">stealthnet-in</code> {t("admin.singbox.configDescSuffix")}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 min-h-0 flex flex-col gap-2">
@@ -877,9 +883,9 @@ export function SingboxPage() {
             {configError && <p className="text-sm text-destructive">{configError}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfigOpen(false)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setConfigOpen(false)}>{t("admin.singbox.cancel")}</Button>
             <Button onClick={saveConfig} disabled={configSaving}>
-              {configSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Сохранить
+              {configSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} {t("admin.singbox.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

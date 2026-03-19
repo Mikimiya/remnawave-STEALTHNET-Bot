@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import {
   api,
@@ -20,26 +21,27 @@ import {
 } from "@/components/ui/dialog";
 import { CalendarClock, Plus, Play, Trash2, Pencil, Loader2, Clock } from "lucide-react";
 
-const TRIGGER_LABELS: Record<AutoBroadcastTriggerType, string> = {
-  after_registration: "После регистрации",
-  inactivity: "Неактивность (нет оплат)",
-  no_payment: "Ни разу не платил",
-  trial_not_connected: "Не подключил триал",
-  trial_used_never_paid: "Пользовался триалом, но не оплатил",
-  no_traffic: "Подключён к VPN (напоминание)",
-  subscription_expired: "Подписка истекла",
-  subscription_ending_soon: "Подписка заканчивается скоро (за N дней)",
-};
-
-const CHANNEL_LABELS: Record<string, string> = {
-  telegram: "Telegram",
-  email: "Email",
-  both: "Telegram и Email",
-};
-
 export function AutoBroadcastPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const token = state.accessToken ?? "";
+
+  const TRIGGER_LABELS: Record<AutoBroadcastTriggerType, string> = {
+    after_registration: t("admin.autoBroadcast.triggerAfterReg"),
+    inactivity: t("admin.autoBroadcast.triggerInactivity"),
+    no_payment: t("admin.autoBroadcast.triggerNoPayment"),
+    trial_not_connected: t("admin.autoBroadcast.triggerTrialNotConn"),
+    trial_used_never_paid: t("admin.autoBroadcast.triggerTrialNeverPaid"),
+    no_traffic: t("admin.autoBroadcast.triggerNoTraffic"),
+    subscription_expired: t("admin.autoBroadcast.triggerExpired"),
+    subscription_ending_soon: t("admin.autoBroadcast.triggerEndingSoon"),
+  };
+
+  const CHANNEL_LABELS: Record<string, string> = {
+    telegram: "Telegram",
+    email: "Email",
+    both: t("admin.autoBroadcast.channelBoth"),
+  };
   const [rules, setRules] = useState<AutoBroadcastRule[]>([]);
   const [eligibleCounts, setEligibleCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -149,11 +151,11 @@ export function AutoBroadcastPage() {
       subject: form.subject?.trim() || null,
     };
     if (!payload.name.trim()) {
-      setFormError("Укажите название правила");
+      setFormError(t("admin.autoBroadcast.errorName"));
       return;
     }
     if (!payload.message.trim()) {
-      setFormError("Укажите текст сообщения");
+      setFormError(t("admin.autoBroadcast.errorMessage"));
       return;
     }
     setFormSaving(true);
@@ -166,14 +168,14 @@ export function AutoBroadcastPage() {
       closeForm();
       loadRules();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Ошибка сохранения");
+      setFormError(err instanceof Error ? err.message : t("admin.autoBroadcast.errorSave"));
     } finally {
       setFormSaving(false);
     }
   }
 
   async function handleDelete(ruleId: string) {
-    if (!confirm("Удалить правило?")) return;
+    if (!confirm(t("admin.autoBroadcast.deleteConfirm"))) return;
     try {
       await api.deleteAutoBroadcastRule(token, ruleId);
       loadRules();
@@ -188,9 +190,9 @@ export function AutoBroadcastPage() {
       const { results } = await api.runAutoBroadcastAll(token);
       const ok = results.every((r) => r.errors.length === 0);
       if (ok) loadRules();
-      else alert(results.map((r) => `Правило ${r.ruleId}: ${r.errors.join("; ")}`).join("\n"));
+      else alert(results.map((r) => `Rule ${r.ruleId}: ${r.errors.join("; ")}`).join("\n"));
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Ошибка запуска");
+      alert(err instanceof Error ? err.message : t("admin.autoBroadcast.errorRun"));
     } finally {
       setRunAllLoading(false);
     }
@@ -203,7 +205,7 @@ export function AutoBroadcastPage() {
       if (result.errors.length > 0) alert(result.errors.join("; "));
       else loadRules();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Ошибка запуска");
+      alert(err instanceof Error ? err.message : t("admin.autoBroadcast.errorRun"));
     } finally {
       setRunningRuleId(null);
     }
@@ -213,19 +215,19 @@ export function AutoBroadcastPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Авто-рассылка</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("admin.autoBroadcast.title")}</h1>
           <p className="text-muted-foreground">
-            Настраиваемые правила: после регистрации, неактивность, без платежа — чтобы не терять клиентов
+            {t("admin.autoBroadcast.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={handleRunAll} disabled={runAllLoading || rules.length === 0}>
             {runAllLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Запустить все
+            {t("admin.autoBroadcast.runAll")}
           </Button>
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />
-            Добавить правило
+            {t("admin.autoBroadcast.addRule")}
           </Button>
         </div>
       </div>
@@ -234,16 +236,16 @@ export function AutoBroadcastPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Расписание
+            {t("admin.autoBroadcast.scheduleTitle")}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Cron: минута час день месяц день_недели. Например <code className="rounded bg-muted px-1">0 9 * * *</code> — каждый день в 9:00. Пусто = по умолчанию 9:00.
+            {t("admin.autoBroadcast.scheduleDesc")} <code className="rounded bg-muted px-1">0 9 * * *</code> — {t("admin.autoBroadcast.scheduleDescExample")}
           </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSaveSchedule} className="flex flex-wrap items-end gap-3">
             <div className="min-w-[200px] flex-1 space-y-2">
-              <Label htmlFor="schedule-cron">Выражение cron</Label>
+              <Label htmlFor="schedule-cron">{t("admin.autoBroadcast.scheduleLabel")}</Label>
               <Input
                 id="schedule-cron"
                 value={scheduleCron}
@@ -254,7 +256,7 @@ export function AutoBroadcastPage() {
             </div>
             <Button type="submit" disabled={scheduleSaving}>
               {scheduleSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Сохранить расписание
+              {t("admin.autoBroadcast.scheduleSave")}
             </Button>
           </form>
         </CardContent>
@@ -264,17 +266,17 @@ export function AutoBroadcastPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarClock className="h-5 w-5" />
-            Правила
+            {t("admin.autoBroadcast.rulesTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center gap-2 text-muted-foreground py-8">
               <Loader2 className="h-5 w-5 animate-spin" />
-              Загрузка…
+              {t("admin.autoBroadcast.loading")}
             </div>
           ) : rules.length === 0 ? (
-            <p className="text-muted-foreground py-6">Правил пока нет. Добавьте первое.</p>
+            <p className="text-muted-foreground py-6">{t("admin.autoBroadcast.empty")}</p>
           ) : (
             <div className="space-y-3">
               {rules.map((rule) => (
@@ -286,18 +288,18 @@ export function AutoBroadcastPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{rule.name}</span>
                       {!rule.enabled && (
-                        <span className="rounded bg-muted px-2 py-0.5 text-xs">выкл</span>
+                        <span className="rounded bg-muted px-2 py-0.5 text-xs">{t("admin.autoBroadcast.disabled")}</span>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
                       {TRIGGER_LABELS[rule.triggerType]}
                       {rule.triggerType === "subscription_ending_soon"
-                        ? ` · за ${rule.delayDays} дн. до окончания`
-                        : ` · через ${rule.delayDays} дн.`}{" "}
+                        ? ` · ${t("admin.autoBroadcast.daysBefore", { n: rule.delayDays })}`
+                        : ` · ${t("admin.autoBroadcast.daysAfter", { n: rule.delayDays })}`}{" "}
                       · {CHANNEL_LABELS[rule.channel]}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Отправлено: {rule.sentCount ?? 0} · Сейчас подходят: {eligibleCounts[rule.id] ?? "—"}
+                      {t("admin.autoBroadcast.sentCount")}: {rule.sentCount ?? 0} · {t("admin.autoBroadcast.eligibleNow")}: {eligibleCounts[rule.id] ?? "—"}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -312,7 +314,7 @@ export function AutoBroadcastPage() {
                       ) : (
                         <Play className="h-4 w-4" />
                       )}
-                      Запустить
+                      {t("admin.autoBroadcast.run")}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(rule)}>
                       <Pencil className="h-4 w-4" />
@@ -331,8 +333,8 @@ export function AutoBroadcastPage() {
       <Dialog open={showForm} onOpenChange={(open) => !open && closeForm()}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Редактировать правило" : "Новое правило"}</DialogTitle>
-            <DialogDescription className="sr-only">Форма правила авторассылки</DialogDescription>
+            <DialogTitle>{editingId ? t("admin.autoBroadcast.formTitleEdit") : t("admin.autoBroadcast.formTitleNew")}</DialogTitle>
+            <DialogDescription className="sr-only">{t("admin.autoBroadcast.formDialogDescription")}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4 py-4">
               {formError && (
@@ -340,33 +342,33 @@ export function AutoBroadcastPage() {
               )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Название</Label>
+                  <Label>{t("admin.autoBroadcast.formNameLabel")}</Label>
                   <Input
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="Например: Напоминание через 3 дня"
+                    placeholder={t("admin.autoBroadcast.formNamePlaceholder")}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Триггер</Label>
+                  <Label>{t("admin.autoBroadcast.formTriggerLabel")}</Label>
                   <select
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={form.triggerType}
                     onChange={(e) => {
-                    const t = e.target.value as AutoBroadcastTriggerType;
+                    const triggerVal = e.target.value as AutoBroadcastTriggerType;
                     setForm((f) => ({
                       ...f,
-                      triggerType: t,
+                      triggerType: triggerVal,
                       delayDays:
-                        t === "subscription_ending_soon"
+                        triggerVal === "subscription_ending_soon"
                           ? Math.max(1, Math.min(3, f.delayDays))
                           : f.delayDays,
                     }));
                   }}
                   >
-                    {(Object.keys(TRIGGER_LABELS) as AutoBroadcastTriggerType[]).map((t) => (
-                      <option key={t} value={t}>
-                        {TRIGGER_LABELS[t]}
+                    {(Object.keys(TRIGGER_LABELS) as AutoBroadcastTriggerType[]).map((triggerKey) => (
+                      <option key={triggerKey} value={triggerKey}>
+                        {TRIGGER_LABELS[triggerKey]}
                       </option>
                     ))}
                   </select>
@@ -376,8 +378,8 @@ export function AutoBroadcastPage() {
                 <div className="space-y-2">
                   <Label>
                     {form.triggerType === "subscription_ending_soon"
-                      ? "За сколько дней до окончания (1–3)"
-                      : "Через сколько дней (0–365)"}
+                      ? t("admin.autoBroadcast.formDaysLabelBefore")
+                      : t("admin.autoBroadcast.formDaysLabelAfter")}
                   </Label>
                   <Input
                     type="number"
@@ -393,12 +395,12 @@ export function AutoBroadcastPage() {
                   />
                   {form.triggerType === "subscription_ending_soon" && (
                     <p className="text-xs text-muted-foreground">
-                      Создайте 3 правила (за 3, за 2, за 1 день) — рассылка будет каждый день с нужным текстом.
+                      {t("admin.autoBroadcast.formEndingSoonHint")}
                     </p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Канал</Label>
+                  <Label>{t("admin.autoBroadcast.formChannelLabel")}</Label>
                   <select
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={form.channel}
@@ -406,27 +408,27 @@ export function AutoBroadcastPage() {
                   >
                     <option value="telegram">Telegram</option>
                     <option value="email">Email</option>
-                    <option value="both">Telegram и Email</option>
+                    <option value="both">{t("admin.autoBroadcast.channelBoth")}</option>
                   </select>
                 </div>
               </div>
               {(form.channel === "email" || form.channel === "both") && (
                 <div className="space-y-2">
-                  <Label>Тема письма (для email)</Label>
+                  <Label>{t("admin.autoBroadcast.formSubjectLabel")}</Label>
                   <Input
                     value={form.subject ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
-                    placeholder="Тема письма"
+                    placeholder={t("admin.autoBroadcast.formSubjectPlaceholder")}
                   />
                 </div>
               )}
               <div className="space-y-2">
-                <Label>Текст сообщения</Label>
+                <Label>{t("admin.autoBroadcast.formMessageLabel")}</Label>
                 <textarea
                   className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={form.message}
                   onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-                  placeholder="Текст для Telegram / email (до 4096 символов)"
+                  placeholder={t("admin.autoBroadcast.formMessagePlaceholder")}
                   maxLength={4096}
                 />
                 <p className="text-xs text-muted-foreground">{form.message.length} / 4096</p>
@@ -439,15 +441,15 @@ export function AutoBroadcastPage() {
                   onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))}
                   className="rounded border-input"
                 />
-                <Label htmlFor="form-enabled">Включено (участвует в запуске «Запустить все»)</Label>
+                <Label htmlFor="form-enabled">{t("admin.autoBroadcast.formEnabledLabel")}</Label>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={closeForm}>
-                  Отмена
+                  {t("admin.common.cancel")}
                 </Button>
                 <Button type="submit" disabled={formSaving}>
                   {formSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {editingId ? "Сохранить" : "Создать"}
+                  {editingId ? t("admin.common.save") : t("admin.common.create")}
                 </Button>
               </DialogFooter>
             </form>

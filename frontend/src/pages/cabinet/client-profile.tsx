@@ -11,10 +11,11 @@ import type { ClientPayment } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-function formatDate(s: string | null) {
+import { useTranslation } from "react-i18next";
+function formatDate(s: string | null, lang?: string) {
   if (!s) return "—";
   try {
-    return new Date(s).toLocaleString("ru-RU");
+    return new Date(s).toLocaleString(lang === "zh" ? "zh-CN" : "ru-RU");
   } catch {
     return s;
   }
@@ -29,12 +30,12 @@ function formatMoney(amount: number, currency: string) {
   }).format(amount);
 }
 
-function formatPaymentStatus(status: string): string {
+function formatPaymentStatus(status: string, tFn: (key: string) => string): string {
   const s = (status || "").toLowerCase();
-  if (s === "paid") return "Оплачен";
-  if (s === "pending") return "Не оплачено";
-  if (s === "failed") return "Не прошёл";
-  if (s === "refunded") return "Возврат";
+  if (s === "paid") return tFn("profile.paymentStatusPaid");
+  if (s === "pending") return tFn("profile.paymentStatusPending");
+  if (s === "failed") return tFn("profile.paymentStatusFailed");
+  if (s === "refunded") return tFn("profile.paymentStatusRefunded");
   return status || "—";
 }
 
@@ -47,6 +48,8 @@ export function ClientProfilePage() {
   const [yookassaEnabled, setYookassaEnabled] = useState(false);
   const [cryptopayEnabled, setCryptopayEnabled] = useState(false);
   const [heleketEnabled, setHeleketEnabled] = useState(false);
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
   const [publicAppUrl, setPublicAppUrl] = useState<string | null>(null);
   const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
@@ -103,10 +106,10 @@ export function ClientProfilePage() {
       .then((r) => setDevices(r.devices ?? []))
       .catch((err) => {
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("Подписка не привязана")) {
+        if (msg.includes("subscription is not linked") || msg.includes("Подписка не привязана")) {
           setDevicesError("NO_SUBSCRIPTION");
         } else {
-          setDevicesError("Не удалось загрузить устройства");
+          setDevicesError(t("profile.devicesLoadError"));
         }
         setDevices([]);
       })
@@ -120,7 +123,7 @@ export function ClientProfilePage() {
       await api.deleteClientDevice(token, hwid);
       setDevices((prev) => prev.filter((d) => d.hwid !== hwid));
     } catch {
-      setDevicesError("Не удалось отключить устройство");
+      setDevicesError(t("profile.deviceDeleteError"));
     } finally {
       setDeletingHwid(null);
     }
@@ -138,7 +141,7 @@ export function ClientProfilePage() {
       const data = await api.client2FASetup(token);
       setTwoFaSetupData(data);
     } catch (e) {
-      setTwoFaError(e instanceof Error ? e.message : "Ошибка настройки 2FA");
+      setTwoFaError(e instanceof Error ? e.message : t("profile.twoFaSetupError"));
     } finally {
       setTwoFaLoading(false);
     }
@@ -152,7 +155,7 @@ export function ClientProfilePage() {
   }
   async function confirmTwoFaEnable() {
     if (!token || !twoFaCode.trim() || twoFaCode.length !== 6) {
-      setTwoFaError("Введите 6-значный код из приложения");
+      setTwoFaError(t("profile.twoFaCodeRequired"));
       return;
     }
     setTwoFaError(null);
@@ -162,7 +165,7 @@ export function ClientProfilePage() {
       refreshProfile();
       closeTwoFaEnable();
     } catch (e) {
-      setTwoFaError(e instanceof Error ? e.message : "Неверный код");
+      setTwoFaError(e instanceof Error ? e.message : t("profile.twoFaInvalidCode"));
     } finally {
       setTwoFaLoading(false);
     }
@@ -174,7 +177,7 @@ export function ClientProfilePage() {
   }
   async function confirmTwoFaDisable() {
     if (!token || !twoFaCode.trim() || twoFaCode.length !== 6) {
-      setTwoFaError("Введите 6-значный код из приложения");
+      setTwoFaError(t("profile.twoFaCodeRequired"));
       return;
     }
     setTwoFaError(null);
@@ -185,7 +188,7 @@ export function ClientProfilePage() {
       setTwoFaDisableOpen(false);
       setTwoFaCode("");
     } catch (e) {
-      setTwoFaError(e instanceof Error ? e.message : "Неверный код");
+      setTwoFaError(e instanceof Error ? e.message : t("profile.twoFaInvalidCode"));
     } finally {
       setTwoFaLoading(false);
     }
@@ -194,15 +197,15 @@ export function ClientProfilePage() {
   async function submitChangePassword() {
     if (!token) return;
     if (!currentPassword.trim()) {
-      setChangePasswordError("Введите текущий пароль");
+      setChangePasswordError(t("profile.currentPasswordRequired"));
       return;
     }
     if (newPassword.length < 6) {
-      setChangePasswordError("Новый пароль должен быть минимум 6 символов");
+      setChangePasswordError(t("profile.newPasswordTooShort"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setChangePasswordError("Пароли не совпадают");
+      setChangePasswordError(t("profile.passwordMismatch"));
       return;
     }
     setChangePasswordError(null);
@@ -221,7 +224,7 @@ export function ClientProfilePage() {
         setChangePasswordSuccess(false);
       }, 2000);
     } catch (e) {
-      setChangePasswordError(e instanceof Error ? e.message : "Ошибка смены пароля");
+      setChangePasswordError(e instanceof Error ? e.message : t("profile.changePasswordError"));
     } finally {
       setChangePasswordLoading(false);
     }
@@ -260,7 +263,7 @@ export function ClientProfilePage() {
     if (!token || !client) return;
     const amount = Number(topUpAmount?.replace(",", "."));
     if (!Number.isFinite(amount) || amount <= 0) {
-      setTopUpError("Укажите сумму");
+      setTopUpError(t("profile.enterAmount"));
       return;
     }
     setTopUpError(null);
@@ -270,12 +273,12 @@ export function ClientProfilePage() {
         amount,
         currency,
         paymentMethod: methodId,
-        description: "Пополнение баланса",
+        description: t("profile.topUpDesc"),
       });
       setTopUpModalOpen(false);
       openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -285,7 +288,7 @@ export function ClientProfilePage() {
     if (!token || !client) return;
     const amount = Number(topUpAmount?.replace(",", "."));
     if (!Number.isFinite(amount) || amount <= 0) {
-      setTopUpError("Укажите сумму (в рублях)");
+      setTopUpError(t("profile.enterAmountRub"));
       return;
     }
     setTopUpError(null);
@@ -301,7 +304,7 @@ export function ClientProfilePage() {
         openPaymentInBrowser(yoomoneyUrl);
       }
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -311,7 +314,7 @@ export function ClientProfilePage() {
     if (!token || !client) return;
     const amount = Number(topUpAmount?.replace(",", "."));
     if (!Number.isFinite(amount) || amount <= 0) {
-      setTopUpError("Укажите сумму (в рублях)");
+      setTopUpError(t("profile.enterAmountRub"));
       return;
     }
     setTopUpError(null);
@@ -321,7 +324,7 @@ export function ClientProfilePage() {
       setTopUpModalOpen(false);
       if (res.confirmationUrl) openPaymentInBrowser(res.confirmationUrl);
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -331,7 +334,7 @@ export function ClientProfilePage() {
     if (!token || !client) return;
     const amount = Number(topUpAmount?.replace(",", "."));
     if (!Number.isFinite(amount) || amount <= 0) {
-      setTopUpError("Укажите сумму");
+      setTopUpError(t("profile.enterAmount"));
       return;
     }
     setTopUpError(null);
@@ -341,7 +344,7 @@ export function ClientProfilePage() {
       setTopUpModalOpen(false);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -351,7 +354,7 @@ export function ClientProfilePage() {
     if (!token || !client) return;
     const amount = Number(topUpAmount?.replace(",", "."));
     if (!Number.isFinite(amount) || amount <= 0) {
-      setTopUpError("Укажите сумму");
+      setTopUpError(t("profile.enterAmount"));
       return;
     }
     setTopUpError(null);
@@ -361,7 +364,7 @@ export function ClientProfilePage() {
       setTopUpModalOpen(false);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -408,7 +411,7 @@ export function ClientProfilePage() {
       setLinkEmailSent(true);
       setLinkEmailValue("");
     } catch (err) {
-      setLinkEmailError(err instanceof Error ? err.message : "Ошибка отправки");
+      setLinkEmailError(err instanceof Error ? err.message : t("profile.linkEmailError"));
     } finally {
       setLinkEmailLoading(false);
     }
@@ -442,8 +445,8 @@ export function ClientProfilePage() {
   return (
     <div className="space-y-6 w-full min-w-0 pb-10">
       <div className="min-w-0">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">Профиль</h1>
-        <p className="text-muted-foreground text-sm mt-1 truncate">Личные данные и настройки</p>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">{t("profile.title")}</h1>
+        <p className="text-muted-foreground text-sm mt-1 truncate">{t("profile.subtitle")}</p>
       </div>
 
       <motion.div
@@ -463,8 +466,8 @@ export function ClientProfilePage() {
                 <User className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-bold tracking-tight text-foreground truncate">Данные</h3>
-                <p className="text-xs text-muted-foreground mt-[1px] truncate">Контактная информация</p>
+                <h3 className="text-lg font-bold tracking-tight text-foreground truncate">{t("profile.dataTitle")}</h3>
+                <p className="text-xs text-muted-foreground mt-[1px] truncate">{t("profile.contactInfo")}</p>
               </div>
             </div>
 
@@ -475,7 +478,7 @@ export function ClientProfilePage() {
                     <Fingerprint className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground mb-0.5">ID Аккаунта</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">{t("profile.accountId")}</p>
                     <p className="font-medium text-sm truncate font-mono select-all">{client.id}</p>
                   </div>
                 </div>
@@ -501,7 +504,7 @@ export function ClientProfilePage() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs text-muted-foreground mb-0.5">Email</p>
-                      <p className="font-medium text-sm truncate text-orange-500">Не привязан</p>
+                      <p className="font-medium text-sm truncate text-orange-500">{t("profile.notLinked")}</p>
                     </div>
                   </div>
                   <form onSubmit={sendLinkEmailRequest} className="flex gap-2 mt-2">
@@ -515,10 +518,10 @@ export function ClientProfilePage() {
                     />
                     <Button type="submit" size="sm" className="h-9 shrink-0 gap-2 px-4 shadow-sm" disabled={linkEmailLoading || !linkEmailValue.trim()}>
                       {linkEmailLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-                      <span className="hidden sm:inline">Привязать</span>
+                      <span className="hidden sm:inline">{t("profile.link")}</span>
                     </Button>
                   </form>
-                  {linkEmailSent && <p className="text-xs font-medium text-green-500 mt-1">Отправлено, проверьте почту.</p>}
+                  {linkEmailSent && <p className="text-xs font-medium text-green-500 mt-1">{t("profile.emailLinkSent")}</p>}
                   {linkEmailError && <p className="text-xs font-medium text-destructive mt-1">{linkEmailError}</p>}
                 </div>
               )}
@@ -537,7 +540,7 @@ export function ClientProfilePage() {
                         {client.telegramUsername ? `@${client.telegramUsername}` : `ID ${client.telegramId}`}
                       </p>
                     ) : (
-                      <p className="font-medium text-sm truncate text-orange-500">Не привязан</p>
+                      <p className="font-medium text-sm truncate text-orange-500">{t("profile.notLinked")}</p>
                     )}
                   </div>
                 </div>
@@ -545,11 +548,11 @@ export function ClientProfilePage() {
                   <div className="shrink-0">
                     {isTgMiniapp ? (
                       <Button variant="outline" size="sm" onClick={linkTelegramFromMiniapp} disabled={linkTelegramLoading} className="shadow-sm">
-                        {linkTelegramLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Привязать текущий"}
+                        {linkTelegramLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : t("profile.linkCurrent")}
                       </Button>
                     ) : (
                       <Button variant="outline" size="sm" onClick={requestLinkTelegramCode} disabled={linkTelegramLoading || !!linkTelegramCode} className="shadow-sm">
-                        {linkTelegramLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Получить код"}
+                        {linkTelegramLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : t("profile.getCode")}
                       </Button>
                     )}
                   </div>
@@ -558,11 +561,11 @@ export function ClientProfilePage() {
               {!isTgMiniapp && !client.telegramId && linkTelegramCode && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Код привязки</p>
+                    <p className="text-sm font-medium">{t("profile.linkCode")}</p>
                     <p className="font-mono text-xl tracking-wider font-bold text-primary">{linkTelegramCode}</p>
                   </div>
                   <p className="text-xs text-muted-foreground/80">
-                    Отправьте боту <code className="bg-primary/10 text-primary font-mono px-1.5 py-0.5 rounded">/link {linkTelegramCode}</code><br />Код действует 10 минут.
+                    {t("profile.linkCodeInstr", { code: linkTelegramCode })}
                   </p>
                 </motion.div>
               )}
@@ -573,7 +576,7 @@ export function ClientProfilePage() {
                     <Wallet className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground mb-0.5">Баланс</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">{t("profile.balance")}</p>
                     <p className="font-bold text-lg truncate tracking-tight">{formatMoney(client.balance, client.preferredCurrency)}</p>
                   </div>
                 </div>
@@ -581,7 +584,7 @@ export function ClientProfilePage() {
                   const el = document.getElementById("topup");
                   if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }}>
-                  Пополнить
+                  {t("profile.topUp")}
                 </Button>
               </div>
 
@@ -591,8 +594,8 @@ export function ClientProfilePage() {
                     <CalendarDays className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground mb-0.5">Дата регистрации</p>
-                    <p className="text-sm font-medium">{new Date(client.createdAt).toLocaleDateString("ru-RU", { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">{t("profile.registrationDate")}</p>
+                    <p className="text-sm font-medium">{new Date(client.createdAt).toLocaleDateString(lang === "zh" ? "zh-CN" : "ru-RU", { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                   </div>
                 </div>
               )}
@@ -600,13 +603,13 @@ export function ClientProfilePage() {
               {hasReferralLinks && (
                 <div className="pt-4 border-t border-border/20 space-y-4">
                   <div>
-                    <h4 className="text-sm font-bold text-foreground">Реферальная программа</h4>
-                    <p className="text-xs text-muted-foreground mt-1">Приглашайте друзей — при регистрации вы получите бонус</p>
+                    <h4 className="text-sm font-bold text-foreground">{t("profile.referralProgram")}</h4>
+                    <p className="text-xs text-muted-foreground mt-1">{t("profile.referralDesc")}</p>
                   </div>
                   <div className="space-y-2">
                     {referralLinkSite && (
                       <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-background/80 border border-border/30 dark:bg-white/5 dark:border-white/5">
-                        <div className="shrink-0 w-12 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Сайт</div>
+                        <div className="shrink-0 w-12 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("common.site")}</div>
                         <code className="flex-1 min-w-[140px] truncate text-xs font-mono text-primary/80 select-all">{referralLinkSite}</code>
                         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg ml-auto" onClick={() => copyReferral("site")}>
                           {copiedRef === "site" ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
@@ -615,7 +618,7 @@ export function ClientProfilePage() {
                     )}
                     {referralLinkBot && (
                       <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-background/80 border border-border/30 dark:bg-white/5 dark:border-white/5">
-                        <div className="shrink-0 w-12 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Бот</div>
+                        <div className="shrink-0 w-12 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("common.bot")}</div>
                         <code className="flex-1 min-w-[140px] truncate text-xs font-mono text-primary/80 select-all">{referralLinkBot}</code>
                         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg ml-auto" onClick={() => copyReferral("bot")}>
                           {copiedRef === "bot" ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
@@ -640,8 +643,8 @@ export function ClientProfilePage() {
                 <Shield className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-bold tracking-tight text-foreground truncate">Безопасность</h3>
-                <p className="text-xs text-muted-foreground mt-[1px] truncate">Защита вашего аккаунта</p>
+                <h3 className="text-lg font-bold tracking-tight text-foreground truncate">{t("profile.security")}</h3>
+                <p className="text-xs text-muted-foreground mt-[1px] truncate">{t("profile.securityDesc")}</p>
               </div>
             </div>
 
@@ -652,18 +655,18 @@ export function ClientProfilePage() {
                     <KeyRound className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground mb-0.5">Двухфакторная аутентификация</p>
-                    <p className="font-medium text-sm truncate">Многоуровневая защита</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">{t("profile.twoFa")}</p>
+                    <p className="font-medium text-sm truncate">{t("profile.twoFaDesc")}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {client.totpEnabled ? (
                     <>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-green-500/20 text-green-700 dark:text-green-400 dark:bg-green-500/20">Включена</span>
-                      <Button variant="outline" size="sm" className="shadow-sm border-red-500/50 text-red-600 hover:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/20" onClick={openTwoFaDisable}>Отключить</Button>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-green-500/20 text-green-700 dark:text-green-400 dark:bg-green-500/20">{t("profile.twoFaEnabled")}</span>
+                      <Button variant="outline" size="sm" className="shadow-sm border-red-500/50 text-red-600 hover:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/20" onClick={openTwoFaDisable}>{t("profile.twoFaDisable")}</Button>
                     </>
                   ) : (
-                    <Button variant="outline" size="sm" className="shadow-sm" onClick={openTwoFaEnable}>Включить</Button>
+                    <Button variant="outline" size="sm" className="shadow-sm" onClick={openTwoFaEnable}>{t("profile.twoFaEnable")}</Button>
                   )}
                 </div>
               </div>
@@ -674,12 +677,12 @@ export function ClientProfilePage() {
                     <KeyRound className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground mb-0.5">Пароль</p>
-                    <p className="font-medium text-sm truncate">Сменить пароль аккаунта</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">{t("profile.password")}</p>
+                    <p className="font-medium text-sm truncate">{t("profile.changePasswordDesc")}</p>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="shadow-sm shrink-0" onClick={() => setChangePasswordOpen(true)}>
-                  Сменить
+                  {t("profile.change")}
                 </Button>
               </div>
 
@@ -690,8 +693,8 @@ export function ClientProfilePage() {
                       <Monitor className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground mb-0.5">Сеансы</p>
-                      <p className="font-medium text-sm truncate">Управление устройствами</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">{t("profile.sessions")}</p>
+                      <p className="font-medium text-sm truncate">{t("profile.devicesDesc")}</p>
                     </div>
                   </div>
                 </div>
@@ -705,8 +708,8 @@ export function ClientProfilePage() {
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/50 text-muted-foreground mb-3 border border-border/50">
                         <Monitor className="h-6 w-6 opacity-60" />
                       </div>
-                      <p className="text-sm font-medium text-foreground">Устройств пока нет</p>
-                      <p className="text-xs text-muted-foreground mt-1 text-center max-w-[280px]">Выберите и оплатите тариф из каталога, чтобы подключить устройства.</p>
+                      <p className="text-sm font-medium text-foreground">{t("profile.noDevices")}</p>
+                      <p className="text-xs text-muted-foreground mt-1 text-center max-w-[280px]">{t("profile.noDevicesSubDesc")}</p>
                     </div>
                   ) : devicesError ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center px-4">
@@ -714,19 +717,19 @@ export function ClientProfilePage() {
                         <Monitor className="h-6 w-6 opacity-80" />
                       </div>
                       <p className="text-sm font-medium text-destructive">{devicesError}</p>
-                      <p className="text-xs text-muted-foreground mt-1 text-center max-w-[250px]">Попробуйте обновить страницу или обратитесь в поддержку.</p>
+                      <p className="text-xs text-muted-foreground mt-1 text-center max-w-[250px]">{t("profile.devicesErrorDesc")}</p>
                     </div>
                   ) : devices.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center px-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/50 text-muted-foreground mb-3 border border-border/50">
                         <Monitor className="h-6 w-6 opacity-60" />
                       </div>
-                      <p className="text-sm font-medium text-foreground">Устройств пока нет</p>
-                      <p className="text-xs text-muted-foreground mt-1 text-center max-w-[280px]">Подключитесь к VPN через приложение, и ваше устройство появится здесь.</p>
+                      <p className="text-sm font-medium text-foreground">{t("profile.noDevices")}</p>
+                      <p className="text-xs text-muted-foreground mt-1 text-center max-w-[280px]">{t("profile.devicesConnectDesc")}</p>
                     </div>
                   ) : (
                     <div className="flex flex-col h-full">
-                      <p className="text-xs text-muted-foreground mb-3">Отключите устройство, чтобы освободить слот для другого:</p>
+                      <p className="text-xs text-muted-foreground mb-3">{t("profile.devicesDisconnectHint")}</p>
                       <div className="grid grid-cols-1 gap-2">
                         {devices.map((d) => {
                           const label = [d.platform, d.deviceModel].filter(Boolean).join(" · ") || (d.hwid.slice(0, 12) + (d.hwid.length > 12 ? "…" : ""));
@@ -744,7 +747,7 @@ export function ClientProfilePage() {
                               </div>
                               <Button variant="outline" size="sm" className="shrink-0 w-full sm:w-auto rounded-xl h-9 px-3 sm:px-4 shadow-sm border-destructive/20 text-destructive bg-destructive/5 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive dark:bg-destructive/10 transition-all" disabled={isDeleting} onClick={() => deleteDevice(d.hwid)}>
                                 {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2 opacity-80" />}
-                                <span>{isDeleting ? "Удаление…" : "Отключить"}</span>
+                                <span>{isDeleting ? t("profile.deleting") : t("profile.disconnect")}</span>
                               </Button>
                             </div>
                           );
@@ -777,8 +780,8 @@ export function ClientProfilePage() {
                   <CreditCard className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold tracking-tight text-foreground">Пополнить баланс</h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">Оплата откроется в новой вкладке</p>
+                  <h3 className="text-xl font-bold tracking-tight text-foreground">{t("profile.topUpBalance")}</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">{t("profile.paymentInNewTab")}</p>
                 </div>
               </div>
 
@@ -831,7 +834,7 @@ export function ClientProfilePage() {
                   onClick={() => {
                     const amount = Number(topUpAmount?.replace(",", "."));
                     if (!Number.isFinite(amount) || amount < 1) {
-                      setTopUpError("Минимальная сумма пополнения — 1");
+                      setTopUpError(t("profile.minTopUp"));
                       return;
                     }
                     setTopUpError(null);
@@ -841,7 +844,7 @@ export function ClientProfilePage() {
                   <div className="absolute inset-0 bg-white/20 translate-y-full transition-transform duration-300 group-hover:translate-y-0" />
                   <span className="relative flex items-center justify-center gap-2">
                     <CreditCard className="h-5 w-5" />
-                    Оплатить {topUpAmount ? `${topUpAmount} ${currency.toUpperCase()}` : ""}
+                    {t("profile.pay")} {topUpAmount ? `${topUpAmount} ${currency.toUpperCase()}` : ""}
                   </span>
                 </Button>
               </div>
@@ -861,13 +864,13 @@ export function ClientProfilePage() {
                   <Wallet className="h-6 w-6" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-xl font-bold tracking-tight text-foreground truncate">История платежей</h3>
-                  <p className="text-sm text-muted-foreground mt-0.5 truncate">Последние 3 транзакции</p>
+                  <h3 className="text-xl font-bold tracking-tight text-foreground truncate">{t("profile.paymentHistory")}</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5 truncate">{t("profile.lastTransactions")}</p>
                 </div>
               </div>
               {payments.length > 3 && (
                 <Button variant="outline" size="sm" className="shrink-0" onClick={() => setPaymentsHistoryOpen(true)}>
-                  Вся история ({payments.length})
+                  {t("profile.allHistory", { count: payments.length })}
                 </Button>
               )}
             </div>
@@ -876,7 +879,7 @@ export function ClientProfilePage() {
               {payments.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center opacity-70">
                   <Wallet className="mb-3 h-10 w-10 text-muted-foreground" />
-                  <p className="text-sm font-medium text-muted-foreground">Платежей пока нет</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t("profile.noPayments")}</p>
                 </div>
               ) : (
                 <ul className="space-y-3 min-w-0">
@@ -891,7 +894,7 @@ export function ClientProfilePage() {
                         </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-sm truncate" title={p.orderId}>{p.orderId}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(p.paidAt ?? p.createdAt)}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(p.paidAt ?? p.createdAt, lang)}</p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between sm:flex-col sm:items-end sm:justify-center shrink-0">
@@ -900,7 +903,7 @@ export function ClientProfilePage() {
                           "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full",
                           p.status?.toLowerCase() === "paid" ? "bg-green-500/10 text-green-500" : "bg-muted text-muted-foreground"
                         )}>
-                          {formatPaymentStatus(p.status)}
+                          {formatPaymentStatus(p.status, t)}
                         </span>
                       </div>
                     </li>
@@ -917,15 +920,15 @@ export function ClientProfilePage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wallet className="h-5 w-5" />
-              Вся история платежей
+              {t("profile.allPaymentsTitle")}
             </DialogTitle>
             <DialogDescription>
-              {payments.length} {payments.length === 1 ? "транзакция" : payments.length < 5 ? "транзакции" : "транзакций"}
+              {t("profile.transactionsCount", { count: payments.length })}
             </DialogDescription>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 min-h-0 -mx-1 px-1 space-y-2 py-2">
             {payments.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">Платежей пока нет</p>
+              <p className="text-sm text-muted-foreground text-center py-6">{t("profile.noPayments")}</p>
             ) : (
               payments.map((p) => (
                 <div
@@ -938,7 +941,7 @@ export function ClientProfilePage() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-sm truncate" title={p.orderId}>{p.orderId}</p>
-                      <p className="text-xs text-muted-foreground">{formatDate(p.paidAt ?? p.createdAt)}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(p.paidAt ?? p.createdAt, lang)}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between sm:flex-col sm:items-end gap-1 shrink-0">
@@ -947,7 +950,7 @@ export function ClientProfilePage() {
                       "text-[10px] font-medium uppercase px-2 py-0.5 rounded-full",
                       p.status?.toLowerCase() === "paid" ? "bg-green-500/10 text-green-600 dark:text-green-400" : "bg-muted text-muted-foreground"
                     )}>
-                      {formatPaymentStatus(p.status)}
+                      {formatPaymentStatus(p.status, t)}
                     </span>
                   </div>
                 </div>
@@ -956,7 +959,7 @@ export function ClientProfilePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentsHistoryOpen(false)}>
-              Закрыть
+              {t("common.close")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -969,13 +972,13 @@ export function ClientProfilePage() {
               <div className="p-2 bg-primary/10 rounded-xl">
                 <Wallet className="h-6 w-6 text-primary" />
               </div>
-              Способ оплаты
+              {t("profile.paymentMethod")}
             </DialogTitle>
             <DialogDescription className="text-base font-medium mt-2">
               <div className="flex flex-col gap-2 mt-4 bg-background/50 p-4 rounded-2xl border border-border/50 text-left relative overflow-hidden group">
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="flex justify-between items-center relative z-10">
-                  <span className="text-muted-foreground">К оплате:</span>
+                  <span className="text-muted-foreground">{t("profile.toPay")}</span>
                   <span className="font-bold text-xl text-primary">
                     {topUpAmount ? formatMoney(Number(topUpAmount.replace(",", ".")), currency.toUpperCase()) : "—"}
                   </span>
@@ -1030,7 +1033,7 @@ export function ClientProfilePage() {
                 <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                   {topUpLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
                 </div>
-                <span className="text-base font-medium">СБП</span>
+                <span className="text-base font-medium">{t("profile.paymentMethods.sbp")}</span>
               </Button>
             )}
             {yoomoneyEnabled && (
@@ -1044,7 +1047,7 @@ export function ClientProfilePage() {
                 <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                   {topUpLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
                 </div>
-                <span className="text-base font-medium">Карты</span>
+                <span className="text-base font-medium">{t("profile.paymentMethods.cards")}</span>
               </Button>
             )}
             {plategaMethods.map((m) => (
@@ -1065,7 +1068,7 @@ export function ClientProfilePage() {
           </div>
           <DialogFooter className="mt-4 sm:justify-center border-t border-border/50 pt-4">
             <Button variant="ghost" onClick={() => setTopUpModalOpen(false)} disabled={topUpLoading} className="rounded-xl hover:bg-background/50 hover:text-foreground text-muted-foreground transition-colors">
-              Отмена
+              {t("common.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1079,12 +1082,12 @@ export function ClientProfilePage() {
             </div>
             <DialogHeader className="p-0 flex flex-col items-center mb-6">
               <DialogTitle className="text-2xl font-bold tracking-tight">
-                {twoFaStep === 1 ? "Настройка 2FA" : "Подтверждение"}
+                {twoFaStep === 1 ? t("profile.twoFaSetupTitle") : t("profile.twoFaConfirmTitle")}
               </DialogTitle>
               <DialogDescription className="text-center text-sm mt-2 max-w-[280px]">
                 {twoFaStep === 1
-                  ? "Отсканируйте QR-код в приложении-аутентификаторе (Google Authenticator, Authy и т.п.)"
-                  : "Введите 6-значный код из вашего приложения для завершения настройки."}
+                  ? t("profile.twoFaSetupDesc")
+                  : t("profile.twoFaStep2Desc")}
               </DialogDescription>
             </DialogHeader>
 
@@ -1099,7 +1102,7 @@ export function ClientProfilePage() {
                     <QRCodeSVG value={twoFaSetupData.otpauthUrl} size={180} level="M" />
                   </div>
                   <div className="w-full space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-left pl-1">Секретный ключ ручного ввода</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-left pl-1">{t("profile.twoFaSecretKey")}</p>
                     <div className="flex items-center gap-2 p-1.5 pr-2 rounded-2xl bg-muted/50 border border-border/50">
                       <div className="flex-1 overflow-x-auto no-scrollbar font-mono text-xs font-bold text-foreground text-center tracking-widest pl-2 select-all whitespace-nowrap">
                         {twoFaSetupData.secret}
@@ -1112,7 +1115,7 @@ export function ClientProfilePage() {
                     </div>
                   </div>
                   <Button className="w-full h-12 rounded-2xl font-bold text-base shadow-lg shadow-primary/20" onClick={() => setTwoFaStep(2)}>
-                    Далее — ввести код
+                    {t("profile.twoFaNext")}
                   </Button>
                 </div>
               ) : twoFaStep === 2 ? (
@@ -1130,10 +1133,10 @@ export function ClientProfilePage() {
                   <div className="flex flex-col gap-3">
                     <Button className="w-full h-12 rounded-2xl font-bold text-base shadow-lg shadow-primary/20" onClick={confirmTwoFaEnable} disabled={twoFaLoading || twoFaCode.length !== 6}>
                       {twoFaLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-                      Подтвердить и включить
+                      {t("profile.twoFaConfirm")}
                     </Button>
                     <Button variant="ghost" className="w-full h-10 rounded-xl text-muted-foreground" onClick={() => setTwoFaStep(1)} disabled={twoFaLoading}>
-                      Назад
+                      {t("common.back")}
                     </Button>
                   </div>
                 </div>
@@ -1153,9 +1156,9 @@ export function ClientProfilePage() {
               <Shield className="h-8 w-8" />
             </div>
             <DialogHeader className="p-0 flex flex-col items-center mb-6">
-              <DialogTitle className="text-2xl font-bold tracking-tight">Отключить 2FA</DialogTitle>
+              <DialogTitle className="text-2xl font-bold tracking-tight">{t("profile.twoFaDisableTitle")}</DialogTitle>
               <DialogDescription className="text-center text-sm mt-2 max-w-[280px]">
-                Введите 6-значный код из вашего приложения-аутентификатора для подтверждения отключения.
+                {t("profile.twoFaDisableDesc")}
               </DialogDescription>
             </DialogHeader>
 
@@ -1170,7 +1173,7 @@ export function ClientProfilePage() {
               />
               <Button variant="destructive" className="w-full h-12 rounded-2xl font-bold text-base shadow-lg shadow-red-500/20" onClick={confirmTwoFaDisable} disabled={twoFaLoading || twoFaCode.length !== 6}>
                 {twoFaLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-                Отключить 2FA
+                {t("profile.twoFaDisable")}
               </Button>
               {twoFaError && (
                 <p className="text-sm font-medium text-destructive animate-in fade-in text-center">{twoFaError}</p>
@@ -1187,9 +1190,9 @@ export function ClientProfilePage() {
               <KeyRound className="h-8 w-8" />
             </div>
             <DialogHeader className="p-0 flex flex-col items-center mb-6">
-              <DialogTitle className="text-2xl font-bold tracking-tight">Сменить пароль</DialogTitle>
+              <DialogTitle className="text-2xl font-bold tracking-tight">{t("profile.changePasswordTitle")}</DialogTitle>
               <DialogDescription className="text-center text-sm mt-2 max-w-[280px]">
-                Введите текущий пароль и придумайте новый.
+                {t("profile.changePasswordModalDesc")}
               </DialogDescription>
             </DialogHeader>
 
@@ -1198,14 +1201,14 @@ export function ClientProfilePage() {
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 text-green-500">
                   <Check className="h-8 w-8" />
                 </div>
-                <p className="text-lg font-bold text-green-500">Пароль изменён!</p>
+                <p className="text-lg font-bold text-green-500">{t("profile.passwordChanged")}</p>
               </div>
             ) : (
               <div className="flex flex-col gap-4 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-3">
                   <Input
                     type="password"
-                    placeholder="Текущий пароль"
+                    placeholder={t("auth.currentPassword")}
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     className="h-12 rounded-xl"
@@ -1213,14 +1216,14 @@ export function ClientProfilePage() {
                   />
                   <Input
                     type="password"
-                    placeholder="Новый пароль (мин. 6 символов)"
+                    placeholder={t("auth.newPassword")}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="h-12 rounded-xl"
                   />
                   <Input
                     type="password"
-                    placeholder="Повторите новый пароль"
+                    placeholder={t("auth.confirmNewPassword")}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="h-12 rounded-xl"
@@ -1231,7 +1234,7 @@ export function ClientProfilePage() {
                 )}
                 <Button className="w-full h-12 rounded-xl font-bold text-base shadow-lg" onClick={submitChangePassword} disabled={changePasswordLoading || !currentPassword || !newPassword || !confirmPassword}>
                   {changePasswordLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-                  Сохранить пароль
+                  {t("profile.savePassword")}
                 </Button>
               </div>
             )}

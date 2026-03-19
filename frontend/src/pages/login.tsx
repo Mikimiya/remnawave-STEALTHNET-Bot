@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTranslation } from "react-i18next";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -17,6 +18,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { state, login, submit2FACode, clearPending2FA } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [brand, setBrand] = useState<{ serviceName: string; logo: string | null }>({
     serviceName: "",
     logo: null,
@@ -46,7 +48,7 @@ export function LoginPage() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка входа");
+      setError(err instanceof Error ? err.message : t("admin.login.enterLogin"));
     } finally {
       setLoading(false);
     }
@@ -56,14 +58,14 @@ export function LoginPage() {
     e.preventDefault();
     setError("");
     if (code.trim().length !== 6) {
-      setError("Введите 6-значный код из приложения");
+      setError(t("admin.login.twoFaError"));
       return;
     }
     setLoading(true);
     try {
       await submit2FACode(code.trim());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Неверный код");
+      setError(err instanceof Error ? err.message : t("admin.error"));
     } finally {
       setLoading(false);
     }
@@ -90,8 +92,8 @@ export function LoginPage() {
                 </div>
               )}
             </div>
-            <CardTitle className="text-2xl">{brand.serviceName || "Вход"}</CardTitle>
-            <p className="text-muted-foreground text-sm">{pending2FA ? "Код из приложения-аутентификатора" : "Вход в админ-панель"}</p>
+            <CardTitle className="text-2xl">{brand.serviceName || t("admin.login.title")}</CardTitle>
+            <p className="text-muted-foreground text-sm">{pending2FA ? t("admin.login.twoFaSubtitle") : t("admin.login.subtitle")}</p>
           </CardHeader>
           <CardContent>
             {pending2FA ? (
@@ -102,7 +104,7 @@ export function LoginPage() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="code">Код 2FA</Label>
+                  <Label htmlFor="code">{t("admin.login.twoFaLabel")}</Label>
                   <Input
                     id="code"
                     type="text"
@@ -116,10 +118,10 @@ export function LoginPage() {
                   />
                 </div>
                 <Button type="submit" className="w-full shadow-lg" disabled={loading || code.length !== 6}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Войти"}
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : t("admin.login.enterLogin")}
                 </Button>
                 <Button type="button" variant="ghost" className="w-full" onClick={clearPending2FA}>
-                  Отмена
+                  {t("admin.login.cancelTwoFa")}
                 </Button>
               </form>
             ) : (
@@ -143,7 +145,7 @@ export function LoginPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Пароль</Label>
+                  <Label htmlFor="password">{t("admin.login.passwordLabel")}</Label>
                   <Input
                     id="password"
                     type="password"
@@ -155,7 +157,7 @@ export function LoginPage() {
                   />
                 </div>
                 <Button type="submit" className="w-full shadow-lg" disabled={loading}>
-                  {loading ? "Вход…" : "Войти"}
+                  {loading ? t("admin.login.enterLoading") : t("admin.login.enterLogin")}
                 </Button>
               </form>
             )}

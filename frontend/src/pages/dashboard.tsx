@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { DashboardStats, RemnaNode, RemnaNodesResponse } from "@/lib/api";
 import { useAuth } from "@/contexts/auth";
+import { useTranslation } from "react-i18next";
 
 const cardVariants = {
   hidden: { opacity: 0, y: 12 },
@@ -63,6 +64,7 @@ export function DashboardPage() {
   const token = state.accessToken ?? null;
   const admin = state.admin;
   const hasRemnaNodesAccess = admin ? canAccessRemnaNodes(admin.role, admin.allowedSections) : false;
+  const { t } = useTranslation();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [nodes, setNodes] = useState<RemnaNode[]>([]);
@@ -89,7 +91,7 @@ export function DashboardPage() {
       else await api.remnaNodeRestart(token, nodeUuid);
       await refetchNodes();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка действия с нодой");
+      setError(e instanceof Error ? e.message : t("admin.dash.nodeActionError"));
     } finally {
       setNodeActionUuid(null);
     }
@@ -122,7 +124,7 @@ export function DashboardPage() {
         setDefaultCurrency(curr ? String(curr).toUpperCase() : "USD");
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Ошибка загрузки");
+          setError(e instanceof Error ? e.message : t("admin.error"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -146,13 +148,13 @@ export function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Дашборд</h1>
-        <p className="text-muted-foreground">Статистика пользователей, продажи, аналитика, ноды Remna</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("admin.dash.title")}</h1>
+        <p className="text-muted-foreground">{t("admin.dash.subtitle")}</p>
       </div>
 
       {admin?.role === "MANAGER" && (!admin.allowedSections || admin.allowedSections.length === 0) && (
         <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
-          У вас нет доступа ни к одному разделу. Обратитесь к администратору.
+          {t("admin.noAccess")}
         </div>
       )}
 
@@ -167,48 +169,48 @@ export function DashboardPage() {
         <motion.div custom={0} variants={cardVariants} initial="hidden" animate="visible">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Всего пользователей</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("admin.dash.totalUsers")}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats?.users.total ?? "—"}</div>
-              <p className="text-xs text-muted-foreground">Клиенты панели</p>
+              <p className="text-xs text-muted-foreground">{t("admin.dash.panelClients")}</p>
             </CardContent>
           </Card>
         </motion.div>
         <motion.div custom={1} variants={cardVariants} initial="hidden" animate="visible">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Привязано к Remna</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("admin.dash.linkedRemna")}</CardTitle>
               <Shield className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats?.users.withRemna ?? "—"}</div>
-              <p className="text-xs text-muted-foreground">С remnawaveUuid</p>
+              <p className="text-xs text-muted-foreground">remnawaveUuid</p>
             </CardContent>
           </Card>
         </motion.div>
         <motion.div custom={2} variants={cardVariants} initial="hidden" animate="visible">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Новых сегодня</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("admin.dash.newToday")}</CardTitle>
               <UserPlus className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats?.users.newToday ?? "—"}</div>
-              <p className="text-xs text-muted-foreground">Регистрации за день</p>
+              <p className="text-xs text-muted-foreground">{t("admin.dash.regsToday")}</p>
             </CardContent>
           </Card>
         </motion.div>
         <motion.div custom={3} variants={cardVariants} initial="hidden" animate="visible">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Новых за 30 дней</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("admin.dash.new30Days")}</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats?.users.newLast30Days ?? "—"}</div>
-              <p className="text-xs text-muted-foreground">Регистрации</p>
+              <p className="text-xs text-muted-foreground">{t("admin.dash.registrations")}</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -220,30 +222,30 @@ export function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              Статистика продаж
+              {t("admin.dash.salesStats")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <p className="text-sm text-muted-foreground">Всего поступления</p>
+                <p className="text-sm text-muted-foreground">{t("admin.dash.totalIncome")}</p>
                 <p className="text-xl font-semibold">{stats ? formatMoney(stats.sales.totalAmount, defaultCurrency) : "—"}</p>
-                <p className="text-xs text-muted-foreground">{stats?.sales.totalCount ?? 0} платежей с платёжек (без оплаты с баланса)</p>
+                <p className="text-xs text-muted-foreground">{stats?.sales.totalCount ?? 0} {t("admin.dash.paymentsFromGateways")}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">За сегодня</p>
+                <p className="text-sm text-muted-foreground">{t("admin.dash.today")}</p>
                 <p className="text-xl font-semibold">{stats ? formatMoney(stats.sales.todayAmount, defaultCurrency) : "—"}</p>
-                <p className="text-xs text-muted-foreground">{stats?.sales.todayCount ?? 0} платежей</p>
+                <p className="text-xs text-muted-foreground">{stats?.sales.todayCount ?? 0} {t("admin.dash.payments")}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">За 7 дней</p>
+                <p className="text-sm text-muted-foreground">{t("admin.dash.last7days")}</p>
                 <p className="text-xl font-semibold">{stats ? formatMoney(stats.sales.last7DaysAmount, defaultCurrency) : "—"}</p>
-                <p className="text-xs text-muted-foreground">{stats?.sales.last7DaysCount ?? 0} платежей</p>
+                <p className="text-xs text-muted-foreground">{stats?.sales.last7DaysCount ?? 0} {t("admin.dash.payments")}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">За 30 дней</p>
+                <p className="text-sm text-muted-foreground">{t("admin.dash.last30days")}</p>
                 <p className="text-xl font-semibold">{stats ? formatMoney(stats.sales.last30DaysAmount, defaultCurrency) : "—"}</p>
-                <p className="text-xs text-muted-foreground">{stats?.sales.last30DaysCount ?? 0} платежей</p>
+                <p className="text-xs text-muted-foreground">{stats?.sales.last30DaysCount ?? 0} {t("admin.dash.payments")}</p>
               </div>
             </div>
           </CardContent>
@@ -256,33 +258,33 @@ export function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5" />
-              Аналитика
+              {t("admin.dash.analytics")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
               <div className="rounded-lg border bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Новые пользователи (сегодня)</p>
+                <p className="text-xs text-muted-foreground">{t("admin.dash.newUsersToday")}</p>
                 <p className="text-lg font-medium">{stats?.users.newToday ?? "—"}</p>
               </div>
               <div className="rounded-lg border bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Новые пользователи (7 дн.)</p>
+                <p className="text-xs text-muted-foreground">{t("admin.dash.newUsers7d")}</p>
                 <p className="text-lg font-medium">{stats?.users.newLast7Days ?? "—"}</p>
               </div>
               <div className="rounded-lg border bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Новые пользователи (30 дн.)</p>
+                <p className="text-xs text-muted-foreground">{t("admin.dash.newUsers30d")}</p>
                 <p className="text-lg font-medium">{stats?.users.newLast30Days ?? "—"}</p>
               </div>
               <div className="rounded-lg border bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Продажи за сегодня</p>
+                <p className="text-xs text-muted-foreground">{t("admin.dash.salesToday")}</p>
                 <p className="text-lg font-medium">{stats ? formatMoney(stats.sales.todayAmount, defaultCurrency) : "—"}</p>
               </div>
               <div className="rounded-lg border bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Продажи за 7 дней</p>
+                <p className="text-xs text-muted-foreground">{t("admin.dash.sales7d")}</p>
                 <p className="text-lg font-medium">{stats ? formatMoney(stats.sales.last7DaysAmount, defaultCurrency) : "—"}</p>
               </div>
               <div className="rounded-lg border bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Продажи за 30 дней</p>
+                <p className="text-xs text-muted-foreground">{t("admin.dash.sales30d")}</p>
                 <p className="text-lg font-medium">{stats ? formatMoney(stats.sales.last30DaysAmount, defaultCurrency) : "—"}</p>
               </div>
             </div>
@@ -296,34 +298,34 @@ export function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Server className="h-5 w-5" />
-              Ноды Remna
+              {t("admin.dash.remnaNodes")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Статус, трафик, CPU/RAM, онлайн пользователей. Данные из Remna API.
+              {t("admin.dash.remnaNodesSubtitle")}
             </p>
           </CardHeader>
           <CardContent>
             {!hasRemnaNodesAccess ? (
               <p className="text-muted-foreground text-sm py-4">
-                Нет доступа к управлению нодами Remna. Обратитесь к администратору для получения раздела «Ноды Remna».
+                {t("admin.dash.noNodesAccess")}
               </p>
             ) : nodes.length === 0 ? (
               <p className="text-muted-foreground text-sm py-4">
-                Ноды не загружены или Remna API не настроен. Проверьте настройки и подключение к Remna.
+                {t("admin.dash.noNodesLoaded")}
               </p>
             ) : (
               <div className="rounded-md border overflow-x-auto">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="text-left py-2.5 px-3 font-medium">Название</th>
-                      <th className="text-left py-2.5 px-3 font-medium">Адрес</th>
-                      <th className="text-left py-2.5 px-3 font-medium">Статус</th>
-                      <th className="text-left py-2.5 px-3 font-medium">Нода</th>
-                      <th className="text-left py-2.5 px-3 font-medium">Трафик</th>
-                      <th className="text-left py-2.5 px-3 font-medium">CPU / RAM</th>
-                      <th className="text-left py-2.5 px-3 font-medium">Онлайн юзеров</th>
-                      <th className="text-left py-2.5 px-3 font-medium">Действия</th>
+                      <th className="text-left py-2.5 px-3 font-medium">{t("admin.name")}</th>
+                      <th className="text-left py-2.5 px-3 font-medium">{t("admin.dash.nodeAddress")}</th>
+                      <th className="text-left py-2.5 px-3 font-medium">{t("admin.status")}</th>
+                      <th className="text-left py-2.5 px-3 font-medium">{t("admin.dash.nodeConn")}</th>
+                      <th className="text-left py-2.5 px-3 font-medium">{t("admin.dash.nodeTraffic")}</th>
+                      <th className="text-left py-2.5 px-3 font-medium">{t("admin.dash.nodeCpuRam")}</th>
+                      <th className="text-left py-2.5 px-3 font-medium">{t("admin.dash.nodeOnlineUsers")}</th>
+                      <th className="text-left py-2.5 px-3 font-medium">{t("admin.actions")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -341,23 +343,23 @@ export function DashboardPage() {
                           </td>
                           <td className="py-3 px-3">
                             {node.isDisabled ? (
-                              <span className="inline-flex rounded-md bg-muted px-2 py-0.5 text-xs">Отключена</span>
+                              <span className="inline-flex rounded-md bg-muted px-2 py-0.5 text-xs">{t("admin.dash.nodeDisabled")}</span>
                             ) : node.isConnecting ? (
-                              <span className="inline-flex rounded-md border px-2 py-0.5 text-xs">Подключение…</span>
+                              <span className="inline-flex rounded-md border px-2 py-0.5 text-xs">{t("admin.dash.nodeConnecting")}</span>
                             ) : (
-                              <span className="inline-flex rounded-md bg-primary/10 text-primary px-2 py-0.5 text-xs">Активна</span>
+                              <span className="inline-flex rounded-md bg-primary/10 text-primary px-2 py-0.5 text-xs">{t("admin.dash.nodeActive")}</span>
                             )}
                           </td>
                           <td className="py-3 px-3">
                             {node.isConnected ? (
                               <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                                 <CircleDot className="h-4 w-4 shrink-0" />
-                                Онлайн
+                                {t("admin.dash.nodeOnline")}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-muted-foreground">
                                 <CircleOff className="h-4 w-4 shrink-0" />
-                                Офлайн
+                                {t("admin.dash.nodeOffline")}
                               </span>
                             )}
                           </td>
@@ -379,7 +381,7 @@ export function DashboardPage() {
                                   onClick={() => handleNodeAction(node.uuid, "enable")}
                                 >
                                   {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Power className="h-3 w-3" />}
-                                  <span className="ml-1">Включить</span>
+                                  <span className="ml-1">{t("admin.enable")}</span>
                                 </Button>
                               ) : (
                                 <Button
@@ -390,7 +392,7 @@ export function DashboardPage() {
                                   onClick={() => handleNodeAction(node.uuid, "disable")}
                                 >
                                   {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <PowerOff className="h-3 w-3" />}
-                                  <span className="ml-1">Выключить</span>
+                                  <span className="ml-1">{t("admin.disable")}</span>
                                 </Button>
                               )}
                               <Button
@@ -401,7 +403,7 @@ export function DashboardPage() {
                                 onClick={() => handleNodeAction(node.uuid, "restart")}
                               >
                                 <RotateCw className="h-3 w-3" />
-                                <span className="ml-1">Перезагрузить</span>
+                                <span className="ml-1">{t("admin.restart")}</span>
                               </Button>
                             </div>
                           </td>

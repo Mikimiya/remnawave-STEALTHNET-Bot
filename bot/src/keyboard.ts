@@ -254,7 +254,8 @@ export function openSubscribePageMarkup(appUrl: string, backLabel?: string | nul
 }
 
 export function topUpPresets(currency: string, backLabel?: string | null, innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds): InlineMarkup {
-  const sym = currency.toUpperCase() === "RUB" ? "₽" : currency.toUpperCase() === "USD" ? "$" : "₴";
+  const c = currency.toUpperCase();
+  const sym = c === "RUB" ? "₽" : c === "USD" ? "$" : c === "CNY" ? "¥" : c;
   const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
   const topup = resolveStyle(toStyle(innerStyles?.topup), "primary");
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");

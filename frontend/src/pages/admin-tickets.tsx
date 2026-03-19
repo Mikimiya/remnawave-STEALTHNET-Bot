@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquare, Loader2, Send, ArrowLeft, Lock, Unlock, CircleDot, CircleCheck } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 type TicketListItem = {
   id: string;
@@ -20,6 +21,7 @@ type TicketMessage = { id: string; authorType: string; content: string; createdA
 export function AdminTicketsPage() {
   const { state } = useAuth();
   const token = state.accessToken ?? "";
+  const { t } = useTranslation();
 
   const [list, setList] = useState<TicketListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +109,7 @@ export function AdminTicketsPage() {
 
   const formatDate = (s: string) => {
     try {
-      return new Date(s).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      return new Date(s).toLocaleString(undefined, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
     } catch {
       return s;
     }
@@ -119,11 +121,11 @@ export function AdminTicketsPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="ghost" size="sm" onClick={() => { setDetailId(null); setDetail(null); }}>
             <ArrowLeft className="h-4 w-4 mr-1" />
-            К списку
+            {t("admin.toList")}
           </Button>
           <Button variant="outline" size="sm" onClick={toggleStatus}>
             {detail.status === "open" ? <Lock className="h-4 w-4 mr-1" /> : <Unlock className="h-4 w-4 mr-1" />}
-            {detail.status === "open" ? "Закрыть" : "Открыть"}
+            {detail.status === "open" ? t("admin.tickets.close") : t("admin.tickets.reopen")}
           </Button>
         </div>
         <Card className="overflow-hidden">
@@ -138,11 +140,11 @@ export function AdminTicketsPage() {
                 }`}
               >
                 {detail.status === "open" ? <CircleDot className="h-3.5 w-3.5" /> : <CircleCheck className="h-3.5 w-3.5" />}
-                {detail.status === "open" ? "Открыт" : "Закрыт"}
+                {detail.status === "open" ? t("admin.tickets.statusOpen") : t("admin.tickets.statusClosed")}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Клиент: {detail.client.email ?? detail.client.telegramUsername ?? detail.client.id} · обновлён {formatDate(detail.updatedAt)}
+              {t("admin.tickets.client")}: {detail.client.email ?? detail.client.telegramUsername ?? detail.client.id} · {t("admin.tickets.updated")} {formatDate(detail.updatedAt)}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -153,7 +155,7 @@ export function AdminTicketsPage() {
                   className={`rounded-lg p-3 text-sm ${m.authorType === "support" ? "bg-primary/10 border border-primary/20" : "bg-muted/50"}`}
                 >
                   <div className="flex justify-between gap-2 text-xs text-muted-foreground mb-1">
-                    <span>{m.authorType === "support" ? "Поддержка" : "Клиент"}</span>
+                    <span>{m.authorType === "support" ? t("admin.tickets.authorSupport") : t("admin.tickets.authorClient")}</span>
                     <span>{formatDate(m.createdAt)}</span>
                   </div>
                   <p className="whitespace-pre-wrap">{m.content}</p>
@@ -162,10 +164,10 @@ export function AdminTicketsPage() {
             </div>
             {detail.status === "open" && (
               <div className="flex flex-col gap-2 pt-2 border-t">
-                <Label htmlFor="admin-reply">Ответ поддержки</Label>
+                <Label htmlFor="admin-reply">{t("admin.tickets.replyLabel")}</Label>
                 <Textarea
                   id="admin-reply"
-                  placeholder="Введите ответ…"
+                  placeholder={t("admin.tickets.replyPlaceholder")}
                   value={replyText}
                   onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setReplyText(e.target.value)}
                   rows={3}
@@ -173,7 +175,7 @@ export function AdminTicketsPage() {
                 />
                 <Button onClick={sendReply} disabled={replySending || !replyText.trim()} size="sm">
                   {replySending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  <span className="ml-2">Отправить</span>
+                  <span className="ml-2">{t("admin.send")}</span>
                 </Button>
               </div>
             )}
@@ -187,7 +189,7 @@ export function AdminTicketsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[200px] gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <Button variant="ghost" size="sm" onClick={() => setDetailId(null)}>К списку</Button>
+        <Button variant="ghost" size="sm" onClick={() => setDetailId(null)}>{t("admin.toList")}</Button>
       </div>
     );
   }
@@ -195,7 +197,7 @@ export function AdminTicketsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h2 className="text-lg font-semibold">Тикеты</h2>
+        <h2 className="text-lg font-semibold">{t("admin.tickets.title")}</h2>
         <div className="flex gap-2">
           {(["all", "open", "closed"] as const).map((f) => (
             <Button
@@ -204,7 +206,7 @@ export function AdminTicketsPage() {
               size="sm"
               onClick={() => setFilter(f)}
             >
-              {f === "all" ? "Все" : f === "open" ? "Открытые" : "Закрытые"}
+              {f === "all" ? t("admin.all") : f === "open" ? t("admin.tickets.filterOpen") : t("admin.tickets.filterClosed")}
             </Button>
           ))}
         </div>
@@ -218,33 +220,33 @@ export function AdminTicketsPage() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>Нет тикетов</p>
+            <p>{t("admin.tickets.empty")}</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
-          {list.map((t) => (
+          {list.map((ticket) => (
             <Card
-              key={t.id}
-              className={`cursor-pointer transition-all hover:shadow-md ${t.status === "open" ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-muted-foreground/30"}`}
-              onClick={() => setDetailId(t.id)}
+              key={ticket.id}
+              className={`cursor-pointer transition-all hover:shadow-md ${ticket.status === "open" ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-muted-foreground/30"}`}
+              onClick={() => setDetailId(ticket.id)}
             >
               <CardContent className="py-3 flex flex-row items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">{t.subject}</p>
+                  <p className="font-medium truncate">{ticket.subject}</p>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                        t.status === "open"
+                        ticket.status === "open"
                           ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      {t.status === "open" ? <CircleDot className="h-3 w-3" /> : <CircleCheck className="h-3 w-3" />}
-                      {t.status === "open" ? "Открыт" : "Закрыт"}
+                      {ticket.status === "open" ? <CircleDot className="h-3 w-3" /> : <CircleCheck className="h-3 w-3" />}
+                      {ticket.status === "open" ? t("admin.tickets.statusOpen") : t("admin.tickets.statusClosed")}
                     </span>
-                    <span className="text-xs text-muted-foreground">{t.client.email ?? t.client.telegramUsername ?? t.client.id}</span>
-                    <span className="text-xs text-muted-foreground">{formatDate(t.updatedAt)}</span>
+                    <span className="text-xs text-muted-foreground">{ticket.client.email ?? ticket.client.telegramUsername ?? ticket.client.id}</span>
+                    <span className="text-xs text-muted-foreground">{formatDate(ticket.updatedAt)}</span>
                   </div>
                 </div>
                 <span className="text-muted-foreground shrink-0">→</span>

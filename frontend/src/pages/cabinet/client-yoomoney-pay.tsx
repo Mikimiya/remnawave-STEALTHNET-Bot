@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
@@ -14,6 +15,7 @@ const YOOMONEY_CONFIRM_URL = "https://yoomoney.ru/quickpay/confirm";
 type FormData = { receiver: string; sum: number; label: string; paymentType: string; successURL: string };
 
 export function ClientYooMoneyPayPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,15 +34,15 @@ export function ClientYooMoneyPayPage() {
       return;
     }
     if (!paymentId.trim()) {
-      setError("Не указан платёж");
+      setError(t("clientYoomoneyPay.errors.paymentMissing"));
       return;
     }
 
     api
       .yoomoneyFormPaymentParams(state.token, paymentId)
       .then(setFormData)
-      .catch((e) => setError(e instanceof Error ? e.message : "Не удалось загрузить платёж"));
-  }, [state.token, paymentId, locationStateForm?.label]);
+    .catch((e) => setError(e instanceof Error ? e.message : t("clientYoomoneyPay.errors.loadFailed")));
+  }, [state.token, paymentId, locationStateForm?.label, t]);
 
   useEffect(() => {
     if (!formData || submittedRef.current || !formRef.current) return;
@@ -53,7 +55,7 @@ export function ClientYooMoneyPayPage() {
       <div className="min-h-[40vh] flex flex-col items-center justify-center gap-4 p-6">
         <p className="text-destructive">{error}</p>
         <button type="button" className="text-primary underline" onClick={() => navigate("/cabinet/profile#topup")}>
-          Вернуться к пополнению
+          {t("clientYoomoneyPay.backToTopup")}
         </button>
       </div>
     );
@@ -63,7 +65,7 @@ export function ClientYooMoneyPayPage() {
     return (
       <div className="min-h-[40vh] flex flex-col items-center justify-center gap-4 p-6">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-muted-foreground">Перенаправление на ЮMoney…</p>
+        <p className="text-muted-foreground">{t("clientYoomoneyPay.redirecting")}</p>
       </div>
     );
   }
@@ -71,7 +73,7 @@ export function ClientYooMoneyPayPage() {
   return (
     <div className="min-h-[40vh] flex flex-col items-center justify-center gap-4 p-6">
       <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      <p className="text-muted-foreground">Открываем форму оплаты ЮMoney…</p>
+      <p className="text-muted-foreground">{t("clientYoomoneyPay.openingForm")}</p>
       <form ref={formRef} action={YOOMONEY_CONFIRM_URL} method="POST" className="hidden">
         <input name="quickpay-form" value="button" readOnly />
         <input name="receiver" value={formData.receiver} readOnly />

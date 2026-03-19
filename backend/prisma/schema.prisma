@@ -69,7 +69,7 @@ model Client {
   referralCode     String?   @unique @map("referral_code")
   referrerId       String?   @map("referrer_id")
   balance          Float     @default(0)
-  preferredLang    String    @default("ru") @map("preferred_lang")
+  preferredLang    String    @default("zh") @map("preferred_lang")
   preferredCurrency String   @default("usd") @map("preferred_currency")
   telegramId       String?   @unique @map("telegram_id")
   telegramUsername String?   @map("telegram_username")
@@ -172,7 +172,7 @@ model PendingEmailRegistration {
   id               String   @id @default(cuid())
   email            String
   passwordHash     String   @map("password_hash")
-  preferredLang    String   @default("ru") @map("preferred_lang")
+  preferredLang    String   @default("zh") @map("preferred_lang")
   preferredCurrency String  @default("usd") @map("preferred_currency")
   referralCode     String?  @map("referral_code")
   utmSource        String?  @map("utm_source")

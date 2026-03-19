@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import { api, type ContestListItem, type ContestDetail, type ContestFormPayload, type ContestPrizeType, type ContestDrawType } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,24 +18,18 @@ import {
 import { Trophy, Plus, Pencil, Trash2, Loader2, Users, Shuffle, Send, Clock, X } from "lucide-react";
 
 const PRIZE_TYPES: { value: ContestPrizeType; label: string }[] = [
-  { value: "custom", label: "Свой текст" },
-  { value: "balance", label: "Деньги на баланс" },
-  { value: "vpn_days", label: "Дни VPN в подарок" },
+  { value: "custom", label: "custom" },
+  { value: "balance", label: "balance" },
+  { value: "vpn_days", label: "vpn_days" },
 ];
 
 const DRAW_TYPES: { value: ContestDrawType; label: string }[] = [
-  { value: "random", label: "Случайный выбор" },
-  { value: "by_days_bought", label: "Кто больше купил дней" },
-  { value: "by_payments_count", label: "По количеству оплат" },
-  { value: "by_referrals_count", label: "Кто больше привёл рефералов" },
+  { value: "random", label: "random" },
+  { value: "by_days_bought", label: "by_days_bought" },
+  { value: "by_payments_count", label: "by_payments_count" },
+  { value: "by_referrals_count", label: "by_referrals_count" },
 ];
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Черновик",
-  active: "Активен",
-  ended: "Завершён",
-  drawn: "Розыгрыш проведён",
-};
 
 function toLocalDatetime(d: string): string {
   if (!d) return "";
@@ -91,8 +86,39 @@ const emptyForm: ContestFormPayload = {
 };
 
 export function ContestsPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const token = state.accessToken!;
+
+  const prizeLabel = (value: string) => {
+    const map: Record<string, string> = {
+      custom: t("admin.contests.prizeCustom"),
+      balance: t("admin.contests.prizeBalance"),
+      vpn_days: t("admin.contests.prizeVpnDays"),
+    };
+    return map[value] ?? value;
+  };
+  const drawLabel = (value: string) => {
+    const map: Record<string, string> = {
+      random: t("admin.contests.drawRandom"),
+      by_days_bought: t("admin.contests.drawByDays"),
+      by_payments_count: t("admin.contests.drawByPayments"),
+      by_referrals_count: t("admin.contests.drawByReferrals"),
+    };
+    return map[value] ?? value;
+  };
+  const statusLabel = (value: string) => {
+    const map: Record<string, string> = {
+      draft: t("admin.contests.statusDraft"),
+      active: t("admin.contests.statusActive"),
+      ended: t("admin.contests.statusEnded"),
+      drawn: t("admin.contests.statusDrawn"),
+    };
+    return map[value] ?? value;
+  };
+
+  const prizeTypesI18n = PRIZE_TYPES.map((p) => ({ value: p.value, label: prizeLabel(p.value) }));
+  const drawTypesI18n = DRAW_TYPES.map((d) => ({ value: d.value, label: drawLabel(d.value) }));
 
   const [list, setList] = useState<ContestListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,7 +144,7 @@ export function ContestsPage() {
       const data = await api.getContests(token);
       setList(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      setError(e instanceof Error ? e.message : t("admin.contests.errorLoad"));
     } finally {
       setLoading(false);
     }
@@ -191,7 +217,7 @@ export function ContestsPage() {
       setShowForm(false);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка сохранения");
+      setError(e instanceof Error ? e.message : t("admin.contests.errorSave"));
     } finally {
       setSaving(false);
     }
@@ -203,7 +229,7 @@ export function ContestsPage() {
       setParticipantsPreview(data);
       setDetailId(id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки участников");
+      setError(e instanceof Error ? e.message : t("admin.contests.errorLoad"));
     }
   };
 
@@ -216,7 +242,7 @@ export function ContestsPage() {
       const d = await api.getContest(token, id);
       setDetail(d);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка розыгрыша");
+      setError(e instanceof Error ? e.message : t("admin.contests.errorSave"));
     } finally {
       setDrawingId(null);
     }
@@ -229,7 +255,7 @@ export function ContestsPage() {
       await api.launchContest(token, id);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка запуска");
+      setError(e instanceof Error ? e.message : t("admin.contests.errorSave"));
     } finally {
       setLaunchingId(null);
     }
@@ -244,7 +270,7 @@ export function ContestsPage() {
       setDetail(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка удаления");
+      setError(e instanceof Error ? e.message : t("admin.contests.errorSave"));
     } finally {
       setSaving(false);
     }
@@ -257,13 +283,13 @@ export function ContestsPage() {
   function formatTimeLeft(endAt: string): string {
     const end = new Date(endAt).getTime();
     const diff = end - Date.now();
-    if (diff <= 0) return "Завершён";
+    if (diff <= 0) return t("admin.contests.statusEnded");
     const days = Math.floor(diff / (24 * 60 * 60 * 1000));
     const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-    if (days > 0) return `До конца: ${days} дн. ${hours} ч.`;
-    if (hours > 0) return `До конца: ${hours} ч.`;
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h`;
     const min = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
-    return `До конца: ${min} мин.`;
+    return `${min}m`;
   }
   function isContestActive(c: ContestListItem): boolean {
     const start = new Date(c.startAt).getTime();
@@ -276,11 +302,11 @@ export function ContestsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <Trophy className="h-7 w-7" />
-          Конкурсы
+          {t("admin.contests.title")}
         </h1>
         <Button onClick={openCreate}>
           <Plus className="h-4 w-4 mr-2" />
-          Создать конкурс
+          {t("admin.contests.addContest")}
         </Button>
       </div>
 
@@ -293,21 +319,21 @@ export function ContestsPage() {
       <Dialog open={showForm} onOpenChange={(open) => !open && setShowForm(false)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Редактировать конкурс" : "Новый конкурс"}</DialogTitle>
-            <DialogDescription className="sr-only">Форма создания и редактирования конкурса</DialogDescription>
+            <DialogTitle>{editingId ? t("admin.common.edit") : t("admin.contests.addContest")}</DialogTitle>
+            <DialogDescription className="sr-only">{t("admin.contests.addContest")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid gap-2">
-              <Label>Название</Label>
+              <Label>{t("admin.promo.formName")}</Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Название конкурса"
+                placeholder={t("admin.contests.title")}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Начало</Label>
+                <Label>{t("admin.contests.startLabel")}</Label>
                 <Input
                   type="datetime-local"
                   value={toLocalDatetime(form.startAt)}
@@ -315,7 +341,7 @@ export function ContestsPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Окончание</Label>
+                <Label>{t("admin.contests.endLabel")}</Label>
                 <Input
                   type="datetime-local"
                   value={toLocalDatetime(form.endAt)}
@@ -324,22 +350,22 @@ export function ContestsPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Тип розыгрыша</Label>
+              <Label>{t("admin.contests.drawTypeLabel")}</Label>
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
                 value={form.drawType}
                 onChange={(e) => setForm((f) => ({ ...f, drawType: e.target.value as ContestDrawType }))}
               >
-                {DRAW_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
+                {drawTypesI18n.map((dt) => (
+                  <option key={dt.value} value={dt.value}>{dt.label}</option>
                 ))}
               </select>
             </div>
             <div className="grid gap-2">
-              <Label>Условия участия (опционально)</Label>
+              <Label>{t("admin.contests.conditionsLabel")}</Label>
               <div className="flex gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <Label className="text-muted-foreground text-xs">Мин. дней тарифа</Label>
+                  <Label className="text-muted-foreground text-xs">{t("admin.contests.condMinDays")}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -350,7 +376,7 @@ export function ContestsPage() {
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <Label className="text-muted-foreground text-xs">Мин. оплат</Label>
+                  <Label className="text-muted-foreground text-xs">{t("admin.contests.condMinPayments")}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -361,7 +387,7 @@ export function ContestsPage() {
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <Label className="text-muted-foreground text-xs">Мин. рефералов (привёл реферала)</Label>
+                  <Label className="text-muted-foreground text-xs">{t("admin.contests.condMinReferrals")}</Label>
                   <Input
                     type="number"
                     min={0}
@@ -376,43 +402,43 @@ export function ContestsPage() {
             {([1, 2, 3] as const).map((place) => (
               <div key={place} className="grid grid-cols-2 gap-4 items-end">
                 <div className="grid gap-2">
-                  <Label>Приз {place} место — тип</Label>
+                  <Label>{t("admin.contests.prizePlace", { place })}</Label>
                   <select
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
                     value={form[`prize${place}Type` as keyof ContestFormPayload] as string}
                     onChange={(e) => setForm((f) => ({ ...f, [`prize${place}Type`]: e.target.value as ContestPrizeType }))}
                   >
-                    {PRIZE_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
+                    {prizeTypesI18n.map((pt) => (
+                      <option key={pt.value} value={pt.value}>{pt.label}</option>
                     ))}
                   </select>
                 </div>
                 <div className="grid gap-2">
-                  <Label>Значение (текст / сумма ₽ / кол-во дней)</Label>
+                  <Label>{t("admin.contests.prizeValue")}</Label>
                   <Input
                     value={form[`prize${place}Value` as keyof ContestFormPayload] as string}
                     onChange={(e) => setForm((f) => ({ ...f, [`prize${place}Value`]: e.target.value }))}
-                    placeholder={form[`prize${place}Type` as keyof ContestFormPayload] === "balance" ? "500" : form[`prize${place}Type` as keyof ContestFormPayload] === "vpn_days" ? "30" : "Описание приза"}
+                    placeholder={form[`prize${place}Type` as keyof ContestFormPayload] === "balance" ? "500" : form[`prize${place}Type` as keyof ContestFormPayload] === "vpn_days" ? "30" : t("admin.contests.prizePlaceholderText")}
                   />
                 </div>
               </div>
             ))}
             <div className="grid gap-2">
-              <Label>Текст ежедневной рассылки в боте (опционально)</Label>
+              <Label>{t("admin.contests.dailyMsgLabel")}</Label>
               <Textarea
                 rows={3}
                 value={form.dailyMessage ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, dailyMessage: e.target.value || null }))}
-                placeholder="Сообщение, которое бот будет отправлять каждый день во время конкурса"
+                placeholder={t("admin.contests.dailyMsgPlaceholder")}
               />
             </div>
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                Отмена
+                {t("admin.common.cancel")}
               </Button>
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {editingId ? "Сохранить" : "Создать"}
+                {editingId ? t("admin.common.save") : t("admin.contests.addContest")}
               </Button>
             </DialogFooter>
           </div>
@@ -427,20 +453,20 @@ export function ContestsPage() {
         <div className="space-y-4">
           {list.length === 0 ? (
             <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                Нет конкурсов. Создайте первый.
-              </CardContent>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  {t("admin.contests.empty")} {t("admin.contests.emptyDesc")}
+                </CardContent>
             </Card>
           ) : (
             list.map((c) => (
               <Card key={c.id}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-lg">{c.name}</CardTitle>
-                  <span className="text-sm text-muted-foreground">{STATUS_LABELS[c.status] ?? c.status}</span>
+                  <span className="text-sm text-muted-foreground">{statusLabel(c.status)}</span>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    {new Date(c.startAt).toLocaleString("ru")} — {new Date(c.endAt).toLocaleString("ru")}
+                    {new Date(c.startAt).toLocaleString(undefined)} — {new Date(c.endAt).toLocaleString(undefined)}
                   </p>
                   {isContestActive(c) && (
                     <p className="text-sm font-medium flex items-center gap-1.5 text-primary">
@@ -449,40 +475,40 @@ export function ContestsPage() {
                     </p>
                   )}
                   <p className="text-sm">
-                    Розыгрыш: {DRAW_TYPES.find((t) => t.value === c.drawType)?.label ?? c.drawType}. Призы: 1 — {c.prize1Value}, 2 — {c.prize2Value}, 3 — {c.prize3Value}.
+                    {t("admin.contests.drawTypeLabel")}: {drawLabel(c.drawType)}. {t("admin.contests.prizeValue")}: 1 — {c.prize1Value}, 2 — {c.prize2Value}, 3 — {c.prize3Value}.
                   </p>
                   {c.winners.length > 0 && (
                     <div className="text-sm">
-                      Победители: {c.winners.map((w) => `#${w.place} ${w.client?.telegramUsername ?? w.client?.email ?? w.client?.id ?? "—"}`).join(", ")}
+                      {t("admin.contests.winnersLabel")}: {c.winners.map((w) => `#${w.place} ${w.client?.telegramUsername ?? w.client?.email ?? w.client?.id ?? "—"}`).join(", ")}
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2 pt-2">
                     {c.status === "draft" && (
                       <Button variant="default" size="sm" onClick={() => handleLaunch(c.id)} disabled={launchingId !== null}>
                         {launchingId === c.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
-                        Запустить
+                        {t("admin.contests.launch")}
                       </Button>
                     )}
                     <Button variant="outline" size="sm" onClick={() => openEdit(c)}>
                       <Pencil className="h-4 w-4 mr-1" />
-                      Изменить
+                      {t("admin.contests.edit")}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => loadParticipantsPreview(c.id)}>
                       <Users className="h-4 w-4 mr-1" />
-                      Участники
+                      {t("admin.contests.participantsBtn")}
                     </Button>
                     {canDraw(c) && (
                       <Button variant="default" size="sm" onClick={() => runDraw(c.id)} disabled={drawingId !== null}>
                         {drawingId === c.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Shuffle className="h-4 w-4 mr-1" />}
-                        Провести розыгрыш
+                        {t("admin.contests.drawBtn")}
                       </Button>
                     )}
                     {deleteConfirmId === c.id ? (
                       <>
                         <Button variant="destructive" size="sm" onClick={() => handleDelete(c.id)} disabled={saving}>
-                          Удалить?
+                          {t("admin.contests.deleteConfirmBtn")}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(null)}>Отмена</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(null)}>{t("admin.common.cancel")}</Button>
                       </>
                     ) : (
                       <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(c.id)}>
@@ -500,7 +526,7 @@ export function ContestsPage() {
       {(detailId && (detail || participantsPreview)) && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{detail?.name ?? "Участники"}</CardTitle>
+            <CardTitle>{detail?.name ?? t("admin.contests.participantsBtn")}</CardTitle>
             <Button variant="ghost" size="sm" onClick={() => { setDetailId(null); setDetail(null); setParticipantsPreview(null); }}>
               <X className="h-4 w-4" />
             </Button>
@@ -514,28 +540,28 @@ export function ContestsPage() {
             )}
             {participantsPreview !== null && (
               <div>
-                <p className="text-sm font-medium">Превью участников (по условиям конкурса): {participantsPreview.total} чел.</p>
+                <p className="text-sm font-medium">{t("admin.contests.participantsPreview", { count: participantsPreview.total })}</p>
                 {participantsPreview.participants.length > 0 && (
                   <ul className="text-sm text-muted-foreground mt-2 list-disc pl-4">
                     {participantsPreview.participants.slice(0, 20).map((p, i) => (
                       <li key={i}>
-                        clientId: {p.clientId}, дней: {p.totalDaysBought}, оплат: {p.paymentsCount}
-                        {p.referralsCount != null && `, рефералов: ${p.referralsCount}`}
+                        clientId: {p.clientId}, {t("admin.contests.colDays")}: {p.totalDaysBought}, {t("admin.contests.colPayments")}: {p.paymentsCount}
+                        {p.referralsCount != null && `, ${t("admin.contests.colReferrals")}: ${p.referralsCount}`}
                       </li>
                     ))}
-                    {participantsPreview.total > 20 && <li>… и ещё {participantsPreview.total - 20}</li>}
+                    {participantsPreview.total > 20 && <li>… +{participantsPreview.total - 20}</li>}
                   </ul>
                 )}
               </div>
             )}
             {detail?.winners && detail.winners.length > 0 && (
               <div>
-                <p className="text-sm font-medium">Победители</p>
+                <p className="text-sm font-medium">{t("admin.contests.winnersLabel")}</p>
                 <ul className="text-sm mt-2 space-y-1">
                   {detail.winners.map((w) => (
                     <li key={w.place}>
-                      {w.place} место: {w.client?.telegramUsername ?? w.client?.email ?? w.client?.id} — {w.prizeType}: {w.prizeValue}
-                      {w.appliedAt ? " (начислено)" : ""}
+                      #{w.place}: {w.client?.telegramUsername ?? w.client?.email ?? w.client?.id} — {prizeLabel(w.prizeType)}: {w.prizeValue}
+                      {w.appliedAt ? ` ${t("admin.contests.awarded")}` : ""}
                     </li>
                   ))}
                 </ul>

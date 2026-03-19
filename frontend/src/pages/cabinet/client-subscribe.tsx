@@ -32,21 +32,22 @@ import type { SubscriptionPageConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 const DEFAULT_SUBSCRIPTION_PAGE_CONFIG: SubscriptionPageConfig = {
   platforms: {
     ios: {
-      displayName: { ru: "iOS", en: "iOS" },
+      displayName: { ru: "iOS", en: "iOS", zh: "iOS" },
       apps: [
         {
           name: "Happ",
           blocks: [
             {
-              title: { ru: "Установка приложения", en: "App Installation" },
-              description: { ru: "Откройте App Store и установите приложение. Запустите его и разрешите конфигурацию VPN.", en: "Open App Store, install the app, then allow VPN configuration." },
+              title: { ru: "Установка приложения", en: "App Installation", zh: "安装应用" },
+              description: { ru: "Откройте App Store и установите приложение. Запустите его и разрешите конфигурацию VPN.", en: "Open App Store, install the app, then allow VPN configuration.", zh: "打开 App Store 安装应用，启动后允许 VPN 配置。" },
               buttons: [
-                { link: "https://apps.apple.com/us/app/happ-proxy-utility/id6504287215", text: { ru: "App Store", en: "App Store" }, type: "external" },
-                { link: "happ://add/{{SUBSCRIPTION_LINK}}", text: { ru: "Добавить подписку", en: "Add Subscription" }, type: "subscriptionLink" },
+                { link: "https://apps.apple.com/us/app/happ-proxy-utility/id6504287215", text: { ru: "App Store", en: "App Store", zh: "App Store" }, type: "external" },
+                { link: "happ://add/{{SUBSCRIPTION_LINK}}", text: { ru: "Добавить подписку", en: "Add Subscription", zh: "添加订阅" }, type: "subscriptionLink" },
               ],
             },
           ],
@@ -55,11 +56,11 @@ const DEFAULT_SUBSCRIPTION_PAGE_CONFIG: SubscriptionPageConfig = {
           name: "Stash",
           blocks: [
             {
-              title: { ru: "Установка приложения", en: "App Installation" },
-              description: { ru: "Установите Stash из App Store, затем нажмите кнопку ниже.", en: "Install Stash from App Store, then tap the button below." },
+              title: { ru: "Установка приложения", en: "App Installation", zh: "安装应用" },
+              description: { ru: "Установите Stash из App Store, затем нажмите кнопку ниже.", en: "Install Stash from App Store, then tap the button below.", zh: "从 App Store 安装 Stash，然后点击下方按钮。" },
               buttons: [
-                { link: "https://apps.apple.com/us/app/stash-rule-based-proxy/id1596063349", text: { ru: "App Store", en: "App Store" }, type: "external" },
-                { link: "stash://install-config?url={{SUBSCRIPTION_LINK}}", text: { ru: "Добавить подписку", en: "Add Subscription" }, type: "subscriptionLink" },
+                { link: "https://apps.apple.com/us/app/stash-rule-based-proxy/id1596063349", text: { ru: "App Store", en: "App Store", zh: "App Store" }, type: "external" },
+                { link: "stash://install-config?url={{SUBSCRIPTION_LINK}}", text: { ru: "Добавить подписку", en: "Add Subscription", zh: "添加订阅" }, type: "subscriptionLink" },
               ],
             },
           ],
@@ -67,17 +68,17 @@ const DEFAULT_SUBSCRIPTION_PAGE_CONFIG: SubscriptionPageConfig = {
       ],
     },
     android: {
-      displayName: { ru: "Android", en: "Android" },
+      displayName: { ru: "Android", en: "Android", zh: "Android" },
       apps: [
         {
           name: "v2rayNG",
           blocks: [
             {
-              title: { ru: "Установка приложения", en: "App Installation" },
-              description: { ru: "Установите приложение из Google Play или по ссылке, затем нажмите «Добавить подписку».", en: "Install the app from Google Play or the link, then tap Add Subscription." },
+              title: { ru: "Установка приложения", en: "App Installation", zh: "安装应用" },
+              description: { ru: "Установите приложение из Google Play или по ссылке, затем нажмите «Добавить подписку».", en: "Install the app from Google Play or the link, then tap Add Subscription.", zh: "从 Google Play 或链接安装应用，然后点击「添加订阅」。" },
               buttons: [
-                { link: "https://play.google.com/store/apps/details?id=com.v2ray.ang", text: { ru: "Google Play", en: "Google Play" }, type: "external" },
-                { link: "v2rayng://install-subscription?url={{SUBSCRIPTION_LINK}}", text: { ru: "Добавить подписку", en: "Add Subscription" }, type: "subscriptionLink" },
+                { link: "https://play.google.com/store/apps/details?id=com.v2ray.ang", text: { ru: "Google Play", en: "Google Play", zh: "Google Play" }, type: "external" },
+                { link: "v2rayng://install-subscription?url={{SUBSCRIPTION_LINK}}", text: { ru: "Добавить подписку", en: "Add Subscription", zh: "添加订阅" }, type: "subscriptionLink" },
               ],
             },
           ],
@@ -85,14 +86,14 @@ const DEFAULT_SUBSCRIPTION_PAGE_CONFIG: SubscriptionPageConfig = {
       ],
     },
     macos: {
-      displayName: { ru: "macOS", en: "macOS" },
+      displayName: { ru: "macOS", en: "macOS", zh: "macOS" },
       apps: [
         {
-          name: "Clash / V2rayU / Surge и др.",
+          name: "Clash / V2rayU / Surge",
           blocks: [
             {
-              title: { ru: "Подключение на Mac", en: "Connect on Mac" },
-              description: { ru: "Скопируйте ссылку на подписку выше и вставьте её в настройках Clash for Windows/Mac, V2rayU, Surge или другого клиента на macOS.", en: "Copy the subscription link above and paste it in Clash, V2rayU, Surge or another VPN client on macOS." },
+              title: { ru: "Подключение на Mac", en: "Connect on Mac", zh: "在 Mac 上连接" },
+              description: { ru: "Скопируйте ссылку на подписку выше и вставьте её в настройках Clash for Windows/Mac, V2rayU, Surge или другого клиента на macOS.", en: "Copy the subscription link above and paste it in Clash, V2rayU, Surge or another VPN client on macOS.", zh: "复制上方订阅链接，粘贴到 Clash、V2rayU、Surge 或其他 macOS 客户端的设置中。" },
               buttons: [],
             },
           ],
@@ -100,14 +101,14 @@ const DEFAULT_SUBSCRIPTION_PAGE_CONFIG: SubscriptionPageConfig = {
       ],
     },
     windows: {
-      displayName: { ru: "Windows", en: "Windows" },
+      displayName: { ru: "Windows", en: "Windows", zh: "Windows" },
       apps: [
         {
-          name: "Clash / v2rayN / Nekoray и др.",
+          name: "Clash / v2rayN / Nekoray",
           blocks: [
             {
-              title: { ru: "Подключение в Windows", en: "Connect on Windows" },
-              description: { ru: "Скопируйте ссылку на подписку выше и вставьте её в Clash for Windows, v2rayN, Nekoray или другой клиент на Windows.", en: "Copy the subscription link above and paste it in Clash for Windows, v2rayN, Nekoray or another VPN client on Windows." },
+              title: { ru: "Подключение в Windows", en: "Connect on Windows", zh: "在 Windows 上连接" },
+              description: { ru: "Скопируйте ссылку на подписку выше и вставьте её в Clash for Windows, v2rayN, Nekoray или другой клиент на Windows.", en: "Copy the subscription link above and paste it in Clash for Windows, v2rayN, Nekoray or another VPN client on Windows.", zh: "复制上方订阅链接，粘贴到 Clash for Windows、v2rayN、Nekoray 或其他 Windows 客户端中。" },
               buttons: [],
             },
           ],
@@ -115,14 +116,14 @@ const DEFAULT_SUBSCRIPTION_PAGE_CONFIG: SubscriptionPageConfig = {
       ],
     },
     linux: {
-      displayName: { ru: "Linux", en: "Linux" },
+      displayName: { ru: "Linux", en: "Linux", zh: "Linux" },
       apps: [
         {
           name: "Clash / v2ray",
           blocks: [
             {
-              title: { ru: "Подключение", en: "Connection" },
-              description: { ru: "Скопируйте ссылку на подписку выше и вставьте её в настройках Clash, v2rayA или другого клиента.", en: "Copy the subscription link above and paste it in your Clash, v2rayA or other client." },
+              title: { ru: "Подключение", en: "Connection", zh: "连接" },
+              description: { ru: "Скопируйте ссылку на подписку выше и вставьте её в настройках Clash, v2rayA или другого клиента.", en: "Copy the subscription link above and paste it in your Clash, v2rayA or other client.", zh: "复制上方订阅链接，粘贴到 Clash、v2rayA 或其他客户端的设置中。" },
               buttons: [],
             },
           ],
@@ -130,14 +131,14 @@ const DEFAULT_SUBSCRIPTION_PAGE_CONFIG: SubscriptionPageConfig = {
       ],
     },
     other: {
-      displayName: { ru: "Другое", en: "Other" },
+      displayName: { ru: "Другое", en: "Other", zh: "其他" },
       apps: [
         {
-          name: "Универсально",
+          name: "Universal",
           blocks: [
             {
-              title: { ru: "Использование ссылки", en: "Using the link" },
-              description: { ru: "Скопируйте ссылку на подписку выше и вставьте её в ваше VPN-приложение.", en: "Copy the subscription link above and paste it into your VPN app." },
+              title: { ru: "Использование ссылки", en: "Using the link", zh: "使用订阅链接" },
+              description: { ru: "Скопируйте ссылку на подписку выше и вставьте её в ваше VPN-приложение.", en: "Copy the subscription link above and paste it into your VPN app.", zh: "复制上方订阅链接，粘贴到您的 VPN 应用中。" },
               buttons: [],
             },
           ],
@@ -186,7 +187,7 @@ function detectPlatform(): string {
 
 function getText(map: Record<string, string> | undefined, locale: string): string {
   if (!map) return "";
-  return map[locale] || map.ru || map.en || Object.values(map)[0] || "";
+  return map[locale] || map.zh || map.ru || map.en || Object.values(map)[0] || "";
 }
 
 export function ClientSubscribePage() {
@@ -197,6 +198,7 @@ export function ClientSubscribePage() {
   const locale = (client?.preferredLang ?? "ru").toLowerCase().slice(0, 2);
 
   const [subscription, setSubscription] = useState<unknown>(null);
+  const { t } = useTranslation();
   const [pageConfig, setPageConfig] = useState<SubscriptionPageConfig | null>(null);
   const [publicAppUrl, setPublicAppUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -250,7 +252,7 @@ export function ClientSubscribePage() {
     macos: "macOS",
     windows: "Windows",
     linux: "Linux",
-    other: "Другое",
+    other: t("subscribe.other"),
   };
   const platformLabel = PLATFORM_LABELS[platform] ?? platform;
   const showQrNextToAddButton = isMiniapp || isMobileView;
@@ -262,7 +264,7 @@ export function ClientSubscribePage() {
           <div className="absolute inset-0 rounded-full blur-xl bg-primary/20 animate-pulse" />
           <Loader2 className="h-10 w-10 animate-spin text-primary relative z-10" />
         </div>
-        <p className="text-sm font-medium text-slate-600 dark:text-muted-foreground animate-pulse">Подготовка конфигурации…</p>
+        <p className="text-sm font-medium text-slate-600 dark:text-muted-foreground animate-pulse">{t("subscribe.preparingConfig")}</p>
       </div>
     );
   }
@@ -273,7 +275,7 @@ export function ClientSubscribePage() {
         <Button variant="ghost" size="sm" className="gap-2 -ml-2 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground transition-colors" asChild>
           <Link to="/cabinet/dashboard">
             <ArrowLeft className="h-4 w-4" />
-            Назад
+            {t("common.back")}
           </Link>
         </Button>
         <motion.div
@@ -288,16 +290,16 @@ export function ClientSubscribePage() {
                 <div className="p-2.5 rounded-xl bg-primary/20 text-primary ring-1 ring-primary/30">
                   <Wifi className="h-5 w-5" />
                 </div>
-                Подключение к VPN
+                {t("subscribe.connectToVPN")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5 relative z-10">
               <p className="text-slate-600 dark:text-muted-foreground leading-relaxed">
-                Ссылка на подписку появится после оплаты тарифа. Выберите тариф и оплатите — затем здесь можно будет скачать приложение и добавить подписку.
+                {t("subscribe.noSubscriptionDesc")}
               </p>
               <Button asChild className="w-full gap-2 h-12 text-base font-medium shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:shadow-primary/30">
                 <Link to="/cabinet/tariffs">
-                  Выбрать тариф
+                  {t("subscribe.chooseTariff")}
                 </Link>
               </Button>
             </CardContent>
@@ -307,8 +309,8 @@ export function ClientSubscribePage() {
     );
   }
 
-  const linkCardRef = "Скопируйте ссылку и вставьте в приложение VPN или нажмите «Добавить подписку» в выбранном приложении ниже!";
-  const linkCardRefMiniapp = "Скопируйте ссылку и вставьте в приложение VPN выше или нажмите «Добавить подписку» в выбранном приложении.";
+  const linkCardRef = t("subscribe.linkCardRef");
+  const linkCardRefMiniapp = t("subscribe.linkCardRefMiniapp");
 
   const appsBlock = apps.length === 0 ? (
     <motion.div
@@ -323,7 +325,7 @@ export function ClientSubscribePage() {
               <Info className="h-6 w-6 text-muted-foreground" />
             </div>
             <p className="text-sm text-slate-600 dark:text-muted-foreground max-w-sm">
-              {isMiniapp ? "Список приложений пуст. Скопируйте ссылку ниже и вставьте её в любое приложение VPN (Happ, Stash, v2rayNG и др.)" : "Список приложений пуст. Скопируйте ссылку выше и вставьте её в любое приложение VPN (Happ, Stash, v2rayNG и др.)"} или настройте страницу подписки в админке (Настройки → Страница подписки).
+              {isMiniapp ? t("subscribe.noAppsListMiniapp") : t("subscribe.noAppsList")}
             </p>
           </div>
         </CardContent>
@@ -338,7 +340,7 @@ export function ClientSubscribePage() {
       >
         <div className="h-8 w-1 rounded-full bg-primary" />
         <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-          Приложения для {platformData?.displayName ? getText(platformData.displayName, locale) : platformLabel}
+          {t("subscribe.appsFor")} {platformData?.displayName ? getText(platformData.displayName, locale) : platformLabel}
         </h2>
       </motion.div>
       
@@ -487,11 +489,11 @@ export function ClientSubscribePage() {
                 <div className="p-1.5 rounded-md bg-primary/20 text-primary">
                   <Zap className="h-5 w-5" />
                 </div>
-                Ваша подписка
+                {t("subscribe.yourSubscription")}
               </h1>
               {!isMiniapp && (
                 <p className="text-sm text-slate-600 dark:text-muted-foreground/80">
-                  Единая ссылка для всех ваших устройств
+                  {t("subscribe.singleLinkDesc")}
                 </p>
               )}
             </div>
@@ -505,7 +507,7 @@ export function ClientSubscribePage() {
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-slate-700 dark:text-white/80">Ссылка конфигурации</h2>
+              <h2 className="text-sm font-medium text-slate-700 dark:text-white/80">{t("subscribe.configLink")}</h2>
               <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-muted-foreground font-semibold">
                 Auto-update
               </p>
@@ -540,7 +542,7 @@ export function ClientSubscribePage() {
                         className="flex items-center gap-2"
                       >
                         <Check className="h-4 w-4" />
-                        Скопировано
+                        {t("subscribe.copied")}
                       </motion.div>
                     ) : (
                       <motion.div
@@ -551,7 +553,7 @@ export function ClientSubscribePage() {
                         className="flex items-center gap-2"
                       >
                         <Copy className="h-4 w-4" />
-                        Копировать ссылку
+                        {t("subscribe.copyLink")}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -565,7 +567,7 @@ export function ClientSubscribePage() {
                   className="sm:w-auto w-full gap-2 h-11 border-slate-200/50 dark:border-white/10 bg-white/50 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 transition-colors"
                 >
                   <QrCode className="h-4 w-4" />
-                  Показать QR
+                  {t("subscribe.showQR")}
                 </Button>
               )}
             </div>
@@ -591,10 +593,10 @@ export function ClientSubscribePage() {
       </div>
       <div className="space-y-1">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white/90">
-          Как подключиться?
+          {t("subscribe.howToConnect")}
         </h2>
         <p className="text-sm text-slate-600 dark:text-muted-foreground leading-relaxed">
-          Ниже представлены приложения для вашей платформы ({platformLabel}). Сначала скачайте приложение по ссылке, затем нажмите «Добавить подписку» — откроется диплинк с вашей ссылкой подписки.
+          {t("subscribe.instructionDesc", { platform: platformLabel })}
         </p>
       </div>
     </motion.section>
@@ -609,7 +611,7 @@ export function ClientSubscribePage() {
         <Button variant="ghost" size="sm" className="gap-2 -ml-2 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground transition-colors" asChild>
           <Link to="/cabinet/dashboard">
             <ArrowLeft className="h-4 w-4" />
-            Назад в кабинет
+            {t("subscribe.backToCabinet")}
           </Link>
         </Button>
       </motion.div>
@@ -634,10 +636,10 @@ export function ClientSubscribePage() {
               <div className="p-1.5 rounded-md bg-primary/20 text-primary">
                 <QrCode className="h-5 w-5" />
               </div>
-              QR-код подписки
+              {t("subscribe.qrTitle")}
             </DialogTitle>
             <DialogDescription className="text-slate-600 dark:text-muted-foreground/80">
-              Отсканируйте камерой телефона — в вашем приложении VPN. Например (Happ, Stash, v2rayNG и др.).
+              {t("subscribe.qrDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-5 py-4">
@@ -649,7 +651,7 @@ export function ClientSubscribePage() {
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-muted-foreground bg-slate-100/80 dark:bg-white/5 px-3 py-1.5 rounded-full border border-slate-200/50 dark:border-white/5">
               <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              Ссылка ведёт на конфигурацию VPN
+              {t("subscribe.qrNote")}
             </div>
           </div>
         </DialogContent>

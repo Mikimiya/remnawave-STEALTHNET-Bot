@@ -17,6 +17,7 @@ import {
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 function formatMoney(amount: number, currency: string) {
   return new Intl.NumberFormat("ru-RU", {
@@ -28,6 +29,7 @@ function formatMoney(amount: number, currency: string) {
 }
 
 export function ClientCustomBuildPage() {
+  const { t } = useTranslation();
   const { state, refreshProfile } = useClientAuth();
   const token = state.token;
   const balance = state.client?.balance ?? 0;
@@ -83,7 +85,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       setPromoCode("");
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка оплаты с баланса");
+      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.balancePaymentFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -110,7 +112,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.confirmationUrl) openPaymentInBrowser(res.confirmationUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -129,7 +131,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.paymentUrl) openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -147,7 +149,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.paymentUrl) openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -166,7 +168,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -185,7 +187,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка создания платежа");
+      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -204,7 +206,7 @@ export function ClientCustomBuildPage() {
       <div className="max-w-lg mx-auto p-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-muted-foreground text-center">Гибкий тариф недоступен.</p>
+            <p className="text-muted-foreground text-center">{t("clientCustomBuild.empty")}</p>
           </CardContent>
         </Card>
       </div>
@@ -218,8 +220,8 @@ export function ClientCustomBuildPage() {
           <Layers className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Гибкий тариф</h1>
-          <p className="text-sm text-muted-foreground">Выберите срок, количество устройств и трафик</p>
+          <h1 className="text-xl font-bold tracking-tight">{t("clientCustomBuild.page.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("clientCustomBuild.page.subtitle")}</p>
         </div>
       </div>
 
@@ -229,7 +231,7 @@ export function ClientCustomBuildPage() {
             <div className="flex justify-between text-sm">
               <Label className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Дней
+                {t("clientCustomBuild.fields.days")}
               </Label>
               <span className="font-medium">{days}</span>
             </div>
@@ -251,7 +253,7 @@ export function ClientCustomBuildPage() {
             <div className="flex justify-between text-sm">
               <Label className="flex items-center gap-2">
                 <Smartphone className="h-4 w-4" />
-                Устройств
+                {t("clientCustomBuild.fields.devices")}
               </Label>
               <span className="font-medium">{devices}</span>
             </div>
@@ -274,7 +276,7 @@ export function ClientCustomBuildPage() {
               <div className="flex justify-between text-sm">
                 <Label className="flex items-center gap-2">
                   <Wifi className="h-4 w-4" />
-                  Трафик (ГБ)
+                  {t("clientCustomBuild.fields.traffic")}
                 </Label>
                 <span className="font-medium">{trafficGb}</span>
               </div>
@@ -292,18 +294,23 @@ export function ClientCustomBuildPage() {
           {cb.trafficMode === "unlimited" && (
             <p className="text-sm text-muted-foreground flex items-center gap-2">
               <Wifi className="h-4 w-4" />
-              Трафик безлимитный
+              {t("clientCustomBuild.unlimitedTraffic")}
             </p>
           )}
 
           <div className="pt-4 border-t">
             <div className="flex items-center justify-between">
-              <span className="text-lg font-semibold">Итого</span>
+              <span className="text-lg font-semibold">{t("clientCustomBuild.summary.total")}</span>
               <span className="text-xl font-bold text-primary">{formatMoney(total, cb.currency)}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {days} дн. × {formatMoney(cb.pricePerDay, cb.currency)} + {devices} устр. × {formatMoney(cb.pricePerDevice, cb.currency)}
-              {cb.trafficMode === "per_gb" && trafficGb > 0 && ` + ${trafficGb} ГБ × ${formatMoney(cb.pricePerGb, cb.currency)}`}
+              {t("clientCustomBuild.summary.formula", {
+                days,
+                dayPrice: formatMoney(cb.pricePerDay, cb.currency),
+                devices,
+                devicePrice: formatMoney(cb.pricePerDevice, cb.currency),
+                trafficPart: cb.trafficMode === "per_gb" && trafficGb > 0 ? ` + ${trafficGb} ${t("clientCustomBuild.units.gb")} × ${formatMoney(cb.pricePerGb, cb.currency)}` : "",
+              })}
             </p>
           </div>
 
@@ -314,7 +321,7 @@ export function ClientCustomBuildPage() {
             onClick={() => setPayModalOpen(true)}
           >
             <CreditCard className="h-5 w-5 mr-2" />
-            Оплатить {formatMoney(total, cb.currency)}
+            {t("clientCustomBuild.actions.pay")} {formatMoney(total, cb.currency)}
           </Button>
         </CardContent>
       </Card>
@@ -322,9 +329,9 @@ export function ClientCustomBuildPage() {
       <Dialog open={payModalOpen} onOpenChange={setPayModalOpen}>
         <DialogContent className={cn("sm:max-w-md", isMobileOrMiniapp && "max-w-[calc(100vw-2rem)] rounded-[2rem]")}>
           <DialogHeader>
-            <DialogTitle>Оплата — Гибкий тариф</DialogTitle>
+            <DialogTitle>{t("clientCustomBuild.payment.title")}</DialogTitle>
             <DialogDescription className="text-base">
-              Итого: <span className="font-bold text-primary">{formatMoney(total, cb.currency)}</span>
+              {t("clientCustomBuild.summary.total")}: <span className="font-bold text-primary">{formatMoney(total, cb.currency)}</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -333,14 +340,14 @@ export function ClientCustomBuildPage() {
             {!isMobileOrMiniapp && <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />}
             <div className="flex items-center gap-2 text-sm font-bold text-foreground pl-1 relative z-10">
               {isMobileOrMiniapp ? <Tag className="h-4 w-4 text-primary" /> : <div className="p-1.5 bg-primary/10 rounded-lg"><Tag className="h-4 w-4 text-primary" /></div>}
-              Промокод
+              {t("tariffs.promoCode")}
             </div>
             <div className="relative z-10">
               <Input
                 name="promo_code"
                 autoComplete="off"
                 inputMode="text"
-                placeholder="Введите промокод"
+                placeholder={t("tariffs.enterPromoCode")}
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value)}
                 className={cn("font-mono font-medium focus-visible:ring-primary/50", isMobileOrMiniapp ? "text-base bg-card/40 border-white/5 h-14 rounded-2xl" : "text-sm bg-background border-border/50 h-12 rounded-xl shadow-sm")}
@@ -353,7 +360,7 @@ export function ClientCustomBuildPage() {
           <div className="space-y-3">
             <div className="flex items-center gap-2 pt-2 pb-1">
               <Wallet className={cn("text-primary", isMobileOrMiniapp ? "h-5 w-5" : "h-4 w-4")} />
-              <span className={cn("font-bold", isMobileOrMiniapp ? "text-lg" : "text-sm")}>Способ оплаты</span>
+              <span className={cn("font-bold", isMobileOrMiniapp ? "text-lg" : "text-sm")}>{t("clientCustomBuild.payment.method")}</span>
             </div>
 
             {payError && (
@@ -375,7 +382,7 @@ export function ClientCustomBuildPage() {
                     <>
                       <div className="flex items-center gap-3">
                         {payLoading ? <Loader2 className="h-6 w-6 text-white animate-spin" /> : <Wallet className="h-6 w-6 text-white" />}
-                        <span className="text-base font-bold text-white">Оплатить с баланса</span>
+                        <span className="text-base font-bold text-white">{t("clientCustomBuild.payment.payWithBalance")}</span>
                       </div>
                       <span className="text-white/80 font-mono font-medium bg-black/20 px-2 py-1 rounded-lg">
                         {formatMoney(balance, cb.currency)}
@@ -384,7 +391,7 @@ export function ClientCustomBuildPage() {
                   ) : (
                     <>
                       {payLoading ? <Loader2 className="h-5 w-5 animate-spin relative z-10" /> : <Wallet className="h-5 w-5 relative z-10" />}
-                      <span className="text-base font-semibold relative z-10">Оплатить с баланса</span>
+                      <span className="text-base font-semibold relative z-10">{t("clientCustomBuild.payment.payWithBalance")}</span>
                       <span className="opacity-90 font-medium ml-1 bg-black/10 px-2 py-0.5 rounded-md relative z-10">
                         ({formatMoney(balance, cb.currency)})
                       </span>
@@ -413,7 +420,7 @@ export function ClientCustomBuildPage() {
                       <div className="absolute left-6 p-1.5 rounded-lg bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-yellow-500" /> : <Zap className="h-5 w-5 text-yellow-500" />}
                       </div>
-                      <span className="text-base font-medium">⚡ Crypto Bot (Криптовалюта)</span>
+                      <span className="text-base font-medium">{t("clientCustomBuild.payment.cryptoBot")}</span>
                     </>
                   )}
                 </Button>
@@ -439,7 +446,7 @@ export function ClientCustomBuildPage() {
                       <div className="absolute left-6 p-1.5 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-orange-500" /> : <Zap className="h-5 w-5 text-orange-500" />}
                       </div>
-                      <span className="text-base font-medium">⚡ Heleket (Криптовалюта)</span>
+                      <span className="text-base font-medium">{t("clientCustomBuild.payment.heleket")}</span>
                     </>
                   )}
                 </Button>
@@ -458,14 +465,14 @@ export function ClientCustomBuildPage() {
                       <div className="p-2 rounded-xl bg-green-500/10">
                         {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
                       </div>
-                      <span className="text-base font-bold">СБП / Карты РФ</span>
+                      <span className="text-base font-bold">{t("clientCustomBuild.payment.sbpCards")}</span>
                     </>
                   ) : (
                     <>
                       <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
                       </div>
-                      <span className="text-base font-medium">💳 СБП</span>
+                      <span className="text-base font-medium">{t("clientCustomBuild.payment.sbp")}</span>
                     </>
                   )}
                 </Button>
@@ -484,14 +491,14 @@ export function ClientCustomBuildPage() {
                       <div className="p-2 rounded-xl bg-green-500/10">
                         {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
                       </div>
-                      <span className="text-base font-bold">ЮMoney / Карты</span>
+                      <span className="text-base font-bold">{t("clientCustomBuild.payment.yoomoneyCards")}</span>
                     </>
                   ) : (
                     <>
                       <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
                       </div>
-                      <span className="text-base font-medium">💳 Карты</span>
+                      <span className="text-base font-medium">{t("clientCustomBuild.payment.cards")}</span>
                     </>
                   )}
                 </Button>

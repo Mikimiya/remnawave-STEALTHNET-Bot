@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import {
   api,
@@ -20,6 +21,7 @@ import {
 import { Pencil, Trash2, Ban, ShieldCheck, Wifi, Ticket, KeyRound, Search, Filter } from "lucide-react";
 
 export function ClientsPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   const [data, setData] = useState<{ items: ClientRecord[]; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,10 +113,10 @@ export function ClientsPage() {
       });
       setEditing(updated);
       setEditForm({});
-      setActionMessage("Сохранено");
+      setActionMessage(t("admin.clients.saved"));
       loadClients();
     } catch (e) {
-      setActionMessage(e instanceof Error ? e.message : "Ошибка");
+      setActionMessage(e instanceof Error ? e.message : t("admin.clients.errorGeneric"));
     } finally {
       setSaving(false);
     }
@@ -131,22 +133,22 @@ export function ClientsPage() {
       if (editForm.hwidDeviceLimit !== undefined) payload.hwidDeviceLimit = editForm.hwidDeviceLimit;
       if (editForm.expireAt) payload.expireAt = editForm.expireAt;
       await api.updateClientRemna(token, editing.id, payload);
-      setActionMessage("Лимиты Remna обновлены");
+      setActionMessage(t("admin.clients.remnaUpdated"));
     } catch (e) {
-      setActionMessage(e instanceof Error ? e.message : "Ошибка Remna");
+      setActionMessage(e instanceof Error ? e.message : t("admin.clients.remnaError"));
     } finally {
       setSaving(false);
     }
   }
 
   async function deleteClient(c: ClientRecord) {
-    if (!confirm(`Удалить клиента ${c.email || c.telegramId || c.id}?`)) return;
+    if (!confirm(`${t("admin.clients.deleteConfirm")} ${c.email || c.telegramId || c.id}?`)) return;
     try {
       await api.deleteClient(token, c.id);
       if (editing?.id === c.id) setEditing(null);
       loadClients();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка удаления");
+      alert(e instanceof Error ? e.message : t("admin.clients.deleteError"));
     }
   }
 
@@ -157,31 +159,31 @@ export function ClientsPage() {
     setActionMessage(null);
     try {
       await fn();
-      setActionMessage(name + " — ок");
+      setActionMessage(name);
       loadClients();
     } catch (e) {
-      setActionMessage(name + ": " + (e instanceof Error ? e.message : "ошибка"));
+      setActionMessage(`${name}: ${e instanceof Error ? e.message : t("admin.clients.errorGeneric")}`);
     }
   }
 
   async function saveClientPassword() {
     if (!editing) return;
     if (passwordForm.newPassword.length < 8) {
-      setPasswordMessage("Пароль не менее 8 символов");
+      setPasswordMessage(t("admin.clients.passwordTooShort"));
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirm) {
-      setPasswordMessage("Пароли не совпадают");
+      setPasswordMessage(t("admin.clients.passwordMismatch"));
       return;
     }
     setPasswordMessage(null);
     setSavingPassword(true);
     try {
       await api.setClientPassword(token, editing.id, passwordForm.newPassword);
-      setPasswordMessage("Пароль установлен");
+      setPasswordMessage(t("admin.clients.passwordSet"));
       setPasswordForm({ newPassword: "", confirm: "" });
     } catch (e) {
-      setPasswordMessage(e instanceof Error ? e.message : "Ошибка");
+      setPasswordMessage(e instanceof Error ? e.message : t("admin.clients.errorGeneric"));
     } finally {
       setSavingPassword(false);
     }
@@ -189,33 +191,33 @@ export function ClientsPage() {
 
   async function squadAdd(squadUuid: string) {
     if (!editing) return;
-    await remnaAction("Сквад добавлен", () => api.clientRemnaSquadAdd(token, editing.id, squadUuid));
+    await remnaAction(t("admin.clients.squadAdded"), () => api.clientRemnaSquadAdd(token, editing.id, squadUuid));
     setClientRemnaSquads((prev) => (prev.includes(squadUuid) ? prev : [...prev, squadUuid]));
   }
 
   async function squadRemove(squadUuid: string) {
     if (!editing) return;
-    await remnaAction("Сквад снят", () => api.clientRemnaSquadRemove(token, editing.id, squadUuid));
+    await remnaAction(t("admin.clients.squadRemoved"), () => api.clientRemnaSquadRemove(token, editing.id, squadUuid));
     setClientRemnaSquads((prev) => prev.filter((u) => u !== squadUuid));
   }
 
-  if (loading && !data) return <div className="text-muted-foreground">Загрузка…</div>;
-  if (!data) return <div className="text-destructive">Ошибка загрузки</div>;
+  if (loading && !data) return <div className="text-muted-foreground">{t("admin.clients.loading")}</div>;
+  if (!data) return <div className="text-destructive">{t("admin.clients.loadError")}</div>;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Клиенты</h1>
-        <p className="text-muted-foreground">Пользователи бота, сайта и Mini App</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("admin.clients.title")}</h1>
+        <p className="text-muted-foreground">{t("admin.clients.subtitle")}</p>
       </div>
 
       <Card>
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Всего: {data.total}</CardTitle>
+            <CardTitle>{t("admin.clients.total")}: {data.total}</CardTitle>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                Назад
+                {t("admin.clients.prev")}
               </Button>
               <Button
                 variant="outline"
@@ -223,7 +225,7 @@ export function ClientsPage() {
                 disabled={page * 20 >= data.total}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Вперёд
+                {t("admin.clients.next")}
               </Button>
             </div>
           </div>
@@ -231,15 +233,15 @@ export function ClientsPage() {
             <div className="flex flex-1 items-center gap-2">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
               <Input
-                placeholder="Поиск: email, Telegram, реф. код, ID..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && applySearch()}
-                className="max-w-xs"
-              />
-              <Button variant="secondary" size="sm" onClick={applySearch}>
-                Искать
-              </Button>
+                  placeholder={t("admin.clients.searchPlaceholder")}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && applySearch()}
+                  className="max-w-xs"
+                />
+                <Button variant="secondary" size="sm" onClick={applySearch}>
+                  {t("admin.clients.searchBtn")}
+                </Button>
             </div>
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -251,9 +253,9 @@ export function ClientsPage() {
                   setPage(1);
                 }}
               >
-                <option value="all">Все</option>
-                <option value="active">Только активные</option>
-                <option value="blocked">Только заблокированные</option>
+                <option value="all">{t("admin.clients.filterAll")}</option>
+                <option value="active">{t("admin.clients.filterActive")}</option>
+                <option value="blocked">{t("admin.clients.filterBlocked")}</option>
               </select>
             </div>
           </div>
@@ -263,16 +265,16 @@ export function ClientsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 px-2">Email</th>
-                  <th className="text-left py-2 px-2">Telegram</th>
-                  <th className="text-left py-2 px-2">Нода</th>
-                  <th className="text-left py-2 px-2">Язык</th>
-                  <th className="text-left py-2 px-2">Валюта</th>
-                  <th className="text-left py-2 px-2">Баланс</th>
-                  <th className="text-left py-2 px-2">Реф.%</th>
-                  <th className="text-left py-2 px-2">Блок</th>
-                  <th className="text-left py-2 px-2">Дата</th>
-                  <th className="text-left py-2 px-2">Действия</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colEmail")}</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colTelegram")}</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colNode")}</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colLang")}</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colCurrency")}</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colBalance")}</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colRefPercent")}</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colBlocked")}</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colDate")}</th>
+                  <th className="text-left py-2 px-2">{t("admin.clients.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -301,15 +303,15 @@ export function ClientsPage() {
                     <td className="py-2 px-2">{c.preferredCurrency}</td>
                     <td className="py-2 px-2">{c.balance}</td>
                     <td className="py-2 px-2">{c.referralPercent != null ? c.referralPercent + "%" : "—"}</td>
-                    <td className="py-2 px-2">{c.isBlocked ? <span className="text-destructive">Да</span> : "—"}</td>
+                    <td className="py-2 px-2">{c.isBlocked ? <span className="text-destructive">{t("admin.clients.blockedYes")}</span> : "—"}</td>
                     <td className="py-2 px-2 text-muted-foreground">
                       {new Date(c.createdAt).toLocaleDateString()}
                     </td>
                     <td className="py-2 px-2 flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(c)} title="Редактировать">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(c)} title={t("admin.clients.editTitle")}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => deleteClient(c)} title="Удалить" className="text-destructive">
+                      <Button variant="ghost" size="sm" onClick={() => deleteClient(c)} title={t("admin.clients.deleteTitle")} className="text-destructive">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </td>
@@ -399,39 +401,40 @@ function ClientEditModal({
   savingPassword: boolean;
   token: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-0 text-left">
-          <DialogTitle>Редактировать клиента</DialogTitle>
-          <DialogDescription className="sr-only">Форма редактирования клиента и лимитов Remna</DialogDescription>
+          <DialogTitle>{t("admin.clients.editModalTitle")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("admin.clients.editModalDesc")}</DialogDescription>
         </DialogHeader>
         <div className="px-6 pb-6 pt-4">
           <div className="mb-4 rounded-xl bg-muted/50 p-3 text-sm">
-            <div className="font-medium mb-1">Клиент</div>
+            <div className="font-medium mb-1">{t("admin.clients.clientInfoLabel")}</div>
             <div className="space-y-0.5 text-muted-foreground">
-              {editing.email && <div>Email: {editing.email}</div>}
+              {editing.email && <div>{t("admin.clients.fieldEmail")}: {editing.email}</div>}
               <div>
-                Telegram username: {editing.telegramUsername ? `@${editing.telegramUsername}` : "—"}
+                {t("admin.clients.fieldTelegramUsername")}: {editing.telegramUsername ? `@${editing.telegramUsername}` : "—"}
               </div>
               <div>
-                Telegram ID: {editing.telegramId != null ? editing.telegramId : "—"}
+                {t("admin.clients.fieldTelegramId")}: {editing.telegramId != null ? editing.telegramId : "—"}
               </div>
-              <div>ID в панели: {editing.id}</div>
+              <div>{t("admin.clients.fieldPanelId")}: {editing.id}</div>
               <div>
-                Реферальный код: {editing.referralCode ? (
+                {t("admin.clients.fieldRefCode")}: {editing.referralCode ? (
                   <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{editing.referralCode}</code>
                 ) : "—"}
               </div>
               <div>
-                Рефералов: {editing._count?.referrals ?? 0}
+                {t("admin.clients.fieldReferrals")}: {editing._count?.referrals ?? 0}
               </div>
             </div>
           </div>
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>{t("admin.clients.fieldEmail")}</Label>
                 <Input
                   value={editForm.email ?? ""}
                   onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value || undefined }))}
@@ -439,7 +442,7 @@ function ClientEditModal({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Язык</Label>
+                <Label>{t("admin.clients.fieldLang")}</Label>
                 <Select
                   value={editForm.preferredLang ?? ""}
                   onChange={(v) => setEditForm((f) => ({ ...f, preferredLang: v }))}
@@ -453,12 +456,12 @@ function ClientEditModal({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Валюта</Label>
+                <Label>{t("admin.clients.fieldCurrency")}</Label>
                 <Select
                   value={editForm.preferredCurrency ?? ""}
                   onChange={(v) => setEditForm((f) => ({ ...f, preferredCurrency: v }))}
                   options={(() => {
-                    const currs = activeCurrencies.length ? activeCurrencies.map((c) => c.trim()) : ["usd", "rub"];
+                    const currs = activeCurrencies.length ? activeCurrencies.map((c) => c.trim()) : ["usd", "rub", "cny"];
                     const current = (editForm.preferredCurrency ?? editing.preferredCurrency ?? "").trim();
                     const set = new Set(currs);
                     if (current && !set.has(current)) set.add(current);
@@ -467,7 +470,7 @@ function ClientEditModal({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Баланс</Label>
+                <Label>{t("admin.clients.fieldBalance")}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -476,7 +479,7 @@ function ClientEditModal({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Реферальный % (личный)</Label>
+                <Label>{t("admin.clients.fieldRefPercent")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -488,7 +491,7 @@ function ClientEditModal({
                       referralPercent: e.target.value === "" ? undefined : Number(e.target.value),
                     }))
                   }
-                  placeholder="по умолчанию из настроек"
+                  placeholder={t("admin.clients.fieldRefPercentPlaceholder")}
                 />
               </div>
               <div className="space-y-2 flex items-end gap-2">
@@ -498,37 +501,37 @@ function ClientEditModal({
                     checked={editForm.isBlocked ?? false}
                     onChange={(e) => setEditForm((f) => ({ ...f, isBlocked: e.target.checked }))}
                   />
-                  <span>Заблокирован</span>
+                  <span>{t("admin.clients.fieldBlocked")}</span>
                 </label>
               </div>
               {(editForm.isBlocked ?? editing.isBlocked) && (
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Причина блокировки</Label>
+                  <Label>{t("admin.clients.fieldBlockReason")}</Label>
                   <Input
                     value={editForm.blockReason ?? ""}
                     onChange={(e) => setEditForm((f) => ({ ...f, blockReason: e.target.value || undefined }))}
-                    placeholder="Причина"
+                    placeholder={t("admin.clients.fieldBlockReasonPlaceholder")}
                   />
                 </div>
               )}
             </div>
             {actionMessage && <p className="text-sm text-muted-foreground">{actionMessage}</p>}
             <div className="flex gap-2">
-              <Button onClick={onSave} disabled={saving}>{saving ? "Сохранение…" : "Сохранить"}</Button>
+              <Button onClick={onSave} disabled={saving}>{saving ? t("admin.clients.savingBtn") : t("admin.clients.saveBtn")}</Button>
             </div>
 
             <hr />
             <div>
               <h3 className="font-semibold mb-2 flex items-center gap-2">
                 <KeyRound className="h-4 w-4" />
-                Пароль для входа в кабинет
+                {t("admin.clients.passwordSectionTitle")}
               </h3>
               <p className="text-sm text-muted-foreground mb-2">
-                Установить или сменить пароль клиента. Вход по паролю возможен только при указанном email (сохраните профиль с email выше).
+                {t("admin.clients.passwordSectionDesc")}
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Новый пароль (не менее 8 символов)</Label>
+                  <Label>{t("admin.clients.fieldNewPassword")}</Label>
                   <Input
                     type="password"
                     value={passwordForm.newPassword}
@@ -538,7 +541,7 @@ function ClientEditModal({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Повторите пароль</Label>
+                  <Label>{t("admin.clients.fieldConfirmPassword")}</Label>
                   <Input
                     type="password"
                     value={passwordForm.confirm}
@@ -549,7 +552,7 @@ function ClientEditModal({
                 </div>
               </div>
               {passwordMessage && (
-                <p className={`text-sm mt-2 ${passwordMessage === "Пароль установлен" ? "text-green-600" : "text-destructive"}`}>
+                <p className={`text-sm mt-2 ${passwordMessage === t("admin.clients.passwordSet") ? "text-green-600" : "text-destructive"}`}>
                   {passwordMessage}
                 </p>
               )}
@@ -560,7 +563,7 @@ function ClientEditModal({
                 onClick={onSetPassword}
                 disabled={savingPassword || !passwordForm.newPassword || passwordForm.newPassword.length < 8}
               >
-                {savingPassword ? "Сохранение…" : "Установить / сменить пароль"}
+                {savingPassword ? t("admin.clients.savingBtn") : t("admin.clients.setPasswordBtn")}
               </Button>
             </div>
 
@@ -568,10 +571,10 @@ function ClientEditModal({
               <>
                 <hr />
                 <div>
-                  <h3 className="font-semibold mb-2">Remna (лимиты, сквад, тариф)</h3>
+                  <h3 className="font-semibold mb-2">{t("admin.clients.remnaSection")}</h3>
                   <div className="grid gap-4 sm:grid-cols-2 text-sm">
                     <div className="space-y-2">
-                      <Label>Лимит трафика (ГБ), 0 = без лимита</Label>
+                      <Label>{t("admin.clients.remnaTrafficLabel")}</Label>
                       <Input
                         type="number"
                         min={0}
@@ -600,7 +603,7 @@ function ClientEditModal({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Лимит устройств (HWID)</Label>
+                      <Label>{t("admin.clients.remnaHwidLabel")}</Label>
                       <Input
                         type="number"
                         min={0}
@@ -615,21 +618,21 @@ function ClientEditModal({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Сброс трафика</Label>
+                      <Label>{t("admin.clients.remnaResetLabel")}</Label>
                       <Select
                         value={editForm.trafficLimitStrategy ?? ""}
                         onChange={(v) => setEditForm((f) => ({ ...f, trafficLimitStrategy: v as UpdateClientRemnaPayload["trafficLimitStrategy"] }))}
                         options={[
-                          { value: "", label: "—" },
-                          { value: "NO_RESET", label: "Без сброса" },
-                          { value: "DAY", label: "День" },
-                          { value: "WEEK", label: "Неделя" },
-                          { value: "MONTH", label: "Месяц" },
+                          { value: "", label: t("admin.clients.remnaStrategyNone") },
+                          { value: "NO_RESET", label: t("admin.clients.remnaStrategyNoReset") },
+                          { value: "DAY", label: t("admin.clients.remnaStrategyDay") },
+                          { value: "WEEK", label: t("admin.clients.remnaStrategyWeek") },
+                          { value: "MONTH", label: t("admin.clients.remnaStrategyMonth") },
                         ]}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Дата окончания (ISO)</Label>
+                      <Label>{t("admin.clients.remnaExpireLabel")}</Label>
                       <Input
                         type="datetime-local"
                         value={editForm.expireAt ? editForm.expireAt.slice(0, 16) : ""}
@@ -643,7 +646,7 @@ function ClientEditModal({
                     </div>
                   </div>
                   <Button variant="outline" size="sm" className="mt-2" onClick={onSaveRemnaLimits} disabled={saving}>
-                    Применить лимиты в Remna
+                    {t("admin.clients.remnaApplyBtn")}
                   </Button>
                 </div>
 
@@ -651,37 +654,37 @@ function ClientEditModal({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onRemnaAction("Подписка отозвана", () => api.clientRemnaRevokeSubscription(token, editing.id))}
+                    onClick={() => onRemnaAction(t("admin.clients.remnaRevoked"), () => api.clientRemnaRevokeSubscription(token, editing.id))}
                   >
-                    <Ticket className="h-4 w-4 mr-1" /> Отозвать тариф
+                    <Ticket className="h-4 w-4 mr-1" /> {t("admin.clients.remnaRevokeBtn")}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onRemnaAction("Отключён", () => api.clientRemnaDisable(token, editing.id))}
+                    onClick={() => onRemnaAction(t("admin.clients.remnaDisabled"), () => api.clientRemnaDisable(token, editing.id))}
                   >
-                    <Ban className="h-4 w-4 mr-1" /> Отключить в Remna
+                    <Ban className="h-4 w-4 mr-1" /> {t("admin.clients.remnaDisableBtn")}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onRemnaAction("Включён", () => api.clientRemnaEnable(token, editing.id))}
+                    onClick={() => onRemnaAction(t("admin.clients.remnaEnabled"), () => api.clientRemnaEnable(token, editing.id))}
                   >
-                    <ShieldCheck className="h-4 w-4 mr-1" /> Включить в Remna
+                    <ShieldCheck className="h-4 w-4 mr-1" /> {t("admin.clients.remnaEnableBtn")}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onRemnaAction("Трафик сброшен", () => api.clientRemnaResetTraffic(token, editing.id))}
+                    onClick={() => onRemnaAction(t("admin.clients.remnaTrafficReset"), () => api.clientRemnaResetTraffic(token, editing.id))}
                   >
-                    <Wifi className="h-4 w-4 mr-1" /> Сбросить трафик
+                    <Wifi className="h-4 w-4 mr-1" /> {t("admin.clients.remnaResetTrafficBtn")}
                   </Button>
                 </div>
 
                 {remnaData.squads.length > 0 && (
                   <div className="mt-4">
-                    <Label>Сквады</Label>
-                    <p className="text-xs text-muted-foreground mb-2">Отмечено, в каких сквадах состоит клиент в Remna</p>
+                    <Label>{t("admin.clients.squadsLabel")}</Label>
+                    <p className="text-xs text-muted-foreground mb-2">{t("admin.clients.squadsDesc")}</p>
                     <div className="flex flex-wrap gap-2 mt-1">
                       {remnaData.squads.map((s) => {
                         const inSquad = clientRemnaSquads.includes(s.uuid);
@@ -693,14 +696,26 @@ function ClientEditModal({
                             }`}
                           >
                             <span className="font-medium">{s.name || s.uuid}</span>
-                            <span className="text-[10px]">{inSquad ? "в скваде" : "не в скваде"}</span>
+                            <span className="text-[10px]">{inSquad ? t("admin.clients.inSquad") : t("admin.clients.notInSquad")}</span>
                             {inSquad ? (
-                              <Button variant="ghost" size="sm" className="h-6 px-1 text-destructive" onClick={() => onSquadRemove(s.uuid)} title="Убрать из сквада">
-                                − Убрать
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-1 text-destructive"
+                                onClick={() => onSquadRemove(s.uuid)}
+                                title={t("admin.clients.squadRemoveBtn")}
+                              >
+                                {t("admin.clients.squadRemoveBtn")}
                               </Button>
                             ) : (
-                              <Button variant="ghost" size="sm" className="h-6 px-1" onClick={() => onSquadAdd(s.uuid)} title="Добавить в сквад">
-                                + Добавить
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-1"
+                                onClick={() => onSquadAdd(s.uuid)}
+                                title={t("admin.clients.squadAddBtn")}
+                              >
+                                {t("admin.clients.squadAddBtn")}
                               </Button>
                             )}
                           </span>

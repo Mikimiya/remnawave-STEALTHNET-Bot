@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Send, Paperclip, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const MAX_ATTACHMENT_MB = 20;
 
 export function BroadcastPage() {
   const { state } = useAuth();
   const token = state.accessToken ?? "";
+  const { t } = useTranslation();
   const [broadcastRecipients, setBroadcastRecipients] = useState<{ withTelegram: number; withEmail: number } | null>(null);
   const [broadcastChannel, setBroadcastChannel] = useState<"telegram" | "email" | "both">("telegram");
   const [broadcastSubject, setBroadcastSubject] = useState("");
@@ -38,7 +40,7 @@ export function BroadcastPage() {
         sentEmail: 0,
         failedTelegram: 0,
         failedEmail: 0,
-        errors: [`Файл не должен превышать ${MAX_ATTACHMENT_MB} МБ`],
+        errors: [t("admin.broadcast.fileSizeError", { max: MAX_ATTACHMENT_MB })],
       });
       return;
     }
@@ -68,7 +70,7 @@ export function BroadcastPage() {
         sentEmail: 0,
         failedTelegram: 0,
         failedEmail: 0,
-        errors: [err instanceof Error ? err.message : "Ошибка отправки"],
+        errors: [err instanceof Error ? err.message : t("admin.broadcast.sendError")],
       });
     } finally {
       setBroadcastLoading(false);
@@ -78,65 +80,65 @@ export function BroadcastPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Рассылка</h1>
-        <p className="text-muted-foreground">Отправка сообщения клиентам в Telegram и/или на email</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("admin.broadcast.title")}</h1>
+        <p className="text-muted-foreground">{t("admin.broadcast.subtitle")}</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Send className="h-5 w-5" />
-            Рассылка клиентам
+            {t("admin.broadcast.cardTitle")}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Получатели: клиенты с указанным telegram_id или email.
+            {t("admin.broadcast.cardDesc")}
           </p>
           {broadcastRecipients && (
             <p className="text-xs text-muted-foreground">
-              С Telegram: {broadcastRecipients.withTelegram} · С email: {broadcastRecipients.withEmail}
+              {t("admin.broadcast.recipientsTg")}: {broadcastRecipients.withTelegram} · {t("admin.broadcast.recipientsEmail")}: {broadcastRecipients.withEmail}
             </p>
           )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleBroadcastSend} className="space-y-4">
             <div className="space-y-2">
-              <Label>Канал</Label>
+              <Label>{t("admin.broadcast.channelLabel")}</Label>
               <select
                 className="flex h-9 w-full max-w-xs rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 value={broadcastChannel}
                 onChange={(e) => setBroadcastChannel(e.target.value as "telegram" | "email" | "both")}
               >
-                <option value="telegram">Только Telegram</option>
-                <option value="email">Только Email</option>
-                <option value="both">Telegram и Email</option>
+                <option value="telegram">{t("admin.broadcast.channelTg")}</option>
+                <option value="email">{t("admin.broadcast.channelEmail")}</option>
+                <option value="both">{t("admin.broadcast.channelBoth")}</option>
               </select>
             </div>
             {(broadcastChannel === "email" || broadcastChannel === "both") && (
               <div className="space-y-2">
-                <Label>Тема письма (для email)</Label>
+                <Label>{t("admin.broadcast.subjectLabel")}</Label>
                 <Input
                   value={broadcastSubject}
                   onChange={(e) => setBroadcastSubject(e.target.value)}
-                  placeholder="Сообщение от сервиса"
+                  placeholder={t("admin.broadcast.subjectPlaceholder")}
                   maxLength={500}
                   className="max-w-md"
                 />
               </div>
             )}
             <div className="space-y-2">
-              <Label>Текст сообщения (до 4096 символов)</Label>
+              <Label>{t("admin.broadcast.messageLabel")}</Label>
               <textarea
                 className="flex min-h-[120px] w-full max-w-2xl rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
-                placeholder="Введите текст рассылки. Для Telegram поддерживается HTML."
+                placeholder={t("admin.broadcast.messagePlaceholder")}
                 maxLength={4096}
                 required
               />
               <p className="text-xs text-muted-foreground">{broadcastMessage.length} / 4096</p>
             </div>
             <div className="space-y-2">
-              <Label>Изображение или файл (необязательно, до {MAX_ATTACHMENT_MB} МБ)</Label>
+              <Label>{t("admin.broadcast.attachLabel", { max: MAX_ATTACHMENT_MB })}</Label>
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   ref={fileInputRef}
@@ -152,7 +154,7 @@ export function BroadcastPage() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Paperclip className="h-4 w-4 mr-2" />
-                  Выбрать файл
+                  {t("admin.broadcast.attachBtn")}
                 </Button>
                 {broadcastAttachment && (
                   <span className="text-sm text-muted-foreground flex items-center gap-2">
@@ -161,7 +163,7 @@ export function BroadcastPage() {
                       type="button"
                       className="text-muted-foreground hover:text-foreground"
                       onClick={() => setBroadcastAttachment(null)}
-                      aria-label="Удалить вложение"
+                      aria-label={t("admin.broadcast.removeAttach")}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -169,26 +171,26 @@ export function BroadcastPage() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                В Telegram: изображения — как фото с подписью, остальные файлы — как документ. В email — вложение.
+                {t("admin.broadcast.attachNote")}
               </p>
             </div>
             <Button type="submit" disabled={broadcastLoading || !broadcastMessage.trim()}>
               <Send className="h-4 w-4 mr-2" />
-              {broadcastLoading ? "Отправка…" : "Отправить рассылку"}
+              {broadcastLoading ? t("admin.broadcast.sending") : t("admin.broadcast.sendBtn")}
             </Button>
             {broadcastResult && (
               <div className={`rounded-lg border p-3 text-sm ${broadcastResult.ok ? "border-green-500/50 bg-green-500/10" : "border-amber-500/50 bg-amber-500/10"}`}>
                 {broadcastResult.ok ? (
-                  <p>Отправлено: Telegram {broadcastResult.sentTelegram}, Email {broadcastResult.sentEmail}</p>
+                  <p>{t("admin.broadcast.resultOk", { tg: broadcastResult.sentTelegram, email: broadcastResult.sentEmail })}</p>
                 ) : (
                   <>
-                    <p>Telegram: отправлено {broadcastResult.sentTelegram}, ошибок {broadcastResult.failedTelegram}. Email: отправлено {broadcastResult.sentEmail}, ошибок {broadcastResult.failedEmail}.</p>
+                    <p>{t("admin.broadcast.resultFail", { tg: broadcastResult.sentTelegram, tgFail: broadcastResult.failedTelegram, email: broadcastResult.sentEmail, emailFail: broadcastResult.failedEmail })}</p>
                     {broadcastResult.errors.length > 0 && (
                       <ul className="mt-2 list-disc pl-4 text-muted-foreground">
                         {broadcastResult.errors.slice(0, 5).map((err, i) => (
                           <li key={i}>{err}</li>
                         ))}
-                        {broadcastResult.errors.length > 5 && <li>…и ещё {broadcastResult.errors.length - 5}</li>}
+                        {broadcastResult.errors.length > 5 && <li>{t("admin.broadcast.moreErrors", { count: broadcastResult.errors.length - 5 })}</li>}
                       </ul>
                     )}
                   </>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 const routerFutureFlags = {
   v7_startTransition: true,
@@ -71,13 +72,14 @@ function ForceChangePassword({ children }: { children: React.ReactNode }) {
 
 function RequireClientAuth({ children }: { children: React.ReactNode }) {
   const { state } = useClientAuth();
+  const { t } = useTranslation();
   const inTelegram = typeof window !== "undefined" && Boolean((window as { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp?.initData);
   const showMiniappLoading = state.miniappAuthLoading || (inTelegram && !state.token && !state.miniappAuthAttempted);
   if (showMiniappLoading) {
     return (
       <div className="min-h-svh flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background to-muted/20">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <p className="text-muted-foreground">Загрузка кабинета…</p>
+        <p className="text-muted-foreground">{t("auth.cabinetLoading")}</p>
       </div>
     );
   }
@@ -89,13 +91,14 @@ function RequireClientAuth({ children }: { children: React.ReactNode }) {
 
 function CabinetIndexRedirect() {
   const { state } = useClientAuth();
+  const { t } = useTranslation();
   const inTelegram = typeof window !== "undefined" && Boolean((window as { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp?.initData);
   const showMiniappLoading = state.miniappAuthLoading || (inTelegram && !state.token && !state.miniappAuthAttempted);
   if (showMiniappLoading) {
     return (
       <div className="min-h-svh flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background to-muted/20">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <p className="text-muted-foreground">Загрузка кабинета…</p>
+        <p className="text-muted-foreground">{t("auth.cabinetLoading")}</p>
       </div>
     );
   }
@@ -103,6 +106,7 @@ function CabinetIndexRedirect() {
 }
 
 function RootRoute() {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -118,7 +122,7 @@ function RootRoute() {
     return (
       <div className="min-h-svh flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background to-muted/20">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <p className="text-muted-foreground">Загрузка…</p>
+        <p className="text-muted-foreground">{t("common.loading")}</p>
       </div>
     );
   }

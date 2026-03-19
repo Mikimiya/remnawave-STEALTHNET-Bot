@@ -94,6 +94,7 @@ function formatMoney(amount: number, currency: string): string {
   const curr = (currency || "RUB").toUpperCase();
   if (curr === "RUB") return `${amount.toFixed(2)} ₽`;
   if (curr === "USD") return `$${amount.toFixed(2)}`;
+  if (curr === "CNY") return `¥${amount.toFixed(2)}`;
   return `${amount.toFixed(2)} ${curr}`;
 }
 

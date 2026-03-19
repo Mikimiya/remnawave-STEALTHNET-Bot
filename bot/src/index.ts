@@ -355,6 +355,51 @@ function t(texts: Record<string, string> | null | undefined, key: string): strin
   return (texts?.[key] ?? DEFAULT_MENU_TEXTS[key]) || "";
 }
 
+/**
+ * Selects the bot menu texts for the given language from botMenuTextsLocales.
+ * Falls back to botMenuTexts (single-locale legacy) if locale not found.
+ */
+function getLocaleTexts(
+  config: Awaited<ReturnType<typeof api.getPublicConfig>> | null | undefined,
+  lang: string
+): Record<string, string> | null {
+  const locales = config?.botMenuTextsLocales;
+  if (locales) {
+    const normalized = lang.toLowerCase();
+    const locale = locales[normalized] ?? locales[normalized.split("-")[0]] ?? locales["en"] ?? locales["ru"] ?? null;
+    if (locale) return locale;
+  }
+  return config?.botMenuTexts ?? config?.resolvedBotMenuTexts ?? null;
+}
+
+/**
+ * Maps a Telegram language_code (e.g. "zh-hans", "en-US") to a supported
+ * activeLanguages entry. Falls back to "ru" if none matches.
+ */
+function resolveLangCode(tgLang: string | undefined, activeLanguages?: string[] | null): string {
+  if (!tgLang) return "ru";
+  const supported = activeLanguages?.length ? activeLanguages : ["ru", "en", "zh"];
+  const normalized = tgLang.toLowerCase().split("-")[0];
+  // Map Telegram codes to our codes
+  const aliases: Record<string, string> = { "zh": "zh", "hans": "zh", "hant": "zh" };
+  const code = aliases[normalized] ?? normalized;
+  return supported.includes(code) ? code : supported[0] ?? "ru";
+}
+
+/**
+ * Format days count in the correct language.
+ * ru: 1 день / 2-4 дня / 5+ дней
+ * en: 1 day / N days
+ * zh: N 天
+ */
+function formatDaysForLang(days: number, lang: string): string {
+  const normalized = lang.toLowerCase().split("-")[0];
+  if (normalized === "zh") return `${days} 天`;
+  if (normalized === "en") return `${days} day${days === 1 ? "" : "s"}`;
+  // default: Russian
+  return `${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"}`;
+}
+
 type CustomEmojiEntity = { type: "custom_emoji"; offset: number; length: number; custom_emoji_id: string };
 
 /** Длина первого символа в UTF-16 (для entity) */
@@ -492,8 +537,10 @@ function buildMainMenuText(opts: {
   menuLineVisibility?: Record<string, boolean> | null;
   menuTextCustomEmojiIds?: Record<string, string> | null;
   botEmojis?: Record<string, { unicode?: string; tgEmojiId?: string }> | null;
+  /** Client's preferred language (e.g. "ru", "en", "zh"). Defaults to "ru". */
+  lang?: string;
 }): { text: string; entities: CustomEmojiEntity[] } {
-  const { serviceName, balance, currency, subscription, tariffDisplayName, menuTexts, menuLineVisibility, menuTextCustomEmojiIds, botEmojis } = opts;
+  const { serviceName, balance, currency, subscription, tariffDisplayName, menuTexts, menuLineVisibility, menuTextCustomEmojiIds, botEmojis, lang = "ru" } = opts;
   const name = serviceName.trim() || "Кабинет";
   const balanceStr = formatMoney(balance, currency);
   const lines: string[] = [];
@@ -536,7 +583,7 @@ function buildMainMenuText(opts: {
       : status === "DISABLED" ? t(menuTexts, "statusDisabled")
       : `🟡 ${status}`;
     const expireStr = expireDate
-      ? expireDate.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      ? expireDate.toLocaleString(lang === "zh" ? "zh-CN" : lang === "en" ? "en-GB" : "ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
       : "—";
     const daysLeft =
       expireDate && expireDate > new Date()
@@ -546,7 +593,7 @@ function buildMainMenuText(opts: {
     pushLine("subscriptionPrefix", t(menuTexts, "subscriptionPrefix") + statusLabel);
     pushLine("expirePrefix", t(menuTexts, "expirePrefix") + expireStr);
     if (daysLeft != null) {
-      pushLine("daysLeftPrefix", t(menuTexts, "daysLeftPrefix") + `${daysLeft} ${daysLeft === 1 ? "день" : daysLeft < 5 ? "дня" : "дней"}`);
+      pushLine("daysLeftPrefix", t(menuTexts, "daysLeftPrefix") + formatDaysForLang(daysLeft, lang));
     }
     const deviceLimit = user?.hwidDeviceLimit ?? user?.deviceLimit ?? user?.device_limit;
     const devicesUsed = user?.devicesUsed ?? user?.devices_used;
@@ -654,7 +701,7 @@ async function editMessageContent(ctx: {
 
 function formatMoney(amount: number, currency: string): string {
   const c = currency.toUpperCase();
-  const sym = c === "RUB" ? "₽" : c === "USD" ? "$" : "₴";
+  const sym = c === "RUB" ? "₽" : c === "USD" ? "$" : c === "CNY" ? "¥" : c;
   return `${amount} ${sym}`;
 }
 
@@ -700,7 +747,7 @@ bot.command("start", async (ctx) => {
     const auth = await api.registerByTelegram({
       telegramId,
       telegramUsername,
-      preferredLang: "ru",
+      preferredLang: resolveLangCode(from.language_code, config?.activeLanguages),
       preferredCurrency: config?.defaultCurrency ?? "usd",
       referralCode: refCode,
       utm_source: parsed.utm_source,
@@ -710,6 +757,7 @@ bot.command("start", async (ctx) => {
 
     setToken(from.id, auth.token);
     const client = auth.client;
+    const clientLang = (client?.preferredLang ?? config?.activeLanguages?.[0] ?? "ru").toLowerCase();
 
     // Если это промо-ссылка — активируем промокод
     if (promoCode) {
@@ -744,10 +792,11 @@ bot.command("start", async (ctx) => {
       currency: client?.preferredCurrency ?? config?.defaultCurrency ?? "usd",
       subscription: subRes.subscription,
       tariffDisplayName: (subRes as { tariffDisplayName?: string | null }).tariffDisplayName ?? null,
-      menuTexts: config?.botMenuTexts ?? config?.resolvedBotMenuTexts ?? null,
+      menuTexts: getLocaleTexts(config, clientLang),
       menuLineVisibility: config?.botMenuLineVisibility ?? null,
       menuTextCustomEmojiIds: config?.menuTextCustomEmojiIds ?? null,
       botEmojis: config?.botEmojis ?? null,
+      lang: clientLang,
     });
     const caption = text.length > TELEGRAM_CAPTION_MAX ? text.slice(0, TELEGRAM_CAPTION_MAX - 3) + "..." : text;
     const captionEntities = text.length > TELEGRAM_CAPTION_MAX && entities.length ? entities.filter((e) => e.offset + e.length <= TELEGRAM_CAPTION_MAX - 3) : entities;
@@ -1387,16 +1436,18 @@ bot.on("callback_query:data", async (ctx) => {
       const showProxy = proxyRes.items?.some((c: { tariffs: unknown[] }) => c.tariffs?.length > 0) ?? false;
       const showSingbox = singboxRes.items?.some((c: { tariffs: unknown[] }) => c.tariffs?.length > 0) ?? false;
       const name = config?.serviceName?.trim() || "Кабинет";
+      const clientLang = (client?.preferredLang ?? "ru").toLowerCase();
       const { text, entities } = buildMainMenuText({
         serviceName: name,
         balance: client?.balance ?? 0,
         currency: client?.preferredCurrency ?? config?.defaultCurrency ?? "usd",
         subscription: subRes.subscription,
         tariffDisplayName: (subRes as { tariffDisplayName?: string | null }).tariffDisplayName ?? null,
-        menuTexts: config?.botMenuTexts ?? config?.resolvedBotMenuTexts ?? null,
+        menuTexts: getLocaleTexts(config, clientLang),
         menuLineVisibility: config?.botMenuLineVisibility ?? null,
         menuTextCustomEmojiIds: config?.menuTextCustomEmojiIds ?? null,
         botEmojis: config?.botEmojis ?? null,
+        lang: clientLang,
       });
       const hasSupportLinks = !!(config?.supportLink || config?.agreementLink || config?.offerLink || config?.instructionsLink);
       const backMarkup = mainMenu({

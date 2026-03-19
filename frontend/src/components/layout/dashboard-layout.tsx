@@ -11,28 +11,29 @@ import { useTheme, ACCENT_PALETTES, type ThemeMode, type ThemeAccent } from "@/c
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { api, type AdminNotificationCounters } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 const PANEL_VERSION = "3.2.4";
 const GITHUB_URL = "https://github.com/systemmaster1200-eng/remnawave-STEALTHNET-Bot";
 
-const navWithSections: { to: string; label: string; icon: typeof LayoutDashboard; section: string }[] = [
-  { to: "/admin", label: "Дашборд", icon: LayoutDashboard, section: "dashboard" },
-  { to: "/admin/clients", label: "Клиенты", icon: Users, section: "clients" },
-  { to: "/admin/tariffs", label: "Тарифы", icon: CreditCard, section: "tariffs" },
-  { to: "/admin/proxy", label: "Прокси", icon: Globe, section: "proxy" },
-  { to: "/admin/singbox", label: "Sing-box", icon: Server, section: "singbox" },
-  { to: "/admin/promo", label: "Промо-ссылки", icon: Megaphone, section: "promo" },
-  { to: "/admin/promo-codes", label: "Промокоды", icon: Tag, section: "promo-codes" },
-  { to: "/admin/analytics", label: "Аналитика", icon: BarChart3, section: "analytics" },
-  { to: "/admin/marketing", label: "Маркетинг", icon: Target, section: "marketing" },
-  { to: "/admin/sales-report", label: "Отчёты продаж", icon: FileText, section: "sales-report" },
-  { to: "/admin/broadcast", label: "Рассылка", icon: Send, section: "broadcast" },
-  { to: "/admin/auto-broadcast", label: "Авто-рассылка", icon: CalendarClock, section: "auto-broadcast" },
-  { to: "/admin/backup", label: "Бэкапы", icon: Database, section: "backup" },
-  { to: "/admin/contests", label: "Конкурсы", icon: Trophy, section: "contests" },
-  { to: "/admin/tickets", label: "Тикеты", icon: MessageSquare, section: "tickets" },
-  { to: "/admin/settings", label: "Настройки", icon: Settings, section: "settings" },
-  { to: "/admin/admins", label: "Менеджеры", icon: UserCog, section: "admins" },
+const navSections: { to: string; labelKey: string; icon: typeof LayoutDashboard; section: string }[] = [
+  { to: "/admin", labelKey: "dashboard", icon: LayoutDashboard, section: "dashboard" },
+  { to: "/admin/clients", labelKey: "clients", icon: Users, section: "clients" },
+  { to: "/admin/tariffs", labelKey: "tariffs", icon: CreditCard, section: "tariffs" },
+  { to: "/admin/proxy", labelKey: "proxy", icon: Globe, section: "proxy" },
+  { to: "/admin/singbox", labelKey: "singbox", icon: Server, section: "singbox" },
+  { to: "/admin/promo", labelKey: "promo", icon: Megaphone, section: "promo" },
+  { to: "/admin/promo-codes", labelKey: "promoCodes", icon: Tag, section: "promo-codes" },
+  { to: "/admin/analytics", labelKey: "analytics", icon: BarChart3, section: "analytics" },
+  { to: "/admin/marketing", labelKey: "marketing", icon: Target, section: "marketing" },
+  { to: "/admin/sales-report", labelKey: "salesReport", icon: FileText, section: "sales-report" },
+  { to: "/admin/broadcast", labelKey: "broadcast", icon: Send, section: "broadcast" },
+  { to: "/admin/auto-broadcast", labelKey: "autoBroadcast", icon: CalendarClock, section: "auto-broadcast" },
+  { to: "/admin/backup", labelKey: "backup", icon: Database, section: "backup" },
+  { to: "/admin/contests", labelKey: "contests", icon: Trophy, section: "contests" },
+  { to: "/admin/tickets", labelKey: "tickets", icon: MessageSquare, section: "tickets" },
+  { to: "/admin/settings", labelKey: "settings", icon: Settings, section: "settings" },
+  { to: "/admin/admins", labelKey: "admins", icon: UserCog, section: "admins" },
 ];
 
 function canAccessSection(role: string, allowedSections: string[] | undefined, section: string): boolean {
@@ -41,10 +42,10 @@ function canAccessSection(role: string, allowedSections: string[] | undefined, s
   return Array.isArray(allowedSections) && allowedSections.includes(section);
 }
 
-const MODE_OPTIONS: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
-  { value: "light", icon: Sun, label: "Светлая" },
-  { value: "dark", icon: Moon, label: "Тёмная" },
-  { value: "system", icon: Monitor, label: "Система" },
+const MODE_OPTIONS: { value: ThemeMode; icon: typeof Sun; labelKey: string }[] = [
+  { value: "light", icon: Sun, labelKey: "modeLight" },
+  { value: "dark", icon: Moon, labelKey: "modeDark" },
+  { value: "system", icon: Monitor, labelKey: "modeSystem" },
 ];
 
 function isNavActive(pathname: string, to: string): boolean {
@@ -58,11 +59,12 @@ function isNavActive(pathname: string, to: string): boolean {
 }
 
 function NavItems({ onClick }: { onClick?: () => void }) {
+  const { t } = useTranslation();
   const location = useLocation();
   const admin = useAuth().state.admin;
   const nav = admin
-    ? navWithSections.filter((item) => canAccessSection(admin.role, admin.allowedSections, item.section))
-    : navWithSections;
+    ? navSections.filter((item) => canAccessSection(admin.role, admin.allowedSections, item.section))
+    : navSections;
   return (
     <>
       {nav.map((item) => {
@@ -80,7 +82,7 @@ function NavItems({ onClick }: { onClick?: () => void }) {
             )}
           >
             <item.icon className="h-4 w-4 shrink-0" />
-            {item.label}
+            {t(`admin.nav.${item.labelKey}`)}
           </Link>
         );
       })}
@@ -91,6 +93,7 @@ function NavItems({ onClick }: { onClick?: () => void }) {
 export function DashboardLayout() {
   const { state, logout } = useAuth();
   const { config: themeConfig, setMode, setAccent } = useTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [brand, setBrand] = useState<{ serviceName: string; logo: string | null }>({ serviceName: "", logo: null });
@@ -132,7 +135,7 @@ export function DashboardLayout() {
     const pushToast = (text: string) => {
       const id = Date.now() + Math.random();
       setNotificationToasts((prev) => [...prev, { id, text }]);
-      window.setTimeout(() => { setNotificationToasts((prev) => prev.filter((t) => t.id !== id)); }, 5000);
+      window.setTimeout(() => { setNotificationToasts((prev) => prev.filter((n) => n.id !== id)); }, 5000);
     };
     const fetchCounters = async () => {
       try {
@@ -140,10 +143,10 @@ export function DashboardLayout() {
         if (cancelled) return;
         const last = lastCountersRef.current;
         if (last) {
-          if (data.totalClients > last.totalClients) pushToast("Новый пользователь зарегистрировался.");
-          if (data.totalTariffPayments > last.totalTariffPayments) pushToast("Есть новые оплаты тарифов.");
-          if (data.totalBalanceTopups > last.totalBalanceTopups) pushToast("Есть новые пополнения баланса.");
-          if (data.totalTickets > last.totalTickets) pushToast("Появились новые тикеты.");
+          if (data.totalClients > last.totalClients) pushToast(t("admin.newUser"));
+          if (data.totalTariffPayments > last.totalTariffPayments) pushToast(t("admin.newPayments"));
+          if (data.totalBalanceTopups > last.totalBalanceTopups) pushToast(t("admin.newTopups"));
+          if (data.totalTickets > last.totalTickets) pushToast(t("admin.newTickets"));
         }
         lastCountersRef.current = data;
       } catch { /* ignore */ }
@@ -151,12 +154,28 @@ export function DashboardLayout() {
     fetchCounters();
     const id = window.setInterval(fetchCounters, 15000);
     return () => { cancelled = true; window.clearInterval(id); };
-  }, [state.accessToken, notificationsEnabled]);
+  }, [state.accessToken, notificationsEnabled, t]);
 
   async function handleLogout() {
     await logout();
     navigate("/admin/login", { replace: true });
   }
+
+  const SidebarBottom = ({ onLinkClick }: { onLinkClick?: () => void }) => (
+    <div className="border-t p-4 space-y-1.5">
+      <div className="text-xs text-muted-foreground truncate px-3 py-1">{state.admin?.email}</div>
+      <Link to="/admin/change-password" className="block" onClick={onLinkClick}>
+        <Button variant="ghost" size="sm" className="w-full justify-start gap-2 rounded-xl">
+          <KeyRound className="h-4 w-4" />
+          {t("admin.changePassword")}
+        </Button>
+      </Link>
+      <Button variant="ghost" size="sm" className="w-full justify-start gap-2 rounded-xl" onClick={handleLogout}>
+        <LogOut className="h-4 w-4" />
+        {t("admin.logout")}
+      </Button>
+    </div>
+  );
 
   return (
     <div className="flex min-h-svh bg-transparent">
@@ -173,19 +192,7 @@ export function DashboardLayout() {
         <nav className="flex-1 space-y-1.5 p-4 overflow-y-auto">
           <NavItems />
         </nav>
-        <div className="border-t p-4 space-y-1.5">
-          <div className="text-xs text-muted-foreground truncate px-3 py-1">{state.admin?.email}</div>
-          <Link to="/admin/change-password" className="block">
-            <Button variant="ghost" size="sm" className="w-full justify-start gap-2 rounded-xl">
-              <KeyRound className="h-4 w-4" />
-              Сменить пароль
-            </Button>
-          </Link>
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-2 rounded-xl" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
-            Выйти
-          </Button>
-        </div>
+        <SidebarBottom />
       </aside>
 
       {/* ═══ Mobile sidebar overlay ═══ */}
@@ -211,17 +218,7 @@ export function DashboardLayout() {
               <nav className="flex-1 space-y-1.5 p-4 overflow-y-auto">
                 <NavItems onClick={() => setMobileMenuOpen(false)} />
               </nav>
-              <div className="border-t p-4 space-y-1.5">
-                <div className="text-xs text-muted-foreground truncate px-3 py-1">{state.admin?.email}</div>
-                <Link to="/admin/change-password" className="block" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="ghost" size="sm" className="w-full justify-start gap-2 rounded-xl">
-                    <KeyRound className="h-4 w-4" />Сменить пароль
-                  </Button>
-                </Link>
-                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 rounded-xl" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4" />Выйти
-                </Button>
-              </div>
+              <SidebarBottom onLinkClick={() => setMobileMenuOpen(false)} />
             </motion.aside>
           </>
         )}
@@ -240,30 +237,30 @@ export function DashboardLayout() {
             <div className="relative">
               <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-8 px-2" onClick={() => setShowThemePanel(!showThemePanel)}>
                 <Palette className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Тема</span>
+                <span className="hidden sm:inline">{t("admin.theme")}</span>
               </Button>
               {showThemePanel && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowThemePanel(false)} />
                   <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-xl border bg-card p-4 shadow-xl">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Режим</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">{t("admin.themeMode")}</p>
                     <div className="flex gap-1 mb-4">
                       {MODE_OPTIONS.map((opt) => (
                         <button key={opt.value} onClick={() => setMode(opt.value)}
                           className={cn("flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors",
                             themeConfig.mode === opt.value ? "bg-primary text-primary-foreground" : "bg-muted/50 hover:bg-muted")}>
-                          <opt.icon className="h-3.5 w-3.5" />{opt.label}
+                          <opt.icon className="h-3.5 w-3.5" />{t(`admin.${opt.labelKey}`)}
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Акцент</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">{t("admin.themeAccent")}</p>
                     <div className="grid grid-cols-4 gap-2">
                       {(Object.entries(ACCENT_PALETTES) as [ThemeAccent, typeof ACCENT_PALETTES["default"]][]).map(([key, palette]) => (
                         <button key={key} onClick={() => setAccent(key)}
                           className={cn("flex flex-col items-center gap-1 rounded-lg p-2 text-[10px] transition-all",
                             themeConfig.accent === key ? "ring-2 ring-primary bg-muted" : "hover:bg-muted/50")}>
                           <div className="h-6 w-6 rounded-full border-2 border-foreground/10" style={{ backgroundColor: palette.swatch }} />
-                          <span className="text-muted-foreground truncate w-full text-center">{palette.label}</span>
+                          <span className="text-muted-foreground truncate w-full text-center">{t(palette.labelKey)}</span>
                         </button>
                       ))}
                     </div>
@@ -273,7 +270,7 @@ export function DashboardLayout() {
             </div>
             <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer"
               className="hidden sm:flex items-center gap-1.5 rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent">
-              <Shield className="h-3 w-3" />Версия {PANEL_VERSION}<ExternalLink className="h-3 w-3 opacity-50" />
+              <Shield className="h-3 w-3" />{t("admin.version")} {PANEL_VERSION}<ExternalLink className="h-3 w-3 opacity-50" />
             </a>
           </div>
         </header>
@@ -284,9 +281,9 @@ export function DashboardLayout() {
 
       {notificationToasts.length > 0 && (
         <div className="fixed bottom-4 right-4 z-50 space-y-2">
-          {notificationToasts.map((t) => (
-            <div key={t.id} className="max-w-xs rounded-lg border bg-card px-4 py-3 text-sm shadow-lg">
-              {t.text}
+          {notificationToasts.map((n) => (
+            <div key={n.id} className="max-w-xs rounded-lg border bg-card px-4 py-3 text-sm shadow-lg">
+              {n.text}
             </div>
           ))}
         </div>

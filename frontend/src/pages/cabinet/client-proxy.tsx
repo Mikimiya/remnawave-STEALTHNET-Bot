@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 type ProxyTariff = { id: string; name: string; description?: string; proxyCount: number; durationDays: number; price: number; currency: string };
 type ProxyCategory = { id: string; name: string; sortOrder: number; tariffs: ProxyTariff[] };
@@ -67,6 +68,7 @@ function formatDate(iso: string) {
 }
 
 export function ClientProxyPage() {
+  const { t } = useTranslation();
   const { state, refreshProfile } = useClientAuth();
   const token = state.token;
   const client = state.client;
@@ -141,7 +143,7 @@ export function ClientProxyPage() {
       const r = await api.getProxySlots(token);
       setSlots(r.slots ?? []);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка оплаты");
+      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.paymentFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -160,7 +162,7 @@ export function ClientProxyPage() {
       setPayModal(null);
       if (res.paymentUrl) openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка");
+      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -179,7 +181,7 @@ export function ClientProxyPage() {
       setPayModal(null);
       if (res.confirmationUrl) openPaymentInBrowser(res.confirmationUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка");
+      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -198,7 +200,7 @@ export function ClientProxyPage() {
       setPayModal(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка");
+      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -217,7 +219,7 @@ export function ClientProxyPage() {
       setPayModal(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка");
+      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -238,7 +240,7 @@ export function ClientProxyPage() {
       setPayModal(null);
       openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : "Ошибка");
+      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -260,7 +262,7 @@ export function ClientProxyPage() {
           <div className="flex justify-between items-start gap-4 relative z-10">
             <div className="space-y-1.5">
               <p className={cn("font-medium", isMobileOrMiniapp ? "text-sm text-muted-foreground" : "text-muted-foreground")}>
-                {isMobileOrMiniapp ? "Итого к оплате" : "Тариф:"}
+                {isMobileOrMiniapp ? t("clientProxy.payment.totalToPay") : t("clientProxy.payment.tariffLabel")}
               </p>
               {!isMobileOrMiniapp && <p className="font-bold text-foreground">{payModal.name}</p>}
               {isMobileOrMiniapp && (
@@ -277,17 +279,17 @@ export function ClientProxyPage() {
           {isMobileOrMiniapp && (
             <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3 relative z-10">
               <div className="bg-background/40 rounded-2xl p-3 border border-white/5">
-                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Прокси</p>
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">{t("clientProxy.payment.proxy")}</p>
                 <div className="flex items-center gap-1.5 font-bold text-sm">
                   <Globe className="h-4 w-4 text-primary" />
-                  {payModal.proxyCount} шт.
+                  {payModal.proxyCount} {t("clientProxy.units.piecesShort")}
                 </div>
               </div>
               <div className="bg-background/40 rounded-2xl p-3 border border-white/5">
-                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Срок</p>
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">{t("clientProxy.payment.period")}</p>
                 <div className="flex items-center gap-1.5 font-bold text-sm">
                   <Calendar className="h-4 w-4 text-primary" />
-                  {payModal.durationDays} дн.
+                  {payModal.durationDays} {t("clientProxy.units.daysShort")}
                 </div>
               </div>
             </div>
@@ -297,7 +299,7 @@ export function ClientProxyPage() {
         <div className={cn("space-y-3", isMobileOrMiniapp ? "pb-6" : "")}>
           <div className="flex items-center gap-2 pt-2 pb-1">
             <Wallet className={cn("text-primary", isMobileOrMiniapp ? "h-5 w-5" : "h-4 w-4")} />
-            <span className={cn("font-bold", isMobileOrMiniapp ? "text-lg" : "text-sm")}>Способ оплаты</span>
+            <span className={cn("font-bold", isMobileOrMiniapp ? "text-lg" : "text-sm")}>{t("clientProxy.payment.method")}</span>
           </div>
 
           {payError && (
@@ -320,7 +322,7 @@ export function ClientProxyPage() {
                   <>
                     <div className="flex items-center gap-3">
                       {payLoading ? <Loader2 className="h-6 w-6 text-white animate-spin" /> : <Wallet className="h-6 w-6 text-white" />}
-                      <span className="text-base font-bold text-white">Оплатить с баланса</span>
+                      <span className="text-base font-bold text-white">{t("clientProxy.payment.payWithBalance")}</span>
                     </div>
                     <span className="text-white/80 font-mono font-medium bg-black/20 px-2 py-1 rounded-lg">
                       {formatMoney(client.balance, payModal.currency)}
@@ -329,7 +331,7 @@ export function ClientProxyPage() {
                 ) : (
                   <>
                     {payLoading ? <Loader2 className="h-5 w-5 animate-spin relative z-10" /> : <Wallet className="h-5 w-5 relative z-10" />}
-                    <span className="text-base font-semibold relative z-10">Оплатить с баланса</span>
+                    <span className="text-base font-semibold relative z-10">{t("clientProxy.payment.payWithBalance")}</span>
                     <span className="opacity-90 font-medium ml-1 bg-black/10 px-2 py-0.5 rounded-md relative z-10">
                       ({formatMoney(client.balance, payModal.currency)})
                     </span>
@@ -358,7 +360,7 @@ export function ClientProxyPage() {
                     <div className="absolute left-6 p-1.5 rounded-lg bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
                       {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-yellow-500" /> : <Zap className="h-5 w-5 text-yellow-500" />}
                     </div>
-                    <span className="text-base font-medium">⚡ Crypto Bot (Криптовалюта)</span>
+                    <span className="text-base font-medium">{t("clientProxy.payment.cryptoBot")}</span>
                   </>
                 )}
               </Button>
@@ -384,7 +386,7 @@ export function ClientProxyPage() {
                     <div className="absolute left-6 p-1.5 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
                       {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-orange-500" /> : <Zap className="h-5 w-5 text-orange-500" />}
                     </div>
-                    <span className="text-base font-medium">⚡ Heleket (Криптовалюта)</span>
+                    <span className="text-base font-medium">{t("clientProxy.payment.heleket")}</span>
                   </>
                 )}
               </Button>
@@ -403,14 +405,14 @@ export function ClientProxyPage() {
                     <div className="p-2 rounded-xl bg-green-500/10">
                       {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
                     </div>
-                    <span className="text-base font-bold">СБП / Карты РФ</span>
+                    <span className="text-base font-bold">{t("clientProxy.payment.sbpCards")}</span>
                   </>
                 ) : (
                   <>
                     <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                       {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
                     </div>
-                    <span className="text-base font-medium">💳 СБП</span>
+                    <span className="text-base font-medium">{t("clientProxy.payment.sbp")}</span>
                   </>
                 )}
               </Button>
@@ -429,14 +431,14 @@ export function ClientProxyPage() {
                     <div className="p-2 rounded-xl bg-green-500/10">
                       {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
                     </div>
-                    <span className="text-base font-bold">ЮMoney / Карты</span>
+                    <span className="text-base font-bold">{t("clientProxy.payment.yoomoneyCards")}</span>
                   </>
                 ) : (
                   <>
                     <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                       {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
                     </div>
-                    <span className="text-base font-medium">💳 Карты</span>
+                    <span className="text-base font-medium">{t("clientProxy.payment.cards")}</span>
                   </>
                 )}
               </Button>
@@ -500,7 +502,7 @@ export function ClientProxyPage() {
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-sm sm:text-base font-bold truncate text-foreground">Оплата прокси</h2>
+                  <h2 className="text-sm sm:text-base font-bold truncate text-foreground">{t("clientProxy.payment.title")}</h2>
                   <p className="text-[11px] font-medium text-muted-foreground truncate">{payModal.name}</p>
                 </div>
               </div>
@@ -525,10 +527,10 @@ export function ClientProxyPage() {
                 <div className="flex-1">
                   <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground flex items-center gap-3">
                     <Globe className="h-8 w-8 text-primary" />
-                    Прокси
+                    {t("clientProxy.page.title")}
                   </h1>
                   <p className="mt-3 text-[16px] text-muted-foreground max-w-xl leading-relaxed">
-                    Купите персональные прокси для безопасного и анонимного серфинга в интернете. SOCKS5 и HTTP прокси с высокой скоростью и низким пингом.
+                    {t("clientProxy.page.subtitle")}
                   </p>
                 </div>
               </div>
@@ -537,10 +539,10 @@ export function ClientProxyPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full max-w-md grid-cols-2 rounded-2xl p-1 bg-muted/50 backdrop-blur-md">
                 <TabsTrigger value="tariffs" className="gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <Globe className="h-4 w-4" /> Купить
+                  <Globe className="h-4 w-4" /> {t("clientProxy.tabs.buy")}
                 </TabsTrigger>
                 <TabsTrigger value="my" className="gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  Мои прокси
+                  {t("clientProxy.tabs.myProxy")}
                   {slots.length > 0 && (
                     <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-medium">
                       {slots.length}
@@ -558,7 +560,7 @@ export function ClientProxyPage() {
                   <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-sm">
                     <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-4">
                       <Globe className="h-12 w-12 opacity-20" />
-                      <p>Тарифы прокси пока не настроены. Обратитесь в поддержку.</p>
+                      <p>{t("clientProxy.empty.tariffs")}</p>
                     </CardContent>
                   </Card>
                 ) : isMobileOrMiniapp ? (
@@ -591,37 +593,37 @@ export function ClientProxyPage() {
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="px-3 pb-3 pt-1 flex flex-col gap-3">
-                              {cat.tariffs.map((t) => (
-                                <Card key={t.id} className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-300">
+                              {cat.tariffs.map((tariff) => (
+                                <Card key={tariff.id} className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-300">
                                   <CardContent className="flex flex-row items-center gap-4 py-4 px-4 min-h-0 min-w-0">
                                     <div className="flex-1 min-w-0 space-y-1.5">
-                                      <p className="text-[15px] font-bold leading-tight truncate text-foreground">{t.name}</p>
-                                      {t.description?.trim() ? (
-                                        <p className="text-xs text-muted-foreground font-medium line-clamp-2">{t.description}</p>
+                                      <p className="text-[15px] font-bold leading-tight truncate text-foreground">{tariff.name}</p>
+                                      {tariff.description?.trim() ? (
+                                        <p className="text-xs text-muted-foreground font-medium line-clamp-2">{tariff.description}</p>
                                       ) : null}
                                       <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                                         <span className="flex items-center gap-1.5 bg-background/50 px-2 py-1 rounded-md border border-border/50">
                                           <Calendar className="h-3 w-3 text-primary" />
-                                          {t.durationDays} дн.
+                                          {tariff.durationDays} {t("clientProxy.units.daysShort")}
                                         </span>
                                         <span className="flex items-center gap-1.5 bg-background/50 px-2 py-1 rounded-md border border-border/50">
                                           <Globe className="h-3 w-3 text-primary" />
-                                          {t.proxyCount} шт.
+                                          {tariff.proxyCount} {t("clientProxy.units.piecesShort")}
                                         </span>
                                       </div>
                                     </div>
                                     <div className="flex flex-col items-center justify-center gap-2.5 shrink-0 min-w-[90px]">
-                                      <span className="text-lg font-bold tabular-nums whitespace-nowrap text-foreground" title={formatMoney(t.price, t.currency)}>
-                                        {formatMoney(t.price, t.currency)}
+                                      <span className="text-lg font-bold tabular-nums whitespace-nowrap text-foreground" title={formatMoney(tariff.price, tariff.currency)}>
+                                        {formatMoney(tariff.price, tariff.currency)}
                                       </span>
                                       {token ? (
                                         <Button
                                           size="sm"
                                           className="w-full h-9 rounded-xl shadow-md text-xs font-semibold gap-1.5 hover:scale-105 transition-transform"
-                                          onClick={() => setPayModal(t)}
+                                          onClick={() => setPayModal(tariff)}
                                         >
                                           <CreditCard className="h-3.5 w-3.5 shrink-0" />
-                                          Оплатить
+                                          {t("clientProxy.actions.pay")}
                                         </Button>
                                       ) : null}
                                     </div>
@@ -648,13 +650,13 @@ export function ClientProxyPage() {
                           {cat.name}
                         </h2>
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {cat.tariffs.map((t) => (
-                            <Card key={t.id} className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col group hover:-translate-y-1">
+                          {cat.tariffs.map((tariff) => (
+                            <Card key={tariff.id} className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col group hover:-translate-y-1">
                               <CardContent className="flex-1 flex flex-col p-5 min-h-0 min-w-0">
                                 <div className="mb-4">
-                                  <p className="text-lg font-bold leading-tight line-clamp-2 text-foreground group-hover:text-primary transition-colors">{t.name}</p>
-                                  {t.description?.trim() ? (
-                                    <p className="text-sm text-muted-foreground font-medium mt-1.5 line-clamp-2">{t.description}</p>
+                                  <p className="text-lg font-bold leading-tight line-clamp-2 text-foreground group-hover:text-primary transition-colors">{tariff.name}</p>
+                                  {tariff.description?.trim() ? (
+                                    <p className="text-sm text-muted-foreground font-medium mt-1.5 line-clamp-2">{tariff.description}</p>
                                   ) : null}
                                 </div>
 
@@ -663,28 +665,28 @@ export function ClientProxyPage() {
                                     <div className="bg-primary/20 p-1.5 rounded-lg text-primary">
                                       <Calendar className="h-4 w-4 shrink-0" />
                                     </div>
-                                    <span>{t.durationDays} дней</span>
+                                    <span>{tariff.durationDays} {t("clientProxy.units.days")}</span>
                                   </div>
                                   <div className="flex items-center gap-3 bg-background/50 px-3 py-2 rounded-xl border border-border/50">
                                     <div className="bg-primary/20 p-1.5 rounded-lg text-primary">
                                       <Globe className="h-4 w-4 shrink-0" />
                                     </div>
-                                    <span>{t.proxyCount} прокси</span>
+                                    <span>{tariff.proxyCount} {t("clientProxy.units.proxy")}</span>
                                   </div>
                                 </div>
 
                                 <div className="pt-4 border-t border-border/50 mt-auto flex flex-col gap-3 min-w-0">
-                                  <span className="text-2xl font-black tabular-nums truncate min-w-0 text-foreground text-center" title={formatMoney(t.price, t.currency)}>
-                                    {formatMoney(t.price, t.currency)}
+                                  <span className="text-2xl font-black tabular-nums truncate min-w-0 text-foreground text-center" title={formatMoney(tariff.price, tariff.currency)}>
+                                    {formatMoney(tariff.price, tariff.currency)}
                                   </span>
                                   {token ? (
                                     <Button
                                       size="lg"
                                       className="w-full h-12 rounded-xl shadow-md text-[15px] font-bold gap-2 hover:scale-[1.02] transition-transform"
-                                      onClick={() => setPayModal(t)}
+                                      onClick={() => setPayModal(tariff)}
                                     >
                                       <CreditCard className="h-5 w-5 shrink-0" />
-                                      Оплатить
+                                      {t("clientProxy.actions.pay")}
                                     </Button>
                                   ) : null}
                                 </div>
@@ -707,7 +709,7 @@ export function ClientProxyPage() {
                   <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-sm">
                     <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-4">
                       <Globe className="h-12 w-12 opacity-20" />
-                      <p>У вас пока нет активных прокси. Купите тариф во вкладке «Купить».</p>
+                      <p>{t("clientProxy.empty.slots")}</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -726,16 +728,16 @@ export function ClientProxyPage() {
                                   <Globe className="h-5 w-5" />
                                 </div>
                                 <div>
-                                  <h3 className="font-semibold text-foreground">Прокси {slot.id.slice(0, 8)}…</h3>
+                                  <h3 className="font-semibold text-foreground">{t("clientProxy.slot.title", { id: slot.id.slice(0, 8) })}</h3>
                                   {slot.trafficLimitBytes && Number(slot.trafficLimitBytes) > 0 ? (
                                     <p className="text-xs text-muted-foreground mt-0.5">
-                                      Трафик: {formatBytes(slot.trafficUsedBytes)} / {formatBytes(slot.trafficLimitBytes)}
+                                      {t("clientProxy.slot.traffic")}: {formatBytes(slot.trafficUsedBytes)} / {formatBytes(slot.trafficLimitBytes)}
                                     </p>
                                   ) : null}
                                 </div>
                               </div>
                               <div className="flex flex-col items-end text-sm shrink-0">
-                                <span className="text-xs text-muted-foreground">Действует до</span>
+                                <span className="text-xs text-muted-foreground">{t("clientProxy.slot.activeUntil")}</span>
                                 <span className="font-medium text-foreground">{formatDate(slot.expiresAt)}</span>
                               </div>
                             </div>
@@ -791,7 +793,7 @@ export function ClientProxyPage() {
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <Shield className="h-6 w-6 text-primary" />
                 </div>
-                Оплата прокси
+                {t("clientProxy.payment.title")}
               </DialogTitle>
               <DialogDescription className="hidden" />
             </DialogHeader>
@@ -800,7 +802,7 @@ export function ClientProxyPage() {
 
             <DialogFooter className="mt-4 sm:justify-center border-t border-border/50 pt-4">
               <Button variant="ghost" onClick={closePayment} disabled={payLoading} className="rounded-xl hover:bg-background/50 hover:text-foreground text-muted-foreground transition-colors">
-                Отмена
+                {t("clientProxy.actions.cancel")}
               </Button>
             </DialogFooter>
           </DialogContent>
