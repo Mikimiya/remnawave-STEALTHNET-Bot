@@ -21,6 +21,7 @@ const ru = {
     days_one: "{{count}} день",
     days_few: "{{count}} дня",
     days_many: "{{count}} дней",
+    cryptoBot: "Crypto Bot",
   },
   auth: {
     login: "Войти",
@@ -166,6 +167,7 @@ const ru = {
     yoomoneyRubOnly: "ЮMoney принимает только рубли. Выберите тариф в RUB или оплатите картой Platega.",
     yookassaRubOnly: "ЮKassa принимает только рубли (RUB).",
     youMoneyRubOnly: "ЮMoney принимает только рубли. Выберите тариф в RUB или оплатите картой Platega.",
+    cryptoBot: "⚡ Crypto Bot (Криптовалюта)",
   },
   profile: {
     title: "Профиль",
@@ -474,6 +476,7 @@ const ru = {
     yoomoney: "ЮMoney / Карты",
     sbp: "СБП / Карты РФ",
     crypto: "Криптовалюта",
+    cryptoBot: "⚡ Crypto Bot (Криптовалюта)",
   },
   landing: {
     title: "Добро пожаловать",

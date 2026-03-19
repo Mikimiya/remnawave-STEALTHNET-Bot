@@ -21,6 +21,7 @@ const zh: typeof import("./ru").default = {
     days_one: "{{count}} 天",
     days_few: "{{count}} 天",
     days_many: "{{count}} 天",
+    cryptoBot: "Crypto Bot",
   },
   auth: {
     login: "登录",
@@ -166,9 +167,10 @@ const zh: typeof import("./ru").default = {
     yoomoneyRubOnly: "ЮMoney 仅支持卢布。请选择 RUB 套餐或通过 Platega 刷卡支付。",
     yookassaRubOnly: "ЮKassa 仅支持卢布 (RUB)。",
     youMoneyRubOnly: "ЮMoney 仅支持卢布。请选择 RUB 套餐或通过 Platega 刷卡支付。",
+    cryptoBot: "⚡ Crypto Bot（加密货币）",
   },
   profile: {
-    title: "个人资料",
+    title: "账号设置",
     subtitle: "个人数据与设置",
     dataTitle: "数据",
     contactInfo: "联系信息",
@@ -369,7 +371,7 @@ const zh: typeof import("./ru").default = {
     dashboard: "首页",
     tariffs: "套餐",
     subscribe: "连接",
-    profile: "个人资料",
+    profile: "账号",
     referral: "推荐",
     proxy: "代理",
     singbox: "Sing-box",
@@ -474,6 +476,7 @@ const zh: typeof import("./ru").default = {
     yoomoney: "ЮMoney / 银行卡",
     sbp: "SBP / 俄罗斯银行卡",
     crypto: "加密货币",
+    cryptoBot: "⚡ Crypto Bot（加密货币）",
   },
   landing: {
     title: "欢迎",

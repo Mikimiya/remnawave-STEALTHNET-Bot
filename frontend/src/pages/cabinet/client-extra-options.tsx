@@ -322,14 +322,14 @@ export function ClientExtraOptionsPage() {
                      <div className="p-2 rounded-xl bg-yellow-500/10">
                         {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-yellow-500" /> : <Zap className="h-6 w-6 text-yellow-500" />}
                      </div>
-                     <span className="text-base font-bold">Crypto Bot</span>
+                     <span className="text-base font-bold">{t("common.cryptoBot")}</span>
                      </>
                   ) : (
                      <>
                      <div className="absolute left-6 p-1.5 rounded-lg bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-yellow-500" /> : <Zap className="h-5 w-5 text-yellow-500" />}
                      </div>
-                     <span className="text-base font-medium">⚡ Crypto Bot ({t("extraOptions.crypto")})</span>
+                     <span className="text-base font-medium">{t("extraOptions.cryptoBot")}</span>
                      </>
                   )}
                </Button>

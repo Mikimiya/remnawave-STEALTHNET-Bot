@@ -413,7 +413,7 @@ export function ClientCustomBuildPage() {
                       <div className="p-2 rounded-xl bg-yellow-500/10">
                         {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-yellow-500" /> : <Zap className="h-6 w-6 text-yellow-500" />}
                       </div>
-                      <span className="text-base font-bold">Crypto Bot</span>
+                      <span className="text-base font-bold">{t("common.cryptoBot")}</span>
                     </>
                   ) : (
                     <>

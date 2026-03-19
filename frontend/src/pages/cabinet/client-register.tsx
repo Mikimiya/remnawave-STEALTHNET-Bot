@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { UserPlus, Shield, Mail } from "lucide-react";
+import { UserPlus, Shield, Mail, AlertCircle } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
 import type { PublicConfig } from "@/lib/api";
@@ -336,17 +336,18 @@ export function ClientRegisterPage() {
               {/* Скрытое поле: iOS/Safari реже выводит панель автозаполнения на каждый символ */}
               <input type="text" name="prevent_autofill" autoComplete="off" tabIndex={-1} className="absolute opacity-0 pointer-events-none h-0 w-0 overflow-hidden" aria-hidden />
               {error && (
-                <div className="rounded-md bg-destructive/10 text-destructive text-sm p-3">
-                  {error}
+                <div className="rounded-xl border border-destructive/40 dark:border-red-500/40 bg-destructive/10 dark:bg-red-500/10 px-4 py-3 text-sm text-destructive dark:text-red-400 flex items-start gap-2.5 animate-in fade-in duration-200">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{error}</span>
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("auth.email")}</Label>
                 <Input
                   id="email"
                   type="email"
                   name="register_email"
-                  placeholder="your@email.com"
+                  placeholder={t("auth.enterEmail")}
                   value={email}
                   onChange={handleEmailChange}
                   onBlur={handleEmailBlur}
@@ -354,7 +355,7 @@ export function ClientRegisterPage() {
                   autoComplete="email"
                   className={emailError ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
-                {emailError && <p className="text-xs text-destructive">{emailError}</p>}
+                {emailError && <p className="text-xs text-destructive dark:text-red-400">{emailError}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">{t("auth.password")}</Label>
@@ -369,7 +370,7 @@ export function ClientRegisterPage() {
                   autoComplete="new-password"
                   className={passwordError ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
-                {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+                {passwordError && <p className="text-xs text-destructive dark:text-red-400">{passwordError}</p>}
                 {!passwordError && password && (
                   <p className="text-xs text-green-500">{t("auth.passwordAccepted")}</p>
                 )}

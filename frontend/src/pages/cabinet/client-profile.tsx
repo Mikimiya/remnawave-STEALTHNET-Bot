@@ -491,7 +491,7 @@ export function ClientProfilePage() {
                       <Mail className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground mb-0.5">Email</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">{t("profile.email")}</p>
                       <p className="font-medium text-sm truncate">{client.email}</p>
                     </div>
                   </div>
@@ -503,14 +503,14 @@ export function ClientProfilePage() {
                       <Mail className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground mb-0.5">Email</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">{t("profile.email")}</p>
                       <p className="font-medium text-sm truncate text-orange-500">{t("profile.notLinked")}</p>
                     </div>
                   </div>
                   <form onSubmit={sendLinkEmailRequest} className="flex gap-2 mt-2">
                     <Input
                       type="email"
-                      placeholder="email@example.com"
+                      placeholder={t("auth.enterEmail")}
                       value={linkEmailValue}
                       onChange={(e) => setLinkEmailValue(e.target.value)}
                       className="h-9 bg-background/50 border-white/10 text-sm"
@@ -1005,7 +1005,7 @@ export function ClientProfilePage() {
                 <div className="absolute left-6 p-1.5 rounded-lg bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
                   {topUpLoading ? <Loader2 className="h-5 w-5 animate-spin text-yellow-500" /> : <Globe className="h-5 w-5 text-yellow-500" />}
                 </div>
-                <span className="text-base font-medium">Crypto Bot</span>
+                <span className="text-base font-medium">{t("common.cryptoBot")}</span>
               </Button>
             )}
             {heleketEnabled && (

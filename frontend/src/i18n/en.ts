@@ -21,6 +21,7 @@ const en: typeof import("./ru").default = {
     days_one: "{{count}} day",
     days_few: "{{count}} days",
     days_many: "{{count}} days",
+    cryptoBot: "Crypto Bot",
   },
   auth: {
     login: "Sign in",
@@ -166,6 +167,7 @@ const en: typeof import("./ru").default = {
     yoomoneyRubOnly: "YooMoney only accepts rubles. Choose a RUB plan or pay by card via Platega.",
     yookassaRubOnly: "YooKassa only accepts rubles (RUB).",
     youMoneyRubOnly: "YooMoney only accepts rubles. Choose a RUB plan or pay by card via Platega.",
+    cryptoBot: "⚡ Crypto Bot (Cryptocurrency)",
   },
   profile: {
     title: "Profile",
@@ -474,6 +476,7 @@ const en: typeof import("./ru").default = {
     yoomoney: "YooMoney / Cards",
     sbp: "SBP / Russian bank cards",
     crypto: "Cryptocurrency",
+    cryptoBot: "⚡ Crypto Bot (Cryptocurrency)",
   },
   landing: {
     title: "Welcome",
