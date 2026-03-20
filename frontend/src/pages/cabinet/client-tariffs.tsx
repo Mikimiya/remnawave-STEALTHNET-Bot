@@ -34,38 +34,12 @@ import {
 } from "@/components/ui/dialog";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
-import { cn } from "@/lib/utils";
+import { cn, formatMoney, translateBackendMessage, translatePlategaLabel } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
-
-function formatMoney(amount: number, currency: string) {
-  const code = currency.toUpperCase();
-  const locale = code === "RUB" ? "ru-RU" : code === "CNY" ? "zh-CN" : "en-US";
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: code,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `${amount} ${code}`;
-  }
-}
 
 function formatDailyPrice(price: number, days: number, currency: string) {
   if (!days || days <= 0) return null;
-  const code = currency.toUpperCase();
-  const locale = code === "RUB" ? "ru-RU" : code === "CNY" ? "zh-CN" : "en-US";
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: code,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(price / days);
-  } catch {
-    return null;
-  }
+  return formatMoney(price / days, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 type TariffForPay = {
@@ -90,6 +64,7 @@ export function ClientTariffsPage() {
   const [yookassaEnabled, setYookassaEnabled] = useState(false);
   const [cryptopayEnabled, setCryptopayEnabled] = useState(false);
   const [heleketEnabled, setHeleketEnabled] = useState(false);
+  const [epayMethods, setEpayMethods] = useState<{ type: string; label: string }[]>([]);
   const [trialConfig, setTrialConfig] = useState<{ trialEnabled: boolean; trialDays: number }>({
     trialEnabled: false,
     trialDays: 0,
@@ -138,6 +113,7 @@ export function ClientTariffsPage() {
         setYookassaEnabled(Boolean(c.yookassaEnabled));
         setCryptopayEnabled(Boolean(c.cryptopayEnabled));
         setHeleketEnabled(Boolean(c.heleketEnabled));
+        setEpayMethods(c.epayMethods ?? []);
         setTrialConfig({ trialEnabled: !!c.trialEnabled, trialDays: c.trialDays ?? 0 });
       })
       .catch(() => {});
@@ -151,7 +127,7 @@ export function ClientTariffsPage() {
       await api.clientActivateTrial(token);
       await refreshProfile();
     } catch (e) {
-      setTrialError(e instanceof Error ? e.message : t("tariffs.trialError"));
+      setTrialError(e instanceof Error ? translateBackendMessage(e.message, t) : t("tariffs.trialError"));
     } finally {
       setTrialLoading(false);
     }
@@ -177,7 +153,7 @@ export function ClientTariffsPage() {
         return;
       }
     } catch (e) {
-      setPromoError(e instanceof Error ? e.message : t("common.error"));
+      setPromoError(e instanceof Error ? translateBackendMessage(e.message, t) : t("common.error"));
       setPromoResult(null);
     } finally {
       setPromoChecking(false);
@@ -214,7 +190,7 @@ export function ClientTariffsPage() {
       setPromoResult(null);
       openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("tariffs.paymentError"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("tariffs.paymentError"));
     } finally {
       setPayLoading(false);
     }
@@ -235,7 +211,7 @@ export function ClientTariffsPage() {
       alert(res.message);
       await refreshProfile();
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("tariffs.paymentError"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("tariffs.paymentError"));
     } finally {
       setPayLoading(false);
     }
@@ -261,7 +237,7 @@ export function ClientTariffsPage() {
       setPromoResult(null);
       if (res.paymentUrl) openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("tariffs.paymentError"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("tariffs.paymentError"));
     } finally {
       setPayLoading(false);
     }
@@ -287,7 +263,7 @@ export function ClientTariffsPage() {
       setPromoResult(null);
       if (res.confirmationUrl) openPaymentInBrowser(res.confirmationUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("tariffs.paymentError"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("tariffs.paymentError"));
     } finally {
       setPayLoading(false);
     }
@@ -309,7 +285,7 @@ export function ClientTariffsPage() {
       setPromoResult(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("tariffs.paymentError"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("tariffs.paymentError"));
     } finally {
       setPayLoading(false);
     }
@@ -331,7 +307,30 @@ export function ClientTariffsPage() {
       setPromoResult(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("tariffs.paymentError"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("tariffs.paymentError"));
+    } finally {
+      setPayLoading(false);
+    }
+  }
+
+  async function startEpayPayment(tariff: TariffForPay, epayType: string) {
+    if (!token) return;
+    setPayError(null);
+    setPayLoading(true);
+    try {
+      const res = await api.epayCreatePayment(token, {
+        amount: tariff.price,
+        currency: tariff.currency,
+        tariffId: tariff.id,
+        promoCode: promoResult ? promoInput.trim() : undefined,
+        type: epayType,
+      });
+      setPayModal(null);
+      setPromoInput("");
+      setPromoResult(null);
+      if (res.payUrl) openPaymentInBrowser(res.payUrl);
+    } catch (e) {
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("tariffs.paymentError"));
     } finally {
       setPayLoading(false);
     }
@@ -622,6 +621,19 @@ export function ClientTariffsPage() {
               />
             )}
 
+            {/* ePay methods */}
+            {epayMethods.map((m) => (
+              <PayMethodButton
+                key={m.type}
+                isMobile={isMobileOrMiniapp}
+                icon={<CreditCard className="h-5 w-5 text-blue-500" />}
+                iconBg="bg-blue-500/15"
+                label={m.label}
+                onClick={() => startEpayPayment(tariff, m.type)}
+                disabled={payLoading}
+              />
+            ))}
+
             {/* YooKassa */}
             {yookassaEnabled && tariff.currency.toUpperCase() === "RUB" && (
               <PayMethodButton
@@ -653,7 +665,7 @@ export function ClientTariffsPage() {
                 isMobile={isMobileOrMiniapp}
                 icon={<CreditCard className="h-5 w-5 text-green-500" />}
                 iconBg="bg-green-500/15"
-                label={m.label}
+                label={translatePlategaLabel(m, t)}
                 onClick={() => startPayment(tariff, m.id)}
                 disabled={payLoading}
               />

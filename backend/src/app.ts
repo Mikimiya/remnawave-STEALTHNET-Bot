@@ -16,6 +16,7 @@ import { yoomoneyWebhooksRouter } from "./modules/webhooks/yoomoney.webhooks.rou
 import { yookassaWebhooksRouter } from "./modules/webhooks/yookassa.webhooks.routes.js";
 import { cryptopayWebhooksRouter } from "./modules/webhooks/cryptopay.webhooks.routes.js";
 import { heleketWebhooksRouter } from "./modules/webhooks/heleket.webhooks.routes.js";
+import { epayWebhooksRouter } from "./modules/webhooks/epay.webhooks.routes.js";
 import { botAdminRouter } from "./modules/bot-admin/bot-admin.routes.js";
 import { contestAdminRouter } from "./modules/contest/contest.admin.routes.js";
 import { contestPublicRouter } from "./modules/contest/contest.public.routes.js";
@@ -128,6 +129,7 @@ app.use("/api/webhooks", remnaWebhooksRouter);
 app.use("/api/webhooks", plategaWebhooksRouter);
 app.use("/api/webhooks", yoomoneyWebhooksRouter);
 app.use("/api/webhooks", yookassaWebhooksRouter);
+app.use("/api/webhooks/epay", epayWebhooksRouter);
 // cryptopay уже смонтирован выше с raw body
 
 app.use((_req, res) => {

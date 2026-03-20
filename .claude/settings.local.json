@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(grep -n \"Crypto Bot\\\\|premium access\\\\|your@email\\\\|placeholder=\"\"[A-Z]\\\\|>Email<\\\\|> Email <\\\\|\"\"Email\"\"\\\\|\"\"FAQ\"\"\\\\|\"\"pricing\"\"\\\\|\"\"devices\"\"\\\\|\"\"faq\"\"\\\\|nativeFlow\\\\|synced\\\\|zero-log\\\\|Zero-Log\" c:/Users/Administrator/Documents/remnawave-STEALTHNET-Bot/frontend/src/pages/cabinet/*.tsx)",
-      "Bash(grep -rn placeholder=[^{t] c:/Users/Administrator/Documents/remnawave-STEALTHNET-Bot/frontend/src/pages/cabinet/)"
+      "Bash(grep -rn placeholder=[^{t] c:/Users/Administrator/Documents/remnawave-STEALTHNET-Bot/frontend/src/pages/cabinet/)",
+      "WebFetch(domain:motionpay.net)"
     ]
   }
 }

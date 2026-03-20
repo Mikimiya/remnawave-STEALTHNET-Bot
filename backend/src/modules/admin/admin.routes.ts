@@ -939,6 +939,10 @@ const updateSettingsSchema = z.object({
   cryptopayTestnet: z.boolean().optional(),
   heleketMerchantId: z.string().max(500).nullable().optional(),
   heleketApiKey: z.string().max(500).nullable().optional(),
+  epayPid: z.string().max(200).nullable().optional(),
+  epayKey: z.string().max(500).nullable().optional(),
+  epayApiUrl: z.string().max(2000).nullable().optional(),
+  epayMethods: z.string().max(2000).nullable().optional(),
   groqApiKey: z.string().max(500).nullable().optional(),
   groqModel: z.string().max(100).nullable().optional(),
   groqFallback1: z.string().max(100).nullable().optional(),
@@ -1335,6 +1339,22 @@ adminRouter.patch("/settings", async (req, res) => {
   if (updates.heleketApiKey !== undefined) {
     const val = updates.heleketApiKey ?? "";
     await prisma.systemSetting.upsert({ where: { key: "heleket_api_key" }, create: { key: "heleket_api_key", value: val }, update: { value: val } });
+  }
+  if (updates.epayPid !== undefined) {
+    const val = updates.epayPid ?? "";
+    await prisma.systemSetting.upsert({ where: { key: "epay_pid" }, create: { key: "epay_pid", value: val }, update: { value: val } });
+  }
+  if (updates.epayKey !== undefined) {
+    const val = updates.epayKey ?? "";
+    await prisma.systemSetting.upsert({ where: { key: "epay_key" }, create: { key: "epay_key", value: val }, update: { value: val } });
+  }
+  if (updates.epayApiUrl !== undefined) {
+    const val = updates.epayApiUrl ?? "";
+    await prisma.systemSetting.upsert({ where: { key: "epay_api_url" }, create: { key: "epay_api_url", value: val }, update: { value: val } });
+  }
+  if (updates.epayMethods !== undefined) {
+    const val = updates.epayMethods ?? "";
+    await prisma.systemSetting.upsert({ where: { key: "epay_methods" }, create: { key: "epay_methods", value: val }, update: { value: val } });
   }
   if (updates.groqApiKey !== undefined) {
     const val = updates.groqApiKey ?? "";
@@ -2432,7 +2452,7 @@ adminRouter.get("/analytics", async (_req, res) => {
 
   // ─── Доход по провайдерам ───
   const providerSeries = Object.entries(revenueByProvider).map(([provider, amount]) => ({
-    provider: provider === "balance" ? "Баланс" : provider === "platega" ? "Platega" : provider === "cryptopay" ? "Crypto Pay" : provider === "heleket" ? "Heleket" : provider,
+    provider: provider === "balance" ? "Баланс" : provider === "platega" ? "Platega" : provider === "cryptopay" ? "Crypto Pay" : provider === "heleket" ? "Heleket" : provider === "epay" ? "ePay" : provider,
     amount,
   }));
 

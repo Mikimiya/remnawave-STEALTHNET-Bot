@@ -1035,6 +1035,24 @@ export const api = {
     return request("/client/heleket/create-payment", { method: "POST", body: JSON.stringify(data), token });
   },
 
+  /** ePay (易支付) — 创建订单，返回支付链接 */
+  async epayCreatePayment(
+    token: string,
+    data: {
+      amount?: number;
+      currency?: string;
+      tariffId?: string;
+      proxyTariffId?: string;
+      singboxTariffId?: string;
+      promoCode?: string;
+      type?: string;
+      extraOption?: { kind: "traffic" | "devices" | "servers"; productId: string };
+      customBuild?: { days: number; devices: number; trafficGb?: number };
+    }
+  ): Promise<{ paymentId: string; payUrl: string }> {
+    return request("/client/epay/create-payment", { method: "POST", body: JSON.stringify(data), token });
+  },
+
   async clientActivateTrial(token: string): Promise<{ message: string; client: ClientProfile | null }> {
     return request("/client/trial", { method: "POST", token });
   },
@@ -1298,6 +1316,10 @@ export type UpdateSettingsPayload = {
   cryptopayTestnet?: boolean;
   heleketMerchantId?: string | null;
   heleketApiKey?: string | null;
+  epayPid?: string | null;
+  epayKey?: string | null;
+  epayApiUrl?: string | null;
+  epayMethods?: string | null;
   groqApiKey?: string | null;
   groqModel?: string | null;
   groqFallback1?: string | null;
@@ -1536,6 +1558,10 @@ export interface AdminSettings {
   cryptopayTestnet?: boolean;
   heleketMerchantId?: string | null;
   heleketApiKey?: string | null;
+  epayPid?: string | null;
+  epayKey?: string | null;
+  epayApiUrl?: string | null;
+  epayMethods?: { type: string; enabled: boolean; label: string }[] | null;
   groqApiKey?: string | null;
   groqModel?: string | null;
   groqFallback1?: string | null;
@@ -2202,6 +2228,8 @@ export interface PublicConfig {
   yookassaEnabled?: boolean;
   cryptopayEnabled?: boolean;
   heleketEnabled?: boolean;
+  epayEnabled?: boolean;
+  epayMethods?: { type: string; label: string }[];
   trialEnabled?: boolean;
   trialDays?: number;
   themeAccent?: string;

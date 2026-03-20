@@ -70,6 +70,7 @@ const SYSTEM_CONFIG_KEYS = [
   "yookassa_shop_id", "yookassa_secret_key",
   "cryptopay_api_token", "cryptopay_testnet",
   "heleket_merchant_id", "heleket_api_key",
+  "epay_pid", "epay_key", "epay_api_url", "epay_methods",
   "groq_api_key", "groq_model", "groq_fallback_1", "groq_fallback_2", "groq_fallback_3", "ai_system_prompt",
   "bot_buttons", "bot_buttons_per_row", "bot_back_label", "bot_menu_texts", "bot_menu_line_visibility", "bot_inner_button_styles",
   "bot_menu_texts_en", "bot_menu_texts_zh", "bot_menu_texts_ru", // 多语言菜单文本覆盖：key格式 bot_menu_texts_[lang]
@@ -483,6 +484,10 @@ export async function getSystemConfig() {
     cryptopayTestnet: map.cryptopay_testnet === "true" || map.cryptopay_testnet === "1",
     heleketMerchantId: (map.heleket_merchant_id ?? "").trim() || null,
     heleketApiKey: (map.heleket_api_key ?? "").trim() || null,
+    epayPid: (map.epay_pid ?? "").trim() || null,
+    epayKey: (map.epay_key ?? "").trim() || null,
+    epayApiUrl: (map.epay_api_url ?? "").trim() || null,
+    epayMethods: parseEpayMethods(map.epay_methods),
     groqApiKey: (map.groq_api_key ?? "").trim() || null,
     groqModel: (map.groq_model ?? "").trim() || "llama3-8b-8192",
     groqFallback1: (map.groq_fallback_1 ?? "").trim() || null,
@@ -698,6 +703,31 @@ function parsePlategaMethods(raw: string | undefined): PlategaMethodConfig[] {
   }
 }
 
+export type EpayMethodConfig = { type: string; enabled: boolean; label: string };
+const DEFAULT_EPAY_METHODS: EpayMethodConfig[] = [
+  { type: "alipay", enabled: true, label: "支付宝" },
+  { type: "wxpay", enabled: true, label: "微信支付" },
+  { type: "usdt", enabled: false, label: "USDT" },
+];
+
+function parseEpayMethods(raw: string | undefined): EpayMethodConfig[] {
+  if (!raw || !raw.trim()) return DEFAULT_EPAY_METHODS;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return DEFAULT_EPAY_METHODS;
+    return parsed.map((m: unknown) => {
+      const x = m as Record<string, unknown>;
+      return {
+        type: typeof x.type === "string" ? x.type : "alipay",
+        enabled: Boolean(x.enabled),
+        label: typeof x.label === "string" ? x.label : String(x.type),
+      };
+    });
+  } catch {
+    return DEFAULT_EPAY_METHODS;
+  }
+}
+
 function parseSellOptionTrafficProducts(raw: string | undefined): SellOptionTrafficProduct[] {
   if (!raw?.trim()) return [];
   try {
@@ -884,6 +914,10 @@ export async function getPublicConfig() {
     yookassaEnabled: Boolean(full.yookassaShopId?.trim() && full.yookassaSecretKey?.trim()),
     cryptopayEnabled: Boolean((full as { cryptopayApiToken?: string | null }).cryptopayApiToken?.trim()),
     heleketEnabled: Boolean((full as { heleketMerchantId?: string | null }).heleketMerchantId?.trim() && (full as { heleketApiKey?: string | null }).heleketApiKey?.trim()),
+    epayEnabled: Boolean((full as { epayPid?: string | null }).epayPid?.trim() && (full as { epayKey?: string | null }).epayKey?.trim()),
+    epayMethods: Boolean((full as { epayPid?: string | null }).epayPid?.trim() && (full as { epayKey?: string | null }).epayKey?.trim())
+      ? (full as { epayMethods: EpayMethodConfig[] }).epayMethods.filter((m) => m.enabled).map((m) => ({ type: m.type, label: m.label }))
+      : [],
     skipEmailVerification: full.skipEmailVerification ?? false,
     useRemnaSubscriptionPage: full.useRemnaSubscriptionPage ?? false,
     aiChatEnabled: full.aiChatEnabled ?? true,

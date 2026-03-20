@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LogIn, Shield, AlertCircle } from "lucide-react";
+import { LogIn, AlertCircle } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
 import type { PublicConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthShell } from "@/components/auth-shell";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
@@ -29,10 +29,7 @@ export function ClientLoginPage() {
   const [emailError, setEmailError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [brand, setBrand] = useState<{ serviceName: string; logo: string | null }>({
-    serviceName: "",
-    logo: null,
-  });
+  const [brand, setBrand] = useState<{ serviceName: string; logo: string | null }>({ serviceName: "", logo: null });
   const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null);
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
@@ -66,7 +63,6 @@ export function ClientLoginPage() {
     return !emailErr;
   }
 
-  // Сохраняем UTM из URL для последующей регистрации (если пользователь перейдёт на /cabinet/register)
   useEffect(() => {
     const keys = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
     const utm: Record<string, string> = {};
@@ -77,24 +73,19 @@ export function ClientLoginPage() {
     if (Object.keys(utm).length > 0) {
       try {
         localStorage.setItem("stealthnet_utm", JSON.stringify(utm));
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
   }, [searchParams]);
 
   useEffect(() => {
-    api
-      .getPublicConfig()
-      .then((c: PublicConfig) => {
-        setBrand({ serviceName: c.serviceName ?? "", logo: c.logo ?? null });
-        setTelegramBotUsername(c.telegramBotUsername ?? null);
-        setGoogleEnabled(!!c.googleLoginEnabled);
-        setGoogleClientId(c.googleClientId ?? null);
-        setPublicAppUrl(c.publicAppUrl ?? null);
-        setAppleEnabled(!!c.appleLoginEnabled);
-      })
-      .catch(() => {});
+    api.getPublicConfig().then((c: PublicConfig) => {
+      setBrand({ serviceName: c.serviceName ?? "", logo: c.logo ?? null });
+      setTelegramBotUsername(c.telegramBotUsername ?? null);
+      setGoogleEnabled(!!c.googleLoginEnabled);
+      setGoogleClientId(c.googleClientId ?? null);
+      setPublicAppUrl(c.publicAppUrl ?? null);
+      setAppleEnabled(!!c.appleLoginEnabled);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -107,10 +98,7 @@ export function ClientLoginPage() {
     script.setAttribute("data-onauth", "onTelegramLoginAuth(user)");
     script.async = true;
     (window as unknown as { onTelegramLoginAuth: (user: { id: number; username?: string }) => void }).onTelegramLoginAuth = (user) => {
-      registerByTelegram({
-        telegramId: String(user.id),
-        telegramUsername: user.username,
-      }).then(() => navigate("/cabinet/dashboard", { replace: true }));
+      registerByTelegram({ telegramId: String(user.id), telegramUsername: user.username }).then(() => navigate("/cabinet/dashboard", { replace: true }));
     };
     telegramWidgetRef.current.innerHTML = "";
     telegramWidgetRef.current.appendChild(script);
@@ -124,9 +112,7 @@ export function ClientLoginPage() {
     try {
       sessionStorage.setItem("stealthnet_google_oauth_state", state);
       sessionStorage.setItem("stealthnet_google_oauth_nonce", nonce);
-    } catch {
-      // ignore
-    }
+    } catch {}
     const baseUrl = (publicAppUrl ?? "").trim().replace(/\/$/, "") || window.location.origin;
     const redirectUri = baseUrl + "/cabinet/login";
     const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -151,16 +137,11 @@ export function ClientLoginPage() {
       if (saved !== state) return;
       sessionStorage.removeItem("stealthnet_google_oauth_state");
       sessionStorage.removeItem("stealthnet_google_oauth_nonce");
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     setLoading(true);
-    loginByGoogle(idToken)
-      .then(() => navigate("/cabinet/dashboard", { replace: true }))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error")))
-      .finally(() => setLoading(false));
-  }, [loginByGoogle, navigate]);
+    loginByGoogle(idToken).then(() => navigate("/cabinet/dashboard", { replace: true })).catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error"))).finally(() => setLoading(false));
+  }, [loginByGoogle, navigate, t]);
 
   const handleAppleLogin = useCallback(async () => {
     if (!appleEnabled) return;
@@ -185,7 +166,7 @@ export function ClientLoginPage() {
       setError(err instanceof Error ? err.message : t("common.error"));
       setLoading(false);
     }
-  }, [appleEnabled]);
+  }, [appleEnabled, t]);
 
   useEffect(() => {
     const hash = window.location.hash?.replace("#", "") || "";
@@ -196,20 +177,13 @@ export function ClientLoginPage() {
     if (!idToken) return;
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     setLoading(true);
-    loginByApple(idToken)
-      .then(() => navigate("/cabinet/dashboard", { replace: true }))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error")))
-      .finally(() => setLoading(false));
-  }, [loginByApple, navigate]);
+    loginByApple(idToken).then(() => navigate("/cabinet/dashboard", { replace: true })).catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error"))).finally(() => setLoading(false));
+  }, [loginByApple, navigate, t]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    
-    if (!validateAll()) {
-      return;
-    }
-    
+    if (!validateAll()) return;
     setLoading(true);
     try {
       await login(email, password);
@@ -222,127 +196,38 @@ export function ClientLoginPage() {
   }
 
   return (
-    <div className="min-h-svh flex flex-col items-center justify-center bg-transparent p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="w-full max-w-md"
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }}>
+      <AuthShell
+        brand={brand}
+        icon={LogIn}
+        eyebrow="secure login"
+        title={t("auth.loginTitle")}
+        subtitle={t("auth.loginSubtitle")}
+        sideTitle={brand.serviceName ? `${brand.serviceName} — private access without friction.` : "Private access without friction."}
+        sideDescription="Use one clean sign-in flow for your cabinet, payments, subscriptions, and support. Fast to enter, easy to trust, and comfortable on mobile."
+        sidePoints={[
+          "One-click access to your plans, balance, and connection links",
+          "Google, Apple, Telegram, and classic email sign-in in one place",
+          "Designed for calm, premium onboarding on phones and desktops",
+        ]}
+        footer={<>{t("auth.noAccount")} <Link to="/cabinet/register" className="font-medium text-primary transition-colors hover:text-primary/80 hover:underline">{t("auth.register")}</Link></>}
       >
-        <div className="flex items-center justify-center gap-2 mb-6 min-h-[2.5rem]">
-          {brand.logo ? (
-            <span className="flex items-center justify-center h-11 px-3 rounded-xl dark:bg-transparent bg-zinc-900">
-              <img src={brand.logo} alt="" className="h-8 max-w-[140px] object-contain" />
-            </span>
-          ) : (
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shrink-0">
-              <Shield className="h-6 w-6" />
-            </span>
-          )}
-          {brand.serviceName ? <span className="font-semibold text-xl">{brand.serviceName}</span> : null}
-        </div>
-        <Card className="border shadow-lg">
-          <CardHeader className="space-y-1 text-center">
-            <div className="flex justify-center mb-2">
-              <div className="rounded-lg bg-primary/10 p-3">
-                <LogIn className="h-10 w-10 text-primary" />
-              </div>
-            </div>
-            <CardTitle className="text-2xl">{t("auth.loginTitle")}</CardTitle>
-            <p className="text-muted-foreground text-sm">{t("auth.loginSubtitle")}</p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Скрытое поле: iOS/Safari реже выводит панель автозаполнения на каждый символ */}
-              <input type="text" name="prevent_autofill" autoComplete="off" tabIndex={-1} className="absolute opacity-0 pointer-events-none h-0 w-0 overflow-hidden" aria-hidden />
-              {error && (
-                <div className="rounded-xl border border-destructive/40 dark:border-red-500/40 bg-destructive/10 dark:bg-red-500/10 px-4 py-3 text-sm text-destructive dark:text-red-400 flex items-start gap-2.5 animate-in fade-in duration-200">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{error}</span>
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">{t("auth.email")}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  name="login_email"
-                  placeholder={t("auth.enterEmail")}
-                  value={email}
-                  onChange={handleEmailChange}
-                  onBlur={handleEmailBlur}
-                  required
-                  autoComplete="username"
-                  className={emailError ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {emailError && <p className="text-xs text-destructive dark:text-red-400">{emailError}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">{t("auth.password")}</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  name="login_password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? t("auth.loginLoading") : t("auth.login")}
-              </Button>
-              {(telegramBotUsername || googleEnabled || appleEnabled) && (
-                <div className="space-y-3">
-                  <div className="relative flex items-center gap-2">
-                    <div className="flex-1 border-t border-border" />
-                    <span className="text-xs text-muted-foreground px-2">{t("common.or")}</span>
-                    <div className="flex-1 border-t border-border" />
-                  </div>
-                  {googleEnabled && googleClientId && (
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleGoogleLogin}
-                        disabled={loading}
-                        title={t("auth.loginViaGoogle")}
-                        className={cn(
-                          "h-11 w-11 shrink-0 rounded-full flex items-center justify-center",
-                          "border border-border bg-muted/50 hover:bg-muted transition-colors",
-                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        )}
-                      >
-                        <GoogleIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  )}
-                  {appleEnabled && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full h-11 gap-2"
-                      onClick={handleAppleLogin}
-                      disabled={loading}
-                    >
-                      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                      {t("auth.loginViaApple")}
-                    </Button>
-                  )}
-                  {telegramBotUsername && (
-                    <div ref={telegramWidgetRef} className="flex justify-center min-h-[44px]" />
-                  )}
-                </div>
-              )}
-              <p className="text-center text-sm text-muted-foreground">
-                {t("auth.noAccount")}{" "}
-                <Link to="/cabinet/register" className="text-primary hover:underline">
-                  {t("auth.register")}
-                </Link>
-              </p>
-            </form>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <input type="text" name="prevent_autofill" autoComplete="off" tabIndex={-1} className="absolute h-0 w-0 overflow-hidden opacity-0 pointer-events-none" aria-hidden />
+          {error && <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span></div>}
+          <div className="space-y-2.5">
+            <Label htmlFor="email" className="text-sm font-medium">{t("auth.email")}</Label>
+            <Input id="email" type="email" name="login_email" placeholder={t("auth.enterEmail")} value={email} onChange={handleEmailChange} onBlur={handleEmailBlur} required autoComplete="username" className={cn("h-12 rounded-2xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5", emailError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40")} />
+            {emailError && <p className="px-1 text-xs text-destructive dark:text-red-400">{emailError}</p>}
+          </div>
+          <div className="space-y-2.5">
+            <Label htmlFor="password" className="text-sm font-medium">{t("auth.password")}</Label>
+            <Input id="password" type="password" name="login_password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" className="h-12 rounded-2xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 focus-visible:ring-primary/40 dark:bg-white/5" />
+          </div>
+          <Button type="submit" className="h-12 w-full rounded-2xl text-sm font-semibold shadow-lg shadow-primary/20 transition-transform hover:scale-[1.01]" disabled={loading}>{loading ? t("auth.loginLoading") : t("auth.login")}</Button>
+          {(telegramBotUsername || googleEnabled || appleEnabled) && <div className="space-y-4"><div className="relative flex items-center gap-3"><div className="h-px flex-1 bg-border/70" /><span className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground">{t("common.or")}</span><div className="h-px flex-1 bg-border/70" /></div><div className="grid gap-3">{googleEnabled && googleClientId && <button type="button" onClick={handleGoogleLogin} disabled={loading} title={t("auth.loginViaGoogle")} className={cn("flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/50 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10", "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2")}><GoogleIcon className="h-5 w-5" />{t("auth.loginViaGoogle")}</button>}{appleEnabled && <Button type="button" variant="outline" className="h-12 w-full rounded-2xl gap-3 border-white/10 bg-white/50 text-sm font-medium shadow-sm backdrop-blur hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10" onClick={handleAppleLogin} disabled={loading}><svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>{t("auth.loginViaApple")}</Button>}{telegramBotUsername && <div className="rounded-2xl border border-white/10 bg-white/35 px-3 py-3 shadow-sm backdrop-blur dark:bg-white/5"><div ref={telegramWidgetRef} className="flex min-h-[44px] justify-center" /></div>}</div></div>}
+        </form>
+      </AuthShell>
+    </motion.div>
   );
 }

@@ -17,7 +17,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
-import { cn } from "@/lib/utils";
+import { cn, formatMoney, translateBackendMessage, translatePlategaLabel } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
 type ProxyTariff = { id: string; name: string; description?: string; proxyCount: number; durationDays: number; price: number; currency: string };
@@ -34,15 +34,6 @@ type ProxySlot = {
   trafficUsedBytes: string;
   connectionLimit: number | null;
 };
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: currency.toUpperCase() === "USD" ? "USD" : currency.toUpperCase() === "RUB" ? "RUB" : "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
 
 function formatBytes(bytes: string | null): string {
   if (!bytes) return "—";
@@ -81,6 +72,7 @@ export function ClientProxyPage() {
   const [yookassaEnabled, setYookassaEnabled] = useState(false);
   const [cryptopayEnabled, setCryptopayEnabled] = useState(false);
   const [heleketEnabled, setHeleketEnabled] = useState(false);
+  const [epayMethods, setEpayMethods] = useState<{ type: string; label: string }[]>([]);
   const [payModal, setPayModal] = useState<ProxyTariff | null>(null);
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
@@ -104,6 +96,7 @@ export function ClientProxyPage() {
       setYookassaEnabled(Boolean(c.yookassaEnabled));
       setCryptopayEnabled(Boolean(c.cryptopayEnabled));
       setHeleketEnabled(Boolean(c.heleketEnabled));
+      setEpayMethods(c.epayMethods ?? []);
     }).catch(() => { });
   }, []);
 
@@ -143,7 +136,7 @@ export function ClientProxyPage() {
       const r = await api.getProxySlots(token);
       setSlots(r.slots ?? []);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.paymentFailed"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientProxy.errors.paymentFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -162,7 +155,7 @@ export function ClientProxyPage() {
       setPayModal(null);
       if (res.paymentUrl) openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -181,7 +174,7 @@ export function ClientProxyPage() {
       setPayModal(null);
       if (res.confirmationUrl) openPaymentInBrowser(res.confirmationUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -200,7 +193,7 @@ export function ClientProxyPage() {
       setPayModal(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -219,7 +212,27 @@ export function ClientProxyPage() {
       setPayModal(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientProxy.errors.generic"));
+    } finally {
+      setPayLoading(false);
+    }
+  }
+
+  async function startEpayPayment(tariff: ProxyTariff, epayType: string) {
+    if (!token) return;
+    setPayError(null);
+    setPayLoading(true);
+    try {
+      const res = await api.epayCreatePayment(token, {
+        amount: tariff.price,
+        currency: tariff.currency,
+        proxyTariffId: tariff.id,
+        type: epayType,
+      });
+      setPayModal(null);
+      if (res.payUrl) openPaymentInBrowser(res.payUrl);
+    } catch (e) {
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -240,7 +253,7 @@ export function ClientProxyPage() {
       setPayModal(null);
       openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientProxy.errors.generic"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientProxy.errors.generic"));
     } finally {
       setPayLoading(false);
     }
@@ -392,6 +405,33 @@ export function ClientProxyPage() {
               </Button>
             )}
 
+            {epayMethods.map((m) => (
+              <Button
+                key={m.type}
+                size="lg"
+                variant="outline"
+                onClick={() => startEpayPayment(payModal, m.type)}
+                disabled={payLoading}
+                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
+              >
+                {isMobileOrMiniapp ? (
+                  <>
+                    <div className="p-2 rounded-xl bg-blue-500/10">
+                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-500" /> : <CreditCard className="h-6 w-6 text-blue-500" />}
+                    </div>
+                    <span className="text-base font-bold">{m.label}</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="absolute left-6 p-1.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> : <CreditCard className="h-5 w-5 text-blue-500" />}
+                    </div>
+                    <span className="text-base font-medium">💳 {m.label}</span>
+                  </>
+                )}
+              </Button>
+            ))}
+
             {yookassaEnabled && payModal.currency.toUpperCase() === "RUB" && (
               <Button
                 size="lg"
@@ -458,14 +498,14 @@ export function ClientProxyPage() {
                     <div className="p-2 rounded-xl bg-green-500/10">
                       {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
                     </div>
-                    <span className="text-base font-bold">{m.label}</span>
+                    <span className="text-base font-bold">{translatePlategaLabel(m, t)}</span>
                   </>
                 ) : (
                   <>
                     <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                       {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
                     </div>
-                    <span className="text-base font-medium">💳 {m.label}</span>
+                    <span className="text-base font-medium">💳 {translatePlategaLabel(m, t)}</span>
                   </>
                 )}
               </Button>

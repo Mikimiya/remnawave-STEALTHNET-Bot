@@ -30,6 +30,7 @@ import type { ClientPayment, ClientReferralStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTranslation } from "react-i18next";
+import { formatMoney } from "@/lib/utils";
 
 function formatDate(s: string | null, lang?: string) {
   if (!s) return "—";
@@ -43,15 +44,6 @@ function formatDate(s: string | null, lang?: string) {
   } catch {
     return s;
   }
-}
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: currency.toUpperCase() === "USD" ? "USD" : currency.toUpperCase() === "RUB" ? "RUB" : "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 function formatBytes(bytes: number, lang?: string) {

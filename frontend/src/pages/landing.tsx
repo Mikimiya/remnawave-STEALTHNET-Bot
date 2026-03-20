@@ -269,6 +269,11 @@ function getPaymentLabels(config: PublicConfig): string[] {
   if (config.yoomoneyEnabled) labels.add("yumoney");
   if (config.cryptopayEnabled) labels.add("crypto");
   if (config.heleketEnabled) labels.add("Heleket");
+  if (config.epayMethods?.length) {
+    for (const method of config.epayMethods) {
+      labels.add(method.label);
+    }
+  }
 
   return Array.from(labels).slice(0, 4);
 }

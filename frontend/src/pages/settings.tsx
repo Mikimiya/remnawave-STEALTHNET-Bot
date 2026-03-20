@@ -16,16 +16,10 @@ import { ACCENT_PALETTES } from "@/contexts/theme";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useTranslation } from "react-i18next";
+import { translatePlategaLabel } from "@/lib/utils";
 
 const ALLOWED_LANGS = ["ru", "en", "zh"];
 const ALLOWED_CURRENCIES = ["usd", "rub", "cny"];
-
-const DEFAULT_PLATEGA_METHODS: { id: number; enabled: boolean; label: string }[] = [
-  { id: 2, enabled: true, label: "spb" },
-  { id: 11, enabled: false, label: "cards" },
-  { id: 12, enabled: false, label: "international" },
-  { id: 13, enabled: false, label: "crypto" },
-];
 
 type BotButtonItem = { id: string; visible: boolean; label: string; order: number; style?: string; emojiKey?: string; onePerRow?: boolean };
 
@@ -94,6 +88,11 @@ export function SettingsPage() {
     { id: 11, enabled: false, label: t("admin.settings.defaults.platega.cards") },
     { id: 12, enabled: false, label: t("admin.settings.defaults.platega.international") },
     { id: 13, enabled: false, label: t("admin.settings.defaults.platega.crypto") },
+  ];
+  const defaultEpayMethods: { type: string; enabled: boolean; label: string }[] = [
+    { type: "alipay", enabled: true, label: t("admin.settings.defaults.epay.alipay") },
+    { type: "wxpay", enabled: true, label: t("admin.settings.defaults.epay.wxpay") },
+    { type: "usdt", enabled: false, label: t("admin.settings.defaults.epay.usdt") },
   ];
   const defaultBotButtons: BotButtonItem[] = [
     { id: "tariffs", visible: true, label: t("admin.settings.defaults.botButtons.tariffs"), order: 0, style: "success", emojiKey: "PACKAGE" },
@@ -233,7 +232,13 @@ export function SettingsPage() {
         defaultReferralPercent: data.defaultReferralPercent ?? 30,
         referralPercentLevel2: (data as AdminSettings).referralPercentLevel2 ?? 10,
         referralPercentLevel3: (data as AdminSettings).referralPercentLevel3 ?? 10,
-        plategaMethods: (data as AdminSettings).plategaMethods ?? defaultPlategaMethods,
+        plategaMethods: ((data as AdminSettings).plategaMethods ?? defaultPlategaMethods).map((m) => ({
+          ...m,
+          label: translatePlategaLabel(m, t),
+        })),
+        epayMethods: ((data as AdminSettings).epayMethods ?? defaultEpayMethods).map((m) => ({
+          ...m,
+        })),
         botButtons: (() => {
           const raw = (data as AdminSettings).botButtons;
           const loaded = Array.isArray(raw) ? raw : [];
@@ -547,6 +552,10 @@ export function SettingsPage() {
         cryptopayTestnet: settings.cryptopayTestnet ?? false,
         heleketMerchantId: settings.heleketMerchantId ?? null,
         heleketApiKey: settings.heleketApiKey && settings.heleketApiKey !== "********" ? settings.heleketApiKey : undefined,
+        epayPid: settings.epayPid ?? null,
+        epayKey: settings.epayKey && settings.epayKey !== "********" ? settings.epayKey : undefined,
+        epayApiUrl: settings.epayApiUrl ?? null,
+        epayMethods: settings.epayMethods != null ? JSON.stringify(settings.epayMethods) : undefined,
         groqApiKey: settings.groqApiKey && settings.groqApiKey !== "********" ? settings.groqApiKey : undefined,
         groqModel: settings.groqModel ?? undefined,
         groqFallback1: settings.groqFallback1 ?? undefined,
@@ -1961,7 +1970,7 @@ export function SettingsPage() {
                                   s
                                     ? {
                                         ...s,
-                                        plategaMethods: (s.plategaMethods ?? DEFAULT_PLATEGA_METHODS).map((x) =>
+                                        plategaMethods: (s.plategaMethods ?? defaultPlategaMethods).map((x) =>
                                           x.id === m.id ? { ...x, label: e.target.value } : x
                                         ),
                                       }
@@ -2314,6 +2323,141 @@ export function SettingsPage() {
                           placeholder={t("admin.settings.payments.heleket.apiKeyPlaceholder")}
                         />
                         <p className="text-xs text-muted-foreground">{t("admin.settings.payments.heleket.apiKeyHint")}</p>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <Button type="submit" disabled={saving} className="min-w-[140px]">
+                        {saving ? t("admin.saving") : t("admin.save")}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+
+            {/* ePay (易支付) */}
+            <Card>
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <button type="button" className="group flex w-full text-left">
+                    <CardHeader className="pointer-events-none [&_.chevron]:transition-transform [&_.chevron]:duration-200 group-data-[state=open]:[&_.chevron]:rotate-180">
+                      <div className="flex items-center justify-between pr-2">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-5 w-5 text-primary" />
+                          <CardTitle>ePay</CardTitle>
+                          <span className="text-xs font-normal text-muted-foreground">{t("admin.settings.payments.epay.expand")}</span>
+                        </div>
+                        <ChevronDown className="chevron h-5 w-5 shrink-0 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {t("admin.settings.payments.epay.hint")}
+                      </p>
+                    </CardHeader>
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4 border-t pt-4">
+                    <div className="space-y-2">
+                      <Label>{t("admin.settings.payments.epay.webhookLabel")}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={(settings.publicAppUrl ?? "").replace(/\/$/, "") ? `${(settings.publicAppUrl ?? "").replace(/\/$/, "")}/api/webhooks/epay` : t("admin.settings.payments.common.setAppUrl")}
+                          className="font-mono text-sm bg-muted/50"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={async () => {
+                            const url = (settings.publicAppUrl ?? "").replace(/\/$/, "") ? `${(settings.publicAppUrl ?? "").replace(/\/$/, "")}/api/webhooks/epay` : "";
+                            if (url && navigator.clipboard) {
+                              await navigator.clipboard.writeText(url);
+                            }
+                          }}
+                          disabled={!(settings.publicAppUrl ?? "").trim()}
+                          title={t("admin.copy")}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{t("admin.settings.payments.epay.webhookHint")}</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t("admin.settings.payments.epay.pid")}</Label>
+                        <Input
+                          value={settings.epayPid ?? ""}
+                          onChange={(e) => setSettings((s) => (s ? { ...s, epayPid: e.target.value || null } : s))}
+                          placeholder="1001"
+                        />
+                        <p className="text-xs text-muted-foreground">{t("admin.settings.payments.epay.pidHint")}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t("admin.settings.payments.epay.key")}</Label>
+                        <Input
+                          type="password"
+                          value={settings.epayKey ?? ""}
+                          onChange={(e) => setSettings((s) => (s ? { ...s, epayKey: e.target.value || null } : s))}
+                          placeholder={t("admin.settings.payments.epay.keyPlaceholder")}
+                        />
+                        <p className="text-xs text-muted-foreground">{t("admin.settings.payments.epay.keyHint")}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t("admin.settings.payments.epay.apiUrl")}</Label>
+                        <Input
+                          value={settings.epayApiUrl ?? ""}
+                          onChange={(e) => setSettings((s) => (s ? { ...s, epayApiUrl: e.target.value || null } : s))}
+                          placeholder="https://motionpay.net"
+                        />
+                        <p className="text-xs text-muted-foreground">{t("admin.settings.payments.epay.apiUrlHint")}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("admin.settings.payments.epay.methods")}</Label>
+                      <p className="text-xs text-muted-foreground">{t("admin.settings.payments.epay.methodsHint")}</p>
+                      <div className="rounded-md border divide-y">
+                        {(settings.epayMethods ?? defaultEpayMethods).map((m) => (
+                          <div key={m.type} className="flex items-center gap-4 p-3">
+                            <Switch
+                              id={`epay-method-${m.type}`}
+                              checked={m.enabled}
+                              onCheckedChange={(checked: boolean) =>
+                                setSettings((s) =>
+                                  s
+                                    ? {
+                                        ...s,
+                                        epayMethods: (s.epayMethods ?? defaultEpayMethods).map((x) =>
+                                          x.type === m.type ? { ...x, enabled: checked === true } : x
+                                        ),
+                                      }
+                                    : s
+                                )
+                              }
+                            />
+                            <Label htmlFor={`epay-method-${m.type}`} className="shrink-0 w-16 cursor-pointer font-mono text-xs">
+                              {m.type}
+                            </Label>
+                            <Input
+                              className="flex-1"
+                              value={m.label}
+                              onChange={(e) =>
+                                setSettings((s) =>
+                                  s
+                                    ? {
+                                        ...s,
+                                        epayMethods: (s.epayMethods ?? defaultEpayMethods).map((x) =>
+                                          x.type === m.type ? { ...x, label: e.target.value } : x
+                                        ),
+                                      }
+                                    : s
+                                )
+                              }
+                              placeholder={t("admin.settings.payments.epay.methodLabelPlaceholder")}
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
                     <div className="pt-2 border-t">

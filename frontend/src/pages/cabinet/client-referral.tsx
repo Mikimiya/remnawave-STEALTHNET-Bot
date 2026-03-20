@@ -7,14 +7,7 @@ import { api } from "@/lib/api";
 import type { ClientReferralStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
-function formatMoney(amount: number, currency: string = "usd") {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: currency.toUpperCase() === "USD" ? "USD" : currency.toUpperCase() === "RUB" ? "RUB" : "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+import { formatMoney } from "@/lib/utils";
 
 export function ClientReferralPage() {
   const { state } = useClientAuth();

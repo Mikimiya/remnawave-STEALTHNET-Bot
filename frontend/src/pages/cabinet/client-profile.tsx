@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
-import { cn } from "@/lib/utils";
+import { cn, formatMoney, translateBackendMessage, translatePlategaLabel } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { ClientPayment } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -19,15 +19,6 @@ function formatDate(s: string | null, lang?: string) {
   } catch {
     return s;
   }
-}
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: currency.toUpperCase() === "USD" ? "USD" : currency.toUpperCase() === "RUB" ? "RUB" : "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 function formatPaymentStatus(status: string, tFn: (key: string) => string): string {
@@ -48,6 +39,7 @@ export function ClientProfilePage() {
   const [yookassaEnabled, setYookassaEnabled] = useState(false);
   const [cryptopayEnabled, setCryptopayEnabled] = useState(false);
   const [heleketEnabled, setHeleketEnabled] = useState(false);
+  const [epayMethods, setEpayMethods] = useState<{ type: string; label: string }[]>([]);
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const [publicAppUrl, setPublicAppUrl] = useState<string | null>(null);
@@ -141,7 +133,7 @@ export function ClientProfilePage() {
       const data = await api.client2FASetup(token);
       setTwoFaSetupData(data);
     } catch (e) {
-      setTwoFaError(e instanceof Error ? e.message : t("profile.twoFaSetupError"));
+      setTwoFaError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.twoFaSetupError"));
     } finally {
       setTwoFaLoading(false);
     }
@@ -165,7 +157,7 @@ export function ClientProfilePage() {
       refreshProfile();
       closeTwoFaEnable();
     } catch (e) {
-      setTwoFaError(e instanceof Error ? e.message : t("profile.twoFaInvalidCode"));
+      setTwoFaError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.twoFaInvalidCode"));
     } finally {
       setTwoFaLoading(false);
     }
@@ -188,7 +180,7 @@ export function ClientProfilePage() {
       setTwoFaDisableOpen(false);
       setTwoFaCode("");
     } catch (e) {
-      setTwoFaError(e instanceof Error ? e.message : t("profile.twoFaInvalidCode"));
+      setTwoFaError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.twoFaInvalidCode"));
     } finally {
       setTwoFaLoading(false);
     }
@@ -224,7 +216,7 @@ export function ClientProfilePage() {
         setChangePasswordSuccess(false);
       }, 2000);
     } catch (e) {
-      setChangePasswordError(e instanceof Error ? e.message : t("profile.changePasswordError"));
+      setChangePasswordError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.changePasswordError"));
     } finally {
       setChangePasswordLoading(false);
     }
@@ -246,6 +238,7 @@ export function ClientProfilePage() {
       setYookassaEnabled(Boolean(c.yookassaEnabled));
       setCryptopayEnabled(Boolean(c.cryptopayEnabled));
       setHeleketEnabled(Boolean(c.heleketEnabled));
+      setEpayMethods(c.epayMethods ?? []);
       setPublicAppUrl(c.publicAppUrl ?? null);
       setTelegramBotUsername(c.telegramBotUsername ?? null);
     }).catch(() => { });
@@ -278,7 +271,7 @@ export function ClientProfilePage() {
       setTopUpModalOpen(false);
       openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
+      setTopUpError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -304,7 +297,7 @@ export function ClientProfilePage() {
         openPaymentInBrowser(yoomoneyUrl);
       }
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
+      setTopUpError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -324,7 +317,7 @@ export function ClientProfilePage() {
       setTopUpModalOpen(false);
       if (res.confirmationUrl) openPaymentInBrowser(res.confirmationUrl);
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
+      setTopUpError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -344,7 +337,7 @@ export function ClientProfilePage() {
       setTopUpModalOpen(false);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
+      setTopUpError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -364,7 +357,27 @@ export function ClientProfilePage() {
       setTopUpModalOpen(false);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setTopUpError(e instanceof Error ? e.message : t("profile.paymentError"));
+      setTopUpError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.paymentError"));
+    } finally {
+      setTopUpLoading(false);
+    }
+  }
+
+  async function startTopUpEpay(epayType: string) {
+    if (!token || !client) return;
+    const amount = Number(topUpAmount?.replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setTopUpError(t("profile.enterAmount"));
+      return;
+    }
+    setTopUpError(null);
+    setTopUpLoading(true);
+    try {
+      const res = await api.epayCreatePayment(token, { amount, currency, type: epayType });
+      setTopUpModalOpen(false);
+      if (res.payUrl) openPaymentInBrowser(res.payUrl);
+    } catch (e) {
+      setTopUpError(e instanceof Error ? translateBackendMessage(e.message, t) : t("profile.paymentError"));
     } finally {
       setTopUpLoading(false);
     }
@@ -768,7 +781,7 @@ export function ClientProfilePage() {
         transition={{ duration: 0.3, delay: 0.1 }}
         className={`grid gap-6 ${isMiniapp ? "grid-cols-1" : "lg:grid-cols-2"} min-w-0`}
       >
-        {(plategaMethods.length > 0 || yoomoneyEnabled || yookassaEnabled || cryptopayEnabled || heleketEnabled) && (
+        {(plategaMethods.length > 0 || yoomoneyEnabled || yookassaEnabled || cryptopayEnabled || heleketEnabled || epayMethods.length > 0) && (
           <div id="topup" className="relative flex flex-col rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_rgba(0,0,0,0.3)]">
             <div className="absolute inset-0 overflow-hidden rounded-[2rem] border border-white/10 dark:border-white/5 bg-background/40 backdrop-blur-2xl">
               <div className="absolute -top-32 -left-32 h-64 w-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
@@ -1022,6 +1035,21 @@ export function ClientProfilePage() {
                 <span className="text-base font-medium">Heleket</span>
               </Button>
             )}
+            {epayMethods.map((m) => (
+              <Button
+                key={m.type}
+                size="lg"
+                variant="outline"
+                className="w-full gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative"
+                disabled={topUpLoading}
+                onClick={() => startTopUpEpay(m.type)}
+              >
+                <div className="absolute left-6 p-1.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+                  {topUpLoading ? <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> : <CreditCard className="h-5 w-5 text-blue-500" />}
+                </div>
+                <span className="text-base font-medium">💳 {m.label}</span>
+              </Button>
+            ))}
             {yookassaEnabled && (
               <Button
                 size="lg"
@@ -1062,7 +1090,7 @@ export function ClientProfilePage() {
                 <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                   {topUpLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
                 </div>
-                <span className="text-base font-medium">{m.label}</span>
+                <span className="text-base font-medium">{translatePlategaLabel(m, t)}</span>
               </Button>
             ))}
           </div>

@@ -36,6 +36,7 @@ import { getAuthUrl, exchangeCodeForToken, requestPayment, processPayment } from
 import { createYookassaPayment } from "../yookassa/yookassa.service.js";
 import { createCryptopayInvoice, isCryptopayConfigured } from "../cryptopay/cryptopay.service.js";
 import { createHeleketInvoice, isHeleketConfigured } from "../heleket/heleket.service.js";
+import { createEpayPayment, isEpayConfigured } from "../epay/epay.service.js";
 
 /** Извлекает текущий expireAt из ответа Remna. Возвращает Date если в будущем, иначе null. */
 function extractCurrentExpireAt(data: unknown): Date | null {
@@ -1446,25 +1447,33 @@ clientRouter.get("/subscription", async (req, res) => {
   if (result.error) {
     return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, isTrial: false, message: result.error });
   }
-  const tariffInfo = await resolveTariffInfo(result.data ?? null);
-  let tariffDisplayName = tariffInfo.name;
-  let tariffCategoryName = tariffInfo.categoryName;
-  let isTrial = tariffInfo.isTrial;
-  // Если по Remna показывается «Триал» или «Тариф не выбран», но клиент оплачивал тариф — берём название из последней оплаты
-  if (tariffDisplayName === "Триал" || tariffDisplayName === "Тариф не выбран") {
-    const lastPaidTariff = await prisma.payment.findFirst({
-      where: { clientId: client.id, status: "PAID", tariffId: { not: null } },
-      orderBy: { paidAt: "desc" },
-      select: { tariff: { select: { name: true, category: { select: { name: true } } } } },
+
+  // 1) 优先从最后一次已支付的套餐付款记录中获取（精确，不受 UUID 一对多影响）
+  const lastPaidTariff = await prisma.payment.findFirst({
+    where: { clientId: client.id, status: "PAID", tariffId: { not: null } },
+    orderBy: { paidAt: "desc" },
+    select: { tariff: { select: { name: true, category: { select: { name: true } } } } },
+  });
+  const paidName = lastPaidTariff?.tariff?.name?.trim();
+
+  if (paidName) {
+    // 有付费记录 → 直接使用
+    return res.json({
+      subscription: result.data ?? null,
+      tariffDisplayName: paidName,
+      tariffCategoryName: lastPaidTariff?.tariff?.category?.name ?? null,
+      isTrial: false,
     });
-    const name = lastPaidTariff?.tariff?.name?.trim();
-    if (name) {
-      tariffDisplayName = name;
-      tariffCategoryName = lastPaidTariff?.tariff?.category?.name ?? null;
-      isTrial = false;
-    }
   }
-  return res.json({ subscription: result.data ?? null, tariffDisplayName, tariffCategoryName, isTrial });
+
+  // 2) 没有付费记录 → 回退到 UUID 匹配（仅用于判断试用等场景）
+  const tariffInfo = await resolveTariffInfo(result.data ?? null);
+  return res.json({
+    subscription: result.data ?? null,
+    tariffDisplayName: tariffInfo.name,
+    tariffCategoryName: tariffInfo.categoryName,
+    isTrial: tariffInfo.isTrial,
+  });
 });
 
 /** GET /api/client/devices — список устройств (HWID) пользователя в Remna */
@@ -2932,6 +2941,166 @@ clientRouter.post("/heleket/create-payment", async (req, res) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[heleket/create-payment]", message, err);
     return res.status(500).json({ message: message || "Ошибка создания платежа" });
+  }
+});
+
+/* ==================== ePay (易支付) ==================== */
+const epayCreatePaymentSchema = z.object({
+  amount: z.number().positive().optional(),
+  currency: z.string().min(1).max(10).optional(),
+  tariffId: z.string().min(1).optional(),
+  proxyTariffId: z.string().min(1).optional(),
+  singboxTariffId: z.string().min(1).optional(),
+  promoCode: z.string().max(50).optional(),
+  type: z.string().max(20).optional(),
+  extraOption: z.object({
+    kind: z.enum(["traffic", "devices", "servers"]),
+    productId: z.string().min(1),
+  }).optional(),
+  customBuild: z.object({ days: z.number().int().min(1).max(360), devices: z.number().int().min(1).max(20), trafficGb: z.number().min(0).nullable().optional() }).optional(),
+});
+clientRouter.post("/epay/create-payment", async (req, res) => {
+  try {
+    const clientId = (req as unknown as { clientId: string }).clientId;
+    const parsed = epayCreatePaymentSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid params", errors: parsed.error.flatten() });
+    const config = await getSystemConfig();
+    const epayConfig = {
+      pid: (config as { epayPid?: string | null }).epayPid ?? "",
+      key: (config as { epayKey?: string | null }).epayKey ?? "",
+      apiUrl: (config as { epayApiUrl?: string | null }).epayApiUrl ?? "",
+    };
+    if (!isEpayConfigured(epayConfig)) return res.status(503).json({ message: "ePay not configured" });
+
+    const { amount: amountBody, currency: currencyBody, tariffId: tariffIdBody, proxyTariffId: proxyTariffIdBody, singboxTariffId: singboxTariffIdBody, promoCode: promoCodeStr, type: epayType, extraOption, customBuild: customBuildBody } = parsed.data;
+    let amountRounded: number;
+    let currencyUpper: string;
+    let tariffIdToStore: string | null = null;
+    let proxyTariffIdToStore: string | null = null;
+    let singboxTariffIdToStore: string | null = null;
+    let metadataObj: Record<string, unknown> = promoCodeStr ? { promoCode: promoCodeStr } : {};
+
+    if (customBuildBody) {
+      const cfg = getCustomBuildConfig(config);
+      if (!cfg) return res.status(400).json({ message: "Custom build disabled" });
+      let { days, devices, trafficGb } = customBuildBody;
+      if (days > cfg.maxDays || devices > cfg.maxDevices) {
+        return res.status(400).json({ message: `Days: 1–${cfg.maxDays}, devices: 1–${cfg.maxDevices}` });
+      }
+      const trafficLimitBytes =
+        cfg.trafficMode === "per_gb" && trafficGb != null && trafficGb >= 0
+          ? Math.round(trafficGb * 1024 ** 3)
+          : null;
+      amountRounded = days * cfg.pricePerDay + devices * cfg.pricePerDevice;
+      if (cfg.trafficMode === "per_gb" && trafficGb != null && trafficGb > 0) amountRounded += trafficGb * cfg.pricePerGb;
+      amountRounded = Math.round(amountRounded * 100) / 100;
+      currencyUpper = cfg.currency.toUpperCase();
+      metadataObj = {
+        customBuild: {
+          durationDays: days,
+          deviceLimit: devices,
+          trafficLimitBytes,
+          internalSquadUuids: [cfg.squadUuid],
+        },
+      };
+    } else if (extraOption) {
+      const cfg = config as { sellOptionsEnabled?: boolean; sellOptionsTrafficEnabled?: boolean; sellOptionsTrafficProducts?: SellOptionTrafficProduct[]; sellOptionsDevicesEnabled?: boolean; sellOptionsDevicesProducts?: SellOptionDeviceProduct[]; sellOptionsServersEnabled?: boolean; sellOptionsServersProducts?: SellOptionServerProduct[] };
+      if (!cfg.sellOptionsEnabled) return res.status(400).json({ message: "Options disabled" });
+      if (extraOption.kind === "traffic") {
+        const product = cfg.sellOptionsTrafficEnabled && cfg.sellOptionsTrafficProducts?.find((p) => p.id === extraOption.productId);
+        if (!product) return res.status(400).json({ message: "Option not found" });
+        amountRounded = Math.round(product.price * 100) / 100;
+        currencyUpper = product.currency.toUpperCase();
+        metadataObj = { extraOption: { kind: "traffic", trafficBytes: Math.round(product.trafficGb * 1024 ** 3) } };
+      } else if (extraOption.kind === "devices") {
+        const product = cfg.sellOptionsDevicesEnabled && cfg.sellOptionsDevicesProducts?.find((p) => p.id === extraOption.productId);
+        if (!product) return res.status(400).json({ message: "Option not found" });
+        amountRounded = Math.round(product.price * 100) / 100;
+        currencyUpper = product.currency.toUpperCase();
+        metadataObj = { extraOption: { kind: "devices", deviceCount: product.deviceCount } };
+      } else {
+        const product = cfg.sellOptionsServersEnabled && cfg.sellOptionsServersProducts?.find((p) => p.id === extraOption.productId);
+        if (!product) return res.status(400).json({ message: "Option not found" });
+        amountRounded = Math.round(product.price * 100) / 100;
+        currencyUpper = product.currency.toUpperCase();
+        metadataObj = { extraOption: { kind: "servers", squadUuid: product.squadUuid, ...((product.trafficGb ?? 0) > 0 && { trafficBytes: Math.round((product.trafficGb ?? 0) * 1024 ** 3) }) } };
+      }
+    } else {
+      currencyUpper = (currencyBody ?? "USD").toUpperCase();
+      if (tariffIdBody) {
+        const tariff = await prisma.tariff.findUnique({ where: { id: tariffIdBody } });
+        if (!tariff) return res.status(400).json({ message: "Tariff not found" });
+        tariffIdToStore = tariffIdBody;
+        amountRounded = Math.round((amountBody ?? tariff.price) * 100) / 100;
+      } else if (proxyTariffIdBody) {
+        const proxyTariff = await prisma.proxyTariff.findUnique({ where: { id: proxyTariffIdBody } });
+        if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: "Proxy tariff not found" });
+        proxyTariffIdToStore = proxyTariffIdBody;
+        amountRounded = Math.round((amountBody ?? proxyTariff.price) * 100) / 100;
+      } else if (singboxTariffIdBody) {
+        const singboxTariff = await prisma.singboxTariff.findUnique({ where: { id: singboxTariffIdBody } });
+        if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: "Singbox tariff not found" });
+        singboxTariffIdToStore = singboxTariffIdBody;
+        amountRounded = Math.round((amountBody ?? singboxTariff.price) * 100) / 100;
+      } else {
+        if (amountBody == null) return res.status(400).json({ message: "Amount required" });
+        amountRounded = Math.round(amountBody * 100) / 100;
+      }
+    }
+
+    if (amountRounded < 0.01) return res.status(400).json({ message: "Minimum amount: 0.01" });
+
+    const orderId = randomUUID();
+    const payment = await prisma.payment.create({
+      data: {
+        clientId,
+        orderId,
+        amount: amountRounded,
+        currency: currencyUpper,
+        status: "PENDING",
+        provider: "epay",
+        tariffId: tariffIdToStore,
+        proxyTariffId: proxyTariffIdToStore,
+        singboxTariffId: singboxTariffIdToStore,
+        metadata: Object.keys(metadataObj).length > 0 ? JSON.stringify(metadataObj) : null,
+      },
+    });
+
+    const serviceName = config.serviceName?.trim() || "STEALTHNET";
+    const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
+    if (!appUrl) {
+      await prisma.payment.delete({ where: { id: payment.id } }).catch(() => {});
+      return res.status(503).json({ message: "publicAppUrl not configured — ePay callbacks will not work" });
+    }
+    const notifyUrl = `${appUrl}/api/webhooks/epay`;
+    const returnUrl = `${appUrl}/cabinet?epay=success`;
+    const clientip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "";
+
+    const result = await createEpayPayment({
+      config: epayConfig,
+      outTradeNo: orderId,
+      notifyUrl,
+      returnUrl,
+      name: serviceName,
+      money: amountRounded.toFixed(2),
+      clientip,
+      type: epayType || undefined,
+      param: payment.id,
+    });
+
+    if (!result.ok) {
+      await prisma.payment.delete({ where: { id: payment.id } }).catch(() => {});
+      return res.status(500).json({ message: result.error });
+    }
+
+    return res.status(201).json({
+      paymentId: payment.id,
+      payUrl: result.payUrl,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[epay/create-payment]", message, err);
+    return res.status(500).json({ message: message || "Payment creation error" });
   }
 });
 

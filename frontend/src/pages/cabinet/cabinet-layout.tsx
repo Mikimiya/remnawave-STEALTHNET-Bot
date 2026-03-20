@@ -7,29 +7,12 @@ import { useIsMiniapp } from "@/hooks/use-is-miniapp";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { GlassSelect } from "@/components/ui/glass-select";
-import { LayoutDashboard, Package, User, LogOut, Shield, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet } from "lucide-react";
+import { LayoutDashboard, Package, User, LogOut, Shield, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X } from "lucide-react";
 import { useTheme, ACCENT_PALETTES, type ThemeMode, type ThemeAccent } from "@/contexts/theme";
-import { cn } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
 import { FloatingChat } from "@/components/floating-chat";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "@/i18n";
-
-function formatMoney(amount: number, currency: string) {
-  const code = currency.toUpperCase();
-  // 按货币选择合适的 locale
-  const locale = code === "RUB" ? "ru-RU" : code === "CNY" ? "zh-CN" : "en-US";
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: code,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `${amount} ${code}`;
-  }
-}
 
 function AnalyticsScripts() {
   useEffect(() => {
@@ -152,15 +135,15 @@ function Client2FAStepScreen() {
 }
 
 const ALL_NAV_ITEMS = [
-  { to: "/cabinet/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
-  { to: "/cabinet/tariffs", labelKey: "nav.tariffs", icon: Package },
-  { to: "/cabinet/custom-build", labelKey: "nav.customBuild", icon: Layers },
-  { to: "/cabinet/extra-options", labelKey: "nav.extraOptions", icon: PlusCircle },
-  { to: "/cabinet/proxy", labelKey: "nav.proxy", icon: Globe },
-  { to: "/cabinet/singbox", labelKey: "nav.singbox", icon: KeyRound },
-  { to: "/cabinet/referral", labelKey: "nav.referral", icon: Users },
-  { to: "/cabinet/tickets", labelKey: "nav.tickets", icon: MessageSquare },
-  { to: "/cabinet/profile", labelKey: "nav.profile", icon: User },
+  { to: "/cabinet/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard, alwaysMore: false },
+  { to: "/cabinet/tariffs", labelKey: "nav.tariffs", icon: Package, alwaysMore: false },
+  { to: "/cabinet/custom-build", labelKey: "nav.customBuild", icon: Layers, alwaysMore: false },
+  { to: "/cabinet/proxy", labelKey: "nav.proxy", icon: Globe, alwaysMore: false },
+  { to: "/cabinet/singbox", labelKey: "nav.singbox", icon: KeyRound, alwaysMore: false },
+  { to: "/cabinet/referral", labelKey: "nav.referral", icon: Users, alwaysMore: false },
+  { to: "/cabinet/profile", labelKey: "nav.profile", icon: User, alwaysMore: false },
+  { to: "/cabinet/extra-options", labelKey: "nav.extraOptions", icon: PlusCircle, alwaysMore: true },
+  { to: "/cabinet/tickets", labelKey: "nav.tickets", icon: MessageSquare, alwaysMore: true },
 ];
 
 const MODE_OPTIONS: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
@@ -425,13 +408,37 @@ function MobileCabinetShell() {
   const navItems = useMemo(() => resolveNavItems(config), [config?.sellOptionsEnabled, config?.showProxyEnabled, config?.showSingboxEnabled, config?.ticketsEnabled, config?.customBuildConfig]);
   const [logoError, setLogoError] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const visibleItems = navItems.slice(0, MAX_VISIBLE_NAV);
-  const hasMore = navItems.length > MAX_VISIBLE_NAV;
+  const mainItems = navItems.filter((i) => !i.alwaysMore);
+  const visibleItems = mainItems.slice(0, MAX_VISIBLE_NAV);
+  const moreItems = [...mainItems.slice(MAX_VISIBLE_NAV), ...navItems.filter((i) => i.alwaysMore)];
+  const hasMore = moreItems.length > 0;
+
+  // Swipe-to-close for drawer
+  const touchStartX = useRef(0);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const handleTouchStart = useCallback((e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; }, []);
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (dx > 60) setMoreMenuOpen(false);
+  }, []);
 
   useEffect(() => { setLogoError(false); }, [config?.logo]);
   useEffect(() => {
     if (state.token) refreshProfile().catch(() => { });
   }, [state.token, refreshProfile]);
+
+  // Auto-close drawer on route change
+  useEffect(() => { setMoreMenuOpen(false); }, [location.pathname]);
+
+  // Body scroll lock & Escape key for drawer
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMoreMenuOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = ""; document.removeEventListener("keydown", onKey); };
+  }, [moreMenuOpen]);
+
   const serviceName = config?.serviceName ?? "";
   const logo = config?.logo && !logoError ? config.logo : null;
 
@@ -504,32 +511,111 @@ function MobileCabinetShell() {
         </div>
       </nav>
 
-      <Dialog open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
-        <DialogContent className="max-w-sm mx-auto rounded-2xl" showCloseButton={true}>
-          <DialogHeader>
-            <DialogTitle>{t("cabinetLayout.menu")}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-1 py-2">
-            {navItems.map(({ to, labelKey, icon: Icon }) => {
-              const active = location.pathname === to;
-              return (
-                <Link
-                  key={to}
-                  to={to}
-                  onClick={() => setMoreMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors",
-                    active ? "bg-primary/20 text-primary" : "hover:bg-muted/60"
-                  )}
-                >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  <span className="font-medium">{t(labelKey)}</span>
-                </Link>
-              );
-            })}
+      {/* Backdrop overlay */}
+      <div
+        className={cn(
+          "fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity duration-300",
+          moreMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+        onClick={() => setMoreMenuOpen(false)}
+      />
+
+      {/* Right slide-out drawer */}
+      <div
+        ref={drawerRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className={cn(
+          "fixed top-0 right-0 bottom-0 z-[70] w-[min(80vw,320px)] flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+          moreMenuOpen ? "translate-x-0" : "translate-x-full"
+        )}
+        style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        {/* Glassmorphism background */}
+        <div className="absolute inset-0 bg-card/70 dark:bg-card/80 backdrop-blur-2xl border-l border-white/10 dark:border-white/5 shadow-[-8px_0_40px_rgba(0,0,0,0.15)] dark:shadow-[-8px_0_40px_rgba(0,0,0,0.4)]" />
+        <div className="absolute -top-20 -right-20 h-56 w-56 rounded-full bg-primary/15 blur-[80px] pointer-events-none" />
+        <div className="absolute bottom-10 -left-10 h-40 w-40 rounded-full bg-blue-500/10 blur-[60px] pointer-events-none" />
+
+        {/* Header */}
+        <div className="relative flex items-center justify-between px-5 pt-4 pb-3">
+          <h2 className="text-lg font-bold tracking-tight text-foreground">{t("cabinetLayout.menu")}</h2>
+          <button
+            type="button"
+            onClick={() => setMoreMenuOpen(false)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-foreground/5 hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-all duration-200 active:scale-90"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* User info card */}
+        {state.client && (
+          <div className="relative mx-4 mb-4 rounded-2xl bg-primary/5 border border-primary/10 p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <User className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground truncate">
+                  {state.client.email?.trim() || (state.client.telegramUsername ? `@${state.client.telegramUsername}` : "—")}
+                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Wallet className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-primary">
+                    {formatMoney(state.client.balance, state.client.preferredCurrency)}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+
+        {/* Nav items */}
+        <div className="relative flex-1 overflow-y-auto px-3 space-y-0.5">
+          {navItems.map(({ to, labelKey, icon: Icon }) => {
+            const active = location.pathname === to;
+            return (
+              <Link
+                key={to}
+                to={to}
+                onClick={() => setMoreMenuOpen(false)}
+                className={cn(
+                  "flex items-center gap-3.5 rounded-2xl px-4 py-3.5 transition-all duration-200 active:scale-[0.98]",
+                  active
+                    ? "bg-primary/15 text-primary shadow-sm"
+                    : "text-foreground/80 hover:bg-foreground/5 hover:text-foreground"
+                )}
+              >
+                <div className={cn(
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+                  active ? "bg-primary/20 text-primary" : "bg-foreground/5 text-muted-foreground"
+                )}>
+                  <Icon className="h-[18px] w-[18px]" />
+                </div>
+                <span className="text-[15px] font-medium">{t(labelKey)}</span>
+                {active && (
+                  <div className="ml-auto h-2 w-2 rounded-full bg-primary shadow-[0_0_8px] shadow-primary/50" />
+                )}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Logout */}
+        <div className="relative px-3 pb-4 pt-2">
+          <div className="h-px bg-border/50 mx-2 mb-3" />
+          <Link
+            to="/cabinet/login"
+            onClick={() => { logout(); setMoreMenuOpen(false); }}
+            className="flex items-center gap-3.5 rounded-2xl px-4 py-3.5 text-destructive/80 hover:bg-destructive/10 hover:text-destructive transition-all duration-200 active:scale-[0.98]"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+              <LogOut className="h-[18px] w-[18px]" />
+            </div>
+            <span className="text-[15px] font-medium">{t("auth.logout")}</span>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
@@ -557,8 +643,9 @@ function CabinetShell() {
   const [logoError, setLogoError] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
-  const visibleNav = navItems.slice(0, MAX_VISIBLE_DESKTOP);
-  const moreNav = navItems.slice(MAX_VISIBLE_DESKTOP);
+  const mainNav = navItems.filter((i) => !i.alwaysMore);
+  const visibleNav = mainNav.slice(0, MAX_VISIBLE_DESKTOP);
+  const moreNav = [...mainNav.slice(MAX_VISIBLE_DESKTOP), ...navItems.filter((i) => i.alwaysMore)];
 
   useEffect(() => { setLogoError(false); }, [config?.logo]);
   useEffect(() => {

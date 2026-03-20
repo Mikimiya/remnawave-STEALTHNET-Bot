@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { UserPlus, Shield, Mail, AlertCircle } from "lucide-react";
+import { UserPlus, Mail, AlertCircle } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
 import type { PublicConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthShell } from "@/components/auth-shell";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
@@ -62,7 +62,6 @@ function storeUtm(utm: Record<string, string>) {
   }
 }
 
-/** UTM из URL с приоритетом, при наличии — сохраняем в localStorage для последующей регистрации */
 function useUtmCapture(searchParams: URLSearchParams) {
   const fromUrl = getUtmFromSearchParams(searchParams);
   if (Object.keys(fromUrl).length > 0) storeUtm(fromUrl);
@@ -220,7 +219,7 @@ export function ClientRegisterPage() {
       sessionStorage.removeItem("stealthnet_google_oauth_state");
       sessionStorage.removeItem("stealthnet_google_oauth_nonce");
     } catch {
-      /* ignore */
+      // ignore
     }
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     setLoading(true);
@@ -228,7 +227,7 @@ export function ClientRegisterPage() {
       .then(() => navigate("/cabinet/dashboard", { replace: true }))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error")))
       .finally(() => setLoading(false));
-  }, [loginByGoogle, navigate]);
+  }, [loginByGoogle, navigate, t]);
 
   const handleAppleLogin = useCallback(async () => {
     if (!appleEnabled) return;
@@ -253,7 +252,7 @@ export function ClientRegisterPage() {
       setError(err instanceof Error ? err.message : t("common.error"));
       setLoading(false);
     }
-  }, [appleEnabled]);
+  }, [appleEnabled, t]);
 
   useEffect(() => {
     const hash = window.location.hash?.replace("#", "") || "";
@@ -268,17 +267,15 @@ export function ClientRegisterPage() {
       .then(() => navigate("/cabinet/dashboard", { replace: true }))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error")))
       .finally(() => setLoading(false));
-  }, [loginByApple, navigate]);
+  }, [loginByApple, navigate, t]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setEmailSent(false);
-    
-    if (!validateAll()) {
-      return;
-    }
-    
+
+    if (!validateAll()) return;
+
     setLoading(true);
     try {
       const result = await register({
@@ -302,139 +299,140 @@ export function ClientRegisterPage() {
   }
 
   return (
-    <div className="min-h-svh flex flex-col items-center justify-center bg-transparent p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="w-full max-w-md"
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }}>
+      <AuthShell
+        brand={brand}
+        icon={UserPlus}
+        eyebrow="create account"
+        title={t("auth.registerTitle")}
+        subtitle={t("auth.registerSubtitle")}
+        sideTitle={brand.serviceName ? `Join ${brand.serviceName} in a minute.` : "Create your secure account in a minute."}
+        sideDescription="Register once and get instant access to the cabinet, subscription management, payments, support, and one-click VPN setup across devices."
+        sidePoints={[
+          "Fast onboarding with email, Telegram, Google, or Apple",
+          "Referral links, preferred language, and currency are preserved automatically",
+          "Built for a polished first impression on mobile and desktop",
+        ]}
+        footer={
+          <>
+            {t("auth.haveAccount")}{" "}
+            <Link to="/cabinet/login" className="font-medium text-primary transition-colors hover:text-primary/80 hover:underline">
+              {t("auth.login")}
+            </Link>
+          </>
+        }
       >
-        <div className="flex items-center justify-center gap-2 mb-6 min-h-[2.5rem]">
-          {brand.logo ? (
-            <span className="flex items-center justify-center h-11 px-3 rounded-xl dark:bg-transparent bg-zinc-900">
-              <img src={brand.logo} alt="" className="h-8 max-w-[140px] object-contain" />
-            </span>
-          ) : (
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shrink-0">
-              <Shield className="h-6 w-6" />
-            </span>
-          )}
-          {brand.serviceName ? <span className="font-semibold text-xl">{brand.serviceName}</span> : null}
-        </div>
-        <Card className="border shadow-lg">
-          <CardHeader className="space-y-1 text-center">
-            <div className="flex justify-center mb-2">
-              <div className="rounded-lg bg-primary/10 p-3">
-                <UserPlus className="h-10 w-10 text-primary" />
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <input type="text" name="prevent_autofill" autoComplete="off" tabIndex={-1} className="absolute h-0 w-0 overflow-hidden opacity-0 pointer-events-none" aria-hidden />
+
+          {error && (
+            <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
             </div>
-            <CardTitle className="text-2xl">{t("auth.registerTitle")}</CardTitle>
-            <p className="text-muted-foreground text-sm">{t("auth.registerSubtitle")}</p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Скрытое поле: iOS/Safari реже выводит панель автозаполнения на каждый символ */}
-              <input type="text" name="prevent_autofill" autoComplete="off" tabIndex={-1} className="absolute opacity-0 pointer-events-none h-0 w-0 overflow-hidden" aria-hidden />
-              {error && (
-                <div className="rounded-xl border border-destructive/40 dark:border-red-500/40 bg-destructive/10 dark:bg-red-500/10 px-4 py-3 text-sm text-destructive dark:text-red-400 flex items-start gap-2.5 animate-in fade-in duration-200">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{error}</span>
-                </div>
+          )}
+
+          <div className="space-y-2.5">
+            <Label htmlFor="email" className="text-sm font-medium">{t("auth.email")}</Label>
+            <Input
+              id="email"
+              type="email"
+              name="register_email"
+              placeholder={t("auth.enterEmail")}
+              value={email}
+              onChange={handleEmailChange}
+              onBlur={handleEmailBlur}
+              required
+              autoComplete="email"
+              className={cn(
+                "h-12 rounded-2xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5",
+                emailError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40"
               )}
-              <div className="space-y-2">
-                <Label htmlFor="email">{t("auth.email")}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  name="register_email"
-                  placeholder={t("auth.enterEmail")}
-                  value={email}
-                  onChange={handleEmailChange}
-                  onBlur={handleEmailBlur}
-                  required
-                  autoComplete="email"
-                  className={emailError ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {emailError && <p className="text-xs text-destructive dark:text-red-400">{emailError}</p>}
+            />
+            {emailError && <p className="px-1 text-xs text-destructive dark:text-red-400">{emailError}</p>}
+          </div>
+
+          <div className="space-y-2.5">
+            <Label htmlFor="password" className="text-sm font-medium">{t("auth.password")}</Label>
+            <Input
+              id="password"
+              type="password"
+              name="register_password"
+              value={password}
+              onChange={handlePasswordChange}
+              onBlur={handlePasswordBlur}
+              required
+              autoComplete="new-password"
+              className={cn(
+                "h-12 rounded-2xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5",
+                passwordError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40"
+              )}
+            />
+            {passwordError && <p className="px-1 text-xs text-destructive dark:text-red-400">{passwordError}</p>}
+            {!passwordError && password && (
+              <p className="px-1 text-xs font-medium text-emerald-500">{t("auth.passwordAccepted")}</p>
+            )}
+          </div>
+
+          {emailSent && (
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 shadow-sm dark:text-emerald-400">
+              <Mail className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{t("auth.emailVerificationSent")}</span>
+            </div>
+          )}
+
+          <Button type="submit" className="h-12 w-full rounded-2xl text-sm font-semibold shadow-lg shadow-primary/20 transition-transform hover:scale-[1.01]" disabled={loading || !email || !password}>
+            {loading ? t("auth.registerLoading") : t("auth.register")}
+          </Button>
+
+          {(telegramBotUsername || googleEnabled || appleEnabled) && (
+            <div className="space-y-4">
+              <div className="relative flex items-center gap-3">
+                <div className="h-px flex-1 bg-border/70" />
+                <span className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground">{t("common.or")}</span>
+                <div className="h-px flex-1 bg-border/70" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">{t("auth.password")}</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  name="register_password"
-                  value={password}
-                  onChange={handlePasswordChange}
-                  onBlur={handlePasswordBlur}
-                  required
-                  autoComplete="new-password"
-                  className={passwordError ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {passwordError && <p className="text-xs text-destructive dark:text-red-400">{passwordError}</p>}
-                {!passwordError && password && (
-                  <p className="text-xs text-green-500">{t("auth.passwordAccepted")}</p>
+
+              <div className="grid gap-3">
+                {googleEnabled && googleClientId && (
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={loading}
+                    title={t("auth.registerViaGoogle")}
+                    className={cn(
+                      "flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/50 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    )}
+                  >
+                    <GoogleIcon className="h-5 w-5" />
+                    {t("auth.registerViaGoogle")}
+                  </button>
+                )}
+
+                {appleEnabled && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 w-full rounded-2xl gap-3 border-white/10 bg-white/50 text-sm font-medium shadow-sm backdrop-blur hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10"
+                    onClick={handleAppleLogin}
+                    disabled={loading}
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                    {t("auth.registerViaApple")}
+                  </Button>
+                )}
+
+                {telegramBotUsername && (
+                  <div className="rounded-2xl border border-white/10 bg-white/35 px-3 py-3 shadow-sm backdrop-blur dark:bg-white/5">
+                    <div ref={telegramWidgetRef} className="flex min-h-[44px] justify-center" />
+                  </div>
                 )}
               </div>
-              {emailSent && (
-                <div className="rounded-md bg-green-500/10 text-green-700 dark:text-green-400 text-sm p-3 flex items-center gap-2">
-                  <Mail className="h-4 w-4 shrink-0" />
-                  {t("auth.emailVerificationSent")}
-                </div>
-              )}
-              <Button type="submit" className="w-full" disabled={loading || !email || !password}>
-                {loading ? t("auth.registerLoading") : t("auth.register")}
-              </Button>
-              {(telegramBotUsername || googleEnabled || appleEnabled) && (
-                <div className="space-y-3">
-                  <div className="relative flex items-center gap-2">
-                    <div className="flex-1 border-t border-border" />
-                    <span className="text-xs text-muted-foreground px-2">{t("common.or")}</span>
-                    <div className="flex-1 border-t border-border" />
-                  </div>
-                  {googleEnabled && googleClientId && (
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleGoogleLogin}
-                        disabled={loading}
-                        title={t("auth.registerViaGoogle")}
-                        className={cn(
-                          "h-11 w-11 shrink-0 rounded-full flex items-center justify-center",
-                          "border border-border bg-muted/50 hover:bg-muted transition-colors",
-                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        )}
-                      >
-                        <GoogleIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  )}
-                  {appleEnabled && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full h-11 gap-2"
-                      onClick={handleAppleLogin}
-                      disabled={loading}
-                    >
-                      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                      {t("auth.registerViaApple")}
-                    </Button>
-                  )}
-                  {telegramBotUsername && (
-                    <div ref={telegramWidgetRef} className="flex justify-center min-h-[44px]" />
-                  )}
-                </div>
-              )}
-              <p className="text-center text-sm text-muted-foreground">
-                {t("auth.haveAccount")}{" "}
-                <Link to="/cabinet/login" className="text-primary hover:underline">
-                  {t("auth.login")}
-                </Link>
-              </p>
-            </form>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
+            </div>
+          )}
+        </form>
+      </AuthShell>
+    </motion.div>
   );
 }

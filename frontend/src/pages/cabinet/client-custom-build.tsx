@@ -16,17 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
-import { cn } from "@/lib/utils";
+import { cn, formatMoney, translateBackendMessage, translatePlategaLabel } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
-
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: currency.toUpperCase() === "USD" ? "USD" : currency.toUpperCase() === "RUB" ? "RUB" : "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
 
 export function ClientCustomBuildPage() {
   const { t } = useTranslation();
@@ -85,7 +76,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       setPromoCode("");
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.balancePaymentFailed"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientCustomBuild.errors.balancePaymentFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -112,7 +103,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.confirmationUrl) openPaymentInBrowser(res.confirmationUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -131,7 +122,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.paymentUrl) openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -149,7 +140,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.paymentUrl) openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -168,7 +159,7 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -187,7 +178,27 @@ export function ClientCustomBuildPage() {
       setPayModalOpen(false);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
-      setPayError(e instanceof Error ? e.message : t("clientCustomBuild.errors.paymentCreateFailed"));
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientCustomBuild.errors.paymentCreateFailed"));
+    } finally {
+      setPayLoading(false);
+    }
+  }
+
+  async function payByEpay(epayType: string) {
+    if (!token || !cb) return;
+    setPayError(null);
+    setPayLoading(true);
+    try {
+      const res = await api.epayCreatePayment(token, {
+        customBuild: customBuildPayload,
+        currency: cb.currency,
+        promoCode: promoCode.trim() || undefined,
+        type: epayType,
+      });
+      setPayModalOpen(false);
+      if (res.payUrl) openPaymentInBrowser(res.payUrl);
+    } catch (e) {
+      setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("clientCustomBuild.errors.paymentCreateFailed"));
     } finally {
       setPayLoading(false);
     }
@@ -306,10 +317,10 @@ export function ClientCustomBuildPage() {
             <p className="text-xs text-muted-foreground mt-1">
               {t("clientCustomBuild.summary.formula", {
                 days,
-                dayPrice: formatMoney(cb.pricePerDay, cb.currency),
+                dayPrice: formatMoney(cb.pricePerDay, cb.currency, { maximumFractionDigits: 2 }),
                 devices,
-                devicePrice: formatMoney(cb.pricePerDevice, cb.currency),
-                trafficPart: cb.trafficMode === "per_gb" && trafficGb > 0 ? ` + ${trafficGb} ${t("clientCustomBuild.units.gb")} × ${formatMoney(cb.pricePerGb, cb.currency)}` : "",
+                devicePrice: formatMoney(cb.pricePerDevice, cb.currency, { maximumFractionDigits: 2 }),
+                trafficPart: cb.trafficMode === "per_gb" && trafficGb > 0 ? ` + ${trafficGb} ${t("clientCustomBuild.units.gb")} × ${formatMoney(cb.pricePerGb, cb.currency, { maximumFractionDigits: 2 })}` : "",
               })}
             </p>
           </div>
@@ -452,6 +463,33 @@ export function ClientCustomBuildPage() {
                 </Button>
               )}
 
+              {(config?.epayMethods ?? []).map((m) => (
+                <Button
+                  key={m.type}
+                  size="lg"
+                  variant="outline"
+                  onClick={() => payByEpay(m.type)}
+                  disabled={payLoading}
+                  className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
+                >
+                  {isMobileOrMiniapp ? (
+                    <>
+                      <div className="p-2 rounded-xl bg-blue-500/10">
+                        {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-500" /> : <CreditCard className="h-6 w-6 text-blue-500" />}
+                      </div>
+                      <span className="text-base font-bold">{m.label}</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="absolute left-6 p-1.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+                        {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> : <CreditCard className="h-5 w-5 text-blue-500" />}
+                      </div>
+                      <span className="text-base font-medium">💳 {m.label}</span>
+                    </>
+                  )}
+                </Button>
+              ))}
+
               {config?.yookassaEnabled && cb.currency.toUpperCase() === "RUB" && (
                 <Button
                   size="lg"
@@ -518,14 +556,14 @@ export function ClientCustomBuildPage() {
                       <div className="p-2 rounded-xl bg-green-500/10">
                         {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
                       </div>
-                      <span className="text-base font-bold">{m.label}</span>
+                      <span className="text-base font-bold">{translatePlategaLabel(m, t)}</span>
                     </>
                   ) : (
                     <>
                       <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
                         {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
                       </div>
-                      <span className="text-base font-medium">💳 {m.label}</span>
+                      <span className="text-base font-medium">💳 {translatePlategaLabel(m, t)}</span>
                     </>
                   )}
                 </Button>
