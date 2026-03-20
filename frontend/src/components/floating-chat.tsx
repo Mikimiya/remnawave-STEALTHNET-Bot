@@ -29,8 +29,12 @@ function getInitialAiMessage(serviceName: string, fallbackServiceName: string, w
   ];
 }
 
-const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFloating = false, showAiTab = true, t }: any) => {
-  if (!showAiTab) {
+const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFloating = false, showAiTab = true, showSupportTab = true, t }: any) => {
+  // Only one tab visible — show a static single-tab header
+  if (!showAiTab || !showSupportTab) {
+    const singleLabel = showAiTab ? t("floatingChat.aiChat") : t("floatingChat.support");
+    const SingleIcon = showAiTab ? Sparkles : Headset;
+    const unread = showAiTab ? aiUnread : supportUnread;
     return (
       <div className={cn(
         "relative flex p-1 w-full sm:w-auto sm:min-w-[200px]",
@@ -39,13 +43,13 @@ const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFl
           : "bg-black/20 backdrop-blur-sm border border-white/5 rounded-xl"
       )}>
         <button
-          onClick={() => setActiveChat("support")}
+          onClick={() => setActiveChat(showAiTab ? "ai" : "support")}
           className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold text-primary-foreground bg-primary relative z-10"
         >
-          <Headset className="w-4 h-4" /> {t("floatingChat.support")}
-          {supportUnread > 0 && (
+          <SingleIcon className="w-4 h-4" /> {singleLabel}
+          {unread > 0 && (
             <span className="ml-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
-              {supportUnread}
+              {unread}
             </span>
           )}
         </button>
@@ -99,7 +103,7 @@ const ChatSwitcher = ({ activeChat, setActiveChat, aiUnread, supportUnread, isFl
   );
 };
 
-const ChatHeader = ({ activeChat, setActiveChat, isExpanded, setIsExpanded, setIsOpen, aiUnread, supportUnread, showAiTab = true, t }: any) => (
+const ChatHeader = ({ activeChat, setActiveChat, isExpanded, setIsExpanded, setIsOpen, aiUnread, supportUnread, showAiTab = true, showSupportTab = true, t }: any) => (
   <>
     <div className="px-4 py-3 sm:py-4 border-b border-white/5 bg-black/5 dark:bg-white/5 shrink-0 relative overflow-hidden pt-[max(env(safe-area-inset-top),16px)] sm:pt-4">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none" />
@@ -140,7 +144,7 @@ const ChatHeader = ({ activeChat, setActiveChat, isExpanded, setIsExpanded, setI
 
     {/* Chat Switcher */}
     <div className="flex sm:justify-center px-4 py-3 sm:py-4 shrink-0 bg-black/5 dark:bg-white/5 border-b border-white/5">
-      <ChatSwitcher activeChat={activeChat} setActiveChat={setActiveChat} aiUnread={aiUnread} supportUnread={supportUnread} showAiTab={showAiTab} />
+      <ChatSwitcher activeChat={activeChat} setActiveChat={setActiveChat} aiUnread={aiUnread} supportUnread={supportUnread} showAiTab={showAiTab} showSupportTab={showSupportTab} t={t} />
     </div>
   </>
 );
@@ -189,7 +193,7 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
     const loadDetail = () => {
       setDetailLoading(true);
       api.getTicket(token, detailId)
-        .then((t) => setDetail(t))
+        .then((data) => setDetail(data))
         .catch(() => setDetail(null))
         .finally(() => setDetailLoading(false));
     };
@@ -410,16 +414,16 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
             <p className="text-xs font-medium text-center">{t("floatingChat.noOpenTicketsLine1")}<br/>{t("floatingChat.noOpenTicketsLine2")}</p>
           </div>
         ) : (
-          list.map((t) => {
-            const isOpen = t.status === "open";
+          list.map((ticket) => {
+            const isOpen = ticket.status === "open";
             return (
               <div
-                key={t.id}
-                onClick={() => setDetailId(t.id)}
+                key={ticket.id}
+                onClick={() => setDetailId(ticket.id)}
                 className="group relative flex flex-col gap-1.5 p-3.5 rounded-2xl border border-black/5 dark:border-white/10 bg-card/60 hover:bg-card/80 transition-all cursor-pointer shadow-sm hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h4 className="font-semibold text-[13px] text-foreground line-clamp-2 leading-tight group-hover:text-primary transition-colors">{t.subject}</h4>
+                  <h4 className="font-semibold text-[13px] text-foreground line-clamp-2 leading-tight group-hover:text-primary transition-colors">{ticket.subject}</h4>
                   {isOpen ? (
                     <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-600 dark:text-emerald-400">
                       <CircleDot className="h-2.5 w-2.5" /> {t("floatingChat.open")}
@@ -431,7 +435,7 @@ function SupportTab({ headerProps, onRefreshUnread }: { headerProps: any, onRefr
                   )}
                 </div>
                 <span className="text-[10px] font-medium text-muted-foreground">
-                  {formatDate(t.updatedAt)}
+                  {formatDate(ticket.updatedAt)}
                 </span>
               </div>
             );
@@ -449,13 +453,15 @@ export function FloatingChat() {
   const token = state.token ?? null;
   const serviceName = config?.serviceName?.trim() || t("floatingChat.serviceFallback");
   const aiChatEnabled = config?.aiChatEnabled !== false;
+  const ticketsEnabled = config?.ticketsEnabled === true;
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeChat, setActiveChat] = useState<ChatType>(() => (config?.aiChatEnabled !== false ? "ai" : "support"));
   const [hasOpenDialog, setHasOpenDialog] = useState(false);
   useEffect(() => {
     if (!aiChatEnabled && activeChat === "ai") setActiveChat("support");
-  }, [aiChatEnabled, activeChat]);
+    if (!ticketsEnabled && activeChat === "support") setActiveChat("ai");
+  }, [aiChatEnabled, ticketsEnabled, activeChat]);
 
   const [aiChats, setAiChats] = useState<Message[]>(() => getInitialAiMessage(t("floatingChat.serviceFallback"), t("floatingChat.serviceFallback"), t("floatingChat.initialMessage")));
   useEffect(() => {
@@ -586,7 +592,9 @@ export function FloatingChat() {
     }
   };
 
-  const headerProps = { activeChat, setActiveChat, isExpanded, setIsExpanded, setIsOpen, aiUnread, supportUnread, showAiTab: aiChatEnabled, t };
+  const headerProps = { activeChat, setActiveChat, isExpanded, setIsExpanded, setIsOpen, aiUnread, supportUnread, showAiTab: aiChatEnabled, showSupportTab: ticketsEnabled, t };
+
+  if (!aiChatEnabled && !ticketsEnabled) return null;
 
   return (
     <>
@@ -714,9 +722,9 @@ export function FloatingChat() {
                     </div>
                   </div>
                 </div>
-              ) : (
+              ) : ticketsEnabled ? (
                 <SupportTab headerProps={headerProps} onRefreshUnread={refreshUnread} />
-              )}
+              ) : null}
             </motion.div>
           )}
         </AnimatePresence>

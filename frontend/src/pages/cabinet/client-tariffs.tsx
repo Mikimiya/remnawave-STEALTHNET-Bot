@@ -1,6 +1,22 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Package, Calendar, Wifi, Smartphone, CreditCard, Loader2, Gift, Tag, Check, Wallet, ChevronDown, Shield, Zap, ArrowLeft } from "lucide-react";
+import {
+  Package,
+  Calendar,
+  Wifi,
+  Smartphone,
+  CreditCard,
+  Loader2,
+  Gift,
+  Tag,
+  Check,
+  Wallet,
+  Shield,
+  Zap,
+  ArrowLeft,
+  ChevronDown,
+  Flame,
+} from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
 import type { PublicTariffCategory } from "@/lib/api";
@@ -8,14 +24,13 @@ import { formatDays } from "@/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
@@ -37,7 +52,32 @@ function formatMoney(amount: number, currency: string) {
   }
 }
 
-type TariffForPay = { id: string; name: string; price: number; currency: string; description?: string | null; durationDays?: number; trafficLimitBytes?: number | null; deviceLimit?: number | null };
+function formatDailyPrice(price: number, days: number, currency: string) {
+  if (!days || days <= 0) return null;
+  const code = currency.toUpperCase();
+  const locale = code === "RUB" ? "ru-RU" : code === "CNY" ? "zh-CN" : "en-US";
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(price / days);
+  } catch {
+    return null;
+  }
+}
+
+type TariffForPay = {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  description?: string | null;
+  durationDays?: number;
+  trafficLimitBytes?: number | null;
+  deviceLimit?: number | null;
+};
 
 export function ClientTariffsPage() {
   const { state, refreshProfile } = useClientAuth();
@@ -50,7 +90,10 @@ export function ClientTariffsPage() {
   const [yookassaEnabled, setYookassaEnabled] = useState(false);
   const [cryptopayEnabled, setCryptopayEnabled] = useState(false);
   const [heleketEnabled, setHeleketEnabled] = useState(false);
-  const [trialConfig, setTrialConfig] = useState<{ trialEnabled: boolean; trialDays: number }>({ trialEnabled: false, trialDays: 0 });
+  const [trialConfig, setTrialConfig] = useState<{ trialEnabled: boolean; trialDays: number }>({
+    trialEnabled: false,
+    trialDays: 0,
+  });
   const [payModal, setPayModal] = useState<{ tariff: TariffForPay } | null>(null);
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
@@ -58,40 +101,46 @@ export function ClientTariffsPage() {
   const [trialError, setTrialError] = useState<string | null>(null);
   const { t, i18n } = useTranslation();
 
-  // Промокод
+  // Promo code — collapsed by default
+  const [promoOpen, setPromoOpen] = useState(false);
   const [promoInput, setPromoInput] = useState("");
   const [promoChecking, setPromoChecking] = useState(false);
-  const [promoResult, setPromoResult] = useState<{ type: string; discountPercent?: number | null; discountFixed?: number | null; name: string } | null>(null);
+  const [promoResult, setPromoResult] = useState<{
+    type: string;
+    discountPercent?: number | null;
+    discountFixed?: number | null;
+    name: string;
+  } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
 
+  // Mobile: selected category index
+  const [selectedCatIndex, setSelectedCatIndex] = useState(0);
+
   const showTrial = trialConfig.trialEnabled && !client?.trialUsed;
-
   const isMobileOrMiniapp = useCabinetMiniapp();
-  const useCategoryCardLayout = isMobileOrMiniapp;
-  const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (useCategoryCardLayout && tariffs.length > 0) {
-      setExpandedCategoryId((prev) => (prev === null ? tariffs[0].id : prev));
-    }
-  }, [useCategoryCardLayout, tariffs]);
-
-  useEffect(() => {
-    api.getPublicTariffs().then((r) => {
-      setTariffs(r.items ?? []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    api
+      .getPublicTariffs()
+      .then((r) => {
+        setTariffs(r.items ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    api.getPublicConfig().then((c) => {
-      setPlategaMethods(c.plategaMethods ?? []);
-      setYoomoneyEnabled(Boolean(c.yoomoneyEnabled));
-      setYookassaEnabled(Boolean(c.yookassaEnabled));
-      setCryptopayEnabled(Boolean(c.cryptopayEnabled));
-      setHeleketEnabled(Boolean(c.heleketEnabled));
-      setTrialConfig({ trialEnabled: !!c.trialEnabled, trialDays: c.trialDays ?? 0 });
-    }).catch(() => { });
+    api
+      .getPublicConfig()
+      .then((c) => {
+        setPlategaMethods(c.plategaMethods ?? []);
+        setYoomoneyEnabled(Boolean(c.yoomoneyEnabled));
+        setYookassaEnabled(Boolean(c.yookassaEnabled));
+        setCryptopayEnabled(Boolean(c.cryptopayEnabled));
+        setHeleketEnabled(Boolean(c.heleketEnabled));
+        setTrialConfig({ trialEnabled: !!c.trialEnabled, trialDays: c.trialDays ?? 0 });
+      })
+      .catch(() => {});
   }, []);
 
   async function activateTrial() {
@@ -139,7 +188,7 @@ export function ClientTariffsPage() {
     if (!promoResult) return price;
     let final = price;
     if (promoResult.discountPercent && promoResult.discountPercent > 0) {
-      final -= final * promoResult.discountPercent / 100;
+      final -= (final * promoResult.discountPercent) / 100;
     }
     if (promoResult.discountFixed && promoResult.discountFixed > 0) {
       final -= promoResult.discountFixed;
@@ -294,9 +343,10 @@ export function ClientTariffsPage() {
     setPromoResult(null);
     setPromoError(null);
     setPayError(null);
+    setPromoOpen(false);
   };
 
-  // === КОНТЕНТ ОПЛАТЫ (ОБЩИЙ ДЛЯ MOBILE VIEW И DESKTOP DIALOG) ===
+  // ── Payment content (shared for mobile page + desktop dialog) ──────────
   const PaymentContent = () => {
     if (!payModal) return null;
     const tariff = payModal.tariff;
@@ -304,289 +354,309 @@ export function ClientTariffsPage() {
     const hasBalance = client ? client.balance >= price : false;
 
     return (
-      <div className="space-y-6">
-        {/* Карточка с инфой о тарифе */}
-        <div className={cn("rounded-2xl relative overflow-hidden", isMobileOrMiniapp ? "bg-card/40 border border-white/5 p-5" : "bg-background/50 border border-border/50 p-4")}>
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="flex justify-between items-start gap-4 relative z-10">
-            <div className="space-y-1.5">
-              <p className={cn("font-medium", isMobileOrMiniapp ? "text-sm text-muted-foreground" : "text-muted-foreground")}>
+      <div className="space-y-5">
+        {/* Tariff summary */}
+        <div
+          className={cn(
+            "rounded-2xl relative overflow-hidden",
+            isMobileOrMiniapp
+              ? "bg-card/40 border border-white/5 p-5"
+              : "bg-background/50 border border-border/50 p-4"
+          )}
+        >
+          <div className="flex justify-between items-start gap-4">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground font-medium">
                 {isMobileOrMiniapp ? t("tariffs.totalToPay") : t("tariffs.tariffLabel")}
               </p>
-              {!isMobileOrMiniapp && <p className="font-bold text-foreground">{tariff.name}</p>}
-              
+              {!isMobileOrMiniapp && (
+                <p className="font-bold text-foreground">{tariff.name}</p>
+              )}
               {isMobileOrMiniapp && (
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-2 mt-1">
                   {promoResult ? (
                     <>
-                      <span className="text-3xl font-black text-primary">{formatMoney(price, tariff.currency)}</span>
-                      <span className="text-lg line-through text-muted-foreground decoration-2">{formatMoney(tariff.price, tariff.currency)}</span>
+                      <span className="text-3xl font-black text-primary">
+                        {formatMoney(price, tariff.currency)}
+                      </span>
+                      <span className="text-lg line-through text-muted-foreground decoration-2">
+                        {formatMoney(tariff.price, tariff.currency)}
+                      </span>
                     </>
                   ) : (
-                    <span className="text-3xl font-black text-primary">{formatMoney(tariff.price, tariff.currency)}</span>
+                    <span className="text-3xl font-black text-primary">
+                      {formatMoney(tariff.price, tariff.currency)}
+                    </span>
                   )}
                 </div>
               )}
             </div>
-            
+
             {!isMobileOrMiniapp && (
               <div className="text-right">
                 {promoResult ? (
                   <div className="flex flex-col items-end">
-                    <span className="line-through text-muted-foreground/70 text-sm decoration-2">{formatMoney(tariff.price, tariff.currency)}</span>
-                    <span className="font-bold text-xl text-primary">{formatMoney(price, tariff.currency)}</span>
+                    <span className="line-through text-muted-foreground/70 text-sm decoration-2">
+                      {formatMoney(tariff.price, tariff.currency)}
+                    </span>
+                    <span className="font-bold text-xl text-primary">
+                      {formatMoney(price, tariff.currency)}
+                    </span>
                   </div>
                 ) : (
-                  <span className="font-bold text-xl text-primary">{formatMoney(tariff.price, tariff.currency)}</span>
+                  <span className="font-bold text-xl text-primary">
+                    {formatMoney(tariff.price, tariff.currency)}
+                  </span>
                 )}
               </div>
             )}
           </div>
-          
+
           {isMobileOrMiniapp && (
-            <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3 relative z-10">
+            <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3">
               <div className="bg-background/40 rounded-2xl p-3 border border-white/5">
-                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">{t("tariffs.duration")}</p>
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">
+                  {t("tariffs.duration")}
+                </p>
                 <div className="flex items-center gap-1.5 font-bold text-sm">
                   <Calendar className="h-4 w-4 text-primary" />
                   {tariff.durationDays} {t("tariffs.days")}
                 </div>
               </div>
               <div className="bg-background/40 rounded-2xl p-3 border border-white/5">
-                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">{t("tariffs.traffic")}</p>
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">
+                  {t("tariffs.traffic")}
+                </p>
                 <div className="flex items-center gap-1.5 font-bold text-sm">
                   <Wifi className="h-4 w-4 text-primary" />
-                  {tariff.trafficLimitBytes != null && tariff.trafficLimitBytes > 0 ? `${(tariff.trafficLimitBytes / 1024 / 1024 / 1024).toFixed(1)} GB` : "∞"}
+                  {tariff.trafficLimitBytes != null && tariff.trafficLimitBytes > 0
+                    ? `${(tariff.trafficLimitBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
+                    : "∞"}
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Промокод */}
-        <div className={cn("space-y-3", !isMobileOrMiniapp && "bg-background/40 border border-border/50 rounded-2xl p-4 focus-within:border-primary/50 focus-within:bg-background/60 hover:border-primary/30 transition-all duration-300 relative overflow-hidden group")}>
-          {!isMobileOrMiniapp && <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />}
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground pl-1 relative z-10">
-            {isMobileOrMiniapp ? <Tag className="h-4 w-4 text-primary" /> : <div className="p-1.5 bg-primary/10 rounded-lg"><Tag className="h-4 w-4 text-primary" /></div>}
+        {/* Promo code — collapsible */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setPromoOpen((v) => !v)}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
+          >
+            <Tag className="h-4 w-4 text-primary" />
             {t("tariffs.promoCode")}
-          </div>
-          <div className="flex gap-2 relative z-10">
-            <Input
-              name="promo_code"
-              autoComplete="off"
-              inputMode="text"
-              value={promoInput}
-              onChange={(e) => { setPromoInput(e.target.value); if (promoResult) { setPromoResult(null); setPromoError(null); } }}
-              placeholder={t("tariffs.enterPromoCode")}
-              className={cn("font-mono font-medium focus-visible:ring-primary/50", isMobileOrMiniapp ? "text-base bg-card/40 border-white/5 h-14 rounded-2xl" : "text-sm bg-background border-border/50 h-12 rounded-xl shadow-sm")}
-              disabled={payLoading || promoChecking}
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 transition-transform duration-200",
+                promoOpen && "rotate-180"
+              )}
             />
-            <Button
-              variant={isMobileOrMiniapp ? "default" : "secondary"}
-              onClick={checkPromo}
-              disabled={!promoInput.trim() || payLoading || promoChecking}
-              className={cn("shrink-0 font-bold bg-primary text-primary-foreground shadow-md transition-all hover:scale-105 active:scale-95", isMobileOrMiniapp ? "h-14 px-6 rounded-2xl text-base" : "h-12 px-5 rounded-xl text-sm border-0 hover:bg-primary/90")}
-            >
-              {promoChecking ? <Loader2 className="h-5 w-5 animate-spin" /> : t("tariffs.apply")}
-            </Button>
-          </div>
+          </button>
+
           <AnimatePresence>
-            {promoResult && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden relative z-10">
-                <div className={cn("flex items-center gap-2 px-4 py-3 bg-green-500/10 border border-green-500/20", isMobileOrMiniapp ? "rounded-2xl" : "rounded-lg")}>
-                  <Check className={cn("text-green-500", isMobileOrMiniapp ? "h-5 w-5" : "h-4 w-4")} />
-                  <span className={cn("font-bold text-green-500", isMobileOrMiniapp ? "text-sm" : "text-sm")}>
-                    {promoResult.name}: -{promoResult.discountPercent ? `${promoResult.discountPercent}%` : ""}{promoResult.discountFixed ? ` ${promoResult.discountFixed}` : ""}
-                  </span>
-                </div>
-              </motion.div>
-            )}
-            {promoError && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden relative z-10">
-                <div className={cn("flex items-center gap-2 px-4 py-3 bg-destructive/10 border border-destructive/20", isMobileOrMiniapp ? "rounded-2xl" : "rounded-lg")}>
-                  <span className={cn("font-bold text-destructive", isMobileOrMiniapp ? "text-sm" : "text-sm")}>
-                    {promoError}
-                  </span>
+            {promoOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-3 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      name="promo_code"
+                      autoComplete="off"
+                      inputMode="text"
+                      value={promoInput}
+                      onChange={(e) => {
+                        setPromoInput(e.target.value);
+                        if (promoResult) {
+                          setPromoResult(null);
+                          setPromoError(null);
+                        }
+                      }}
+                      placeholder={t("tariffs.enterPromoCode")}
+                      className={cn(
+                        "font-mono font-medium focus-visible:ring-primary/50",
+                        isMobileOrMiniapp
+                          ? "text-base bg-card/40 border-white/5 h-12 rounded-2xl"
+                          : "text-sm bg-background border-border/50 h-11 rounded-xl"
+                      )}
+                      disabled={payLoading || promoChecking}
+                    />
+                    <Button
+                      onClick={checkPromo}
+                      disabled={!promoInput.trim() || payLoading || promoChecking}
+                      className={cn(
+                        "shrink-0 font-bold",
+                        isMobileOrMiniapp
+                          ? "h-12 px-5 rounded-2xl text-sm"
+                          : "h-11 px-4 rounded-xl text-sm"
+                      )}
+                    >
+                      {promoChecking ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        t("tariffs.apply")
+                      )}
+                    </Button>
+                  </div>
+
+                  {promoResult && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-xl">
+                      <Check className="h-4 w-4 text-green-500 shrink-0" />
+                      <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                        {promoResult.name}: -{promoResult.discountPercent ? `${promoResult.discountPercent}%` : ""}
+                        {promoResult.discountFixed ? ` ${promoResult.discountFixed}` : ""}
+                      </span>
+                    </div>
+                  )}
+                  {promoError && (
+                    <p className="text-sm font-medium text-destructive px-1">{promoError}</p>
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* Способы оплаты */}
-        <div className={cn("space-y-3")}>
-          <div className="flex items-center gap-2 pt-2 pb-1">
-            <Wallet className={cn("text-primary", isMobileOrMiniapp ? "h-5 w-5" : "h-4 w-4")} />
-            <span className={cn("font-bold", isMobileOrMiniapp ? "text-lg" : "text-sm")}>{t("tariffs.paymentMethod")}</span>
+        {/* Payment methods */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-primary" />
+            <span className="text-sm font-bold text-foreground">{t("tariffs.paymentMethod")}</span>
           </div>
 
           {payError && (
-            <div className={cn("p-4 bg-destructive/10 border border-destructive/20 text-destructive text-center font-bold", isMobileOrMiniapp ? "rounded-2xl text-sm" : "rounded-xl text-sm mb-4")}>
+            <div
+              className={cn(
+                "p-3 bg-destructive/10 border border-destructive/20 text-destructive text-center font-bold text-sm",
+                isMobileOrMiniapp ? "rounded-2xl" : "rounded-xl"
+              )}
+            >
               {payError}
             </div>
           )}
 
-          <div className="space-y-3">
+          {/* Payment grid (2 cols on mobile, list on desktop) */}
+          <div
+            className={cn(
+              isMobileOrMiniapp
+                ? "grid grid-cols-2 gap-2.5"
+                : "flex flex-col gap-2.5"
+            )}
+          >
+            {/* Balance */}
             {client && (
-              <Button
-                size="lg"
+              <button
+                type="button"
                 onClick={() => payByBalance(tariff)}
                 disabled={payLoading || !hasBalance}
-                className={cn("w-full shadow-lg border-0 group relative overflow-hidden", isMobileOrMiniapp ? "justify-between px-6 h-16 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400" : "gap-2 h-14 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300")}
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl border transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed",
+                  isMobileOrMiniapp
+                    ? "flex-col items-center justify-center p-4 border-white/5 bg-card/50 hover:bg-card/70 hover:border-primary/30 active:scale-95 col-span-2"
+                    : "px-4 py-3.5 bg-gradient-to-r from-primary to-primary/80 border-transparent text-primary-foreground hover:shadow-lg hover:-translate-y-0.5"
+                )}
               >
-                {!isMobileOrMiniapp && <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />}
-                
                 {isMobileOrMiniapp ? (
                   <>
-                    <div className="flex items-center gap-3">
-                      {payLoading ? <Loader2 className="h-6 w-6 text-white animate-spin" /> : <Wallet className="h-6 w-6 text-white" />}
-                      <span className="text-base font-bold text-white">{t("tariffs.payFromBalance")}</span>
+                    <div className="p-2.5 rounded-xl bg-primary/15">
+                      {payLoading ? (
+                        <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                      ) : (
+                        <Wallet className="h-5 w-5 text-primary" />
+                      )}
                     </div>
-                    <span className="text-white/80 font-mono font-medium bg-black/20 px-2 py-1 rounded-lg">
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-foreground leading-tight">
+                        {t("tariffs.payFromBalance")}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                        {formatMoney(client.balance, tariff.currency)}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {payLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+                    ) : (
+                      <Wallet className="h-5 w-5 shrink-0" />
+                    )}
+                    <span className="font-semibold text-sm flex-1 text-left">
+                      {t("tariffs.payFromBalance")}
+                    </span>
+                    <span className="font-mono text-sm opacity-80 bg-black/10 px-2 py-0.5 rounded-lg">
                       {formatMoney(client.balance, tariff.currency)}
                     </span>
                   </>
-                ) : (
-                  <>
-                    {payLoading ? <Loader2 className="h-5 w-5 animate-spin relative z-10" /> : <Wallet className="h-5 w-5 relative z-10" />}
-                    <span className="text-base font-semibold relative z-10">{t("tariffs.payFromBalance")}</span>
-                    <span className="opacity-90 font-medium ml-1 bg-black/10 px-2 py-0.5 rounded-md relative z-10">
-                      ({formatMoney(client.balance, payModal.tariff.currency)})
-                    </span>
-                  </>
                 )}
-              </Button>
+              </button>
             )}
 
+            {/* Crypto */}
             {cryptopayEnabled && (
-              <Button
-                size="lg"
-                variant="outline"
+              <PayMethodButton
+                isMobile={isMobileOrMiniapp}
+                icon={<Zap className="h-5 w-5 text-yellow-500" />}
+                iconBg="bg-yellow-500/15"
+                label={t("common.cryptoBot")}
                 onClick={() => startCryptopayPayment(tariff)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-yellow-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-yellow-500" /> : <Zap className="h-6 w-6 text-yellow-500" />}
-                    </div>
-                    <span className="text-base font-bold">{t("common.cryptoBot")}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-yellow-500" /> : <Zap className="h-5 w-5 text-yellow-500" />}
-                    </div>
-                    <span className="text-base font-medium">{t("tariffs.cryptoBot")}</span>
-                  </>
-                )}
-              </Button>
+              />
             )}
 
+            {/* Heleket */}
             {heleketEnabled && (
-              <Button
-                size="lg"
-                variant="outline"
+              <PayMethodButton
+                isMobile={isMobileOrMiniapp}
+                icon={<Zap className="h-5 w-5 text-orange-500" />}
+                iconBg="bg-orange-500/15"
+                label="Heleket"
                 onClick={() => startHeleketPayment(tariff)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-orange-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-orange-500" /> : <Zap className="h-6 w-6 text-orange-500" />}
-                    </div>
-                    <span className="text-base font-bold">Heleket</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-orange-500" /> : <Zap className="h-5 w-5 text-orange-500" />}
-                    </div>
-                    <span className="text-base font-medium">⚡ Heleket ({t("tariffs.crypto")})</span>
-                  </>
-                )}
-              </Button>
+              />
             )}
 
+            {/* YooKassa */}
             {yookassaEnabled && tariff.currency.toUpperCase() === "RUB" && (
-              <Button
-                size="lg"
-                variant="outline"
+              <PayMethodButton
+                isMobile={isMobileOrMiniapp}
+                icon={<CreditCard className="h-5 w-5 text-green-500" />}
+                iconBg="bg-green-500/15"
+                label={t("tariffs.sbp")}
                 onClick={() => startYookassaPayment(tariff)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                 {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-green-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
-                    </div>
-                    <span className="text-base font-bold">{t("tariffs.sbp")}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
-                    </div>
-                    <span className="text-base font-medium">💳 {t("tariffs.sbpShort")}</span>
-                  </>
-                )}
-              </Button>
+              />
             )}
 
+            {/* YooMoney */}
             {yoomoneyEnabled && tariff.currency.toUpperCase() === "RUB" && (
-              <Button
-                size="lg"
-                variant="outline"
+              <PayMethodButton
+                isMobile={isMobileOrMiniapp}
+                icon={<CreditCard className="h-5 w-5 text-green-500" />}
+                iconBg="bg-green-500/15"
+                label={t("tariffs.yoomoney")}
                 onClick={() => startYoomoneyPayment(tariff)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                 {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-green-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
-                    </div>
-                    <span className="text-base font-bold">{t("tariffs.yoomoney")}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
-                    </div>
-                    <span className="text-base font-medium">💳 {t("tariffs.cards")}</span>
-                  </>
-                )}
-              </Button>
+              />
             )}
 
+            {/* Platega methods */}
             {plategaMethods.map((m) => (
-              <Button
+              <PayMethodButton
                 key={m.id}
-                size="lg"
-                variant="outline"
+                isMobile={isMobileOrMiniapp}
+                icon={<CreditCard className="h-5 w-5 text-green-500" />}
+                iconBg="bg-green-500/15"
+                label={m.label}
                 onClick={() => startPayment(tariff, m.id)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-green-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
-                    </div>
-                    <span className="text-base font-bold">{m.label}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
-                    </div>
-                    <span className="text-base font-medium">💳 {m.label}</span>
-                  </>
-                )}
-              </Button>
+              />
             ))}
           </div>
         </div>
@@ -594,10 +664,13 @@ export function ClientTariffsPage() {
     );
   };
 
+  // ════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ════════════════════════════════════════════════════════════════════════
   return (
     <>
       <AnimatePresence mode="wait">
-        {/* MOBILE VIEW */}
+        {/* MOBILE: payment page */}
         {isMobileOrMiniapp && payModal ? (
           <motion.div
             key="payment-view"
@@ -607,25 +680,26 @@ export function ClientTariffsPage() {
             transition={{ duration: 0.2 }}
             className="flex flex-col w-full rounded-[2.5rem] border border-white/10 dark:border-white/5 bg-slate-50/60 dark:bg-slate-950/60 backdrop-blur-[32px] shadow-2xl relative"
           >
-            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border/50 bg-background/30 backdrop-blur-md z-10 transition-colors rounded-t-[2.5rem]">
-              <div className="flex items-center gap-3 min-w-0">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="shrink-0 h-9 w-9 rounded-full bg-background/50 hover:bg-background/80 transition-transform hover:scale-105" 
-                  onClick={closePayment}
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-sm sm:text-base font-bold truncate text-foreground">{t("tariffs.payTitle")}</h2>
-                  <p className="text-[11px] font-medium text-muted-foreground truncate">{payModal.tariff.name}</p>
-                </div>
+            <div className="flex items-center gap-3 px-4 py-4 border-b border-border/50 bg-background/30 backdrop-blur-md rounded-t-[2.5rem]">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="shrink-0 h-9 w-9 rounded-full bg-background/50 hover:bg-background/80"
+                onClick={closePayment}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-bold truncate text-foreground">
+                  {t("tariffs.payTitle")}
+                </h2>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">
+                  {payModal.tariff.name}
+                </p>
               </div>
             </div>
-
-            <div className="p-4 sm:p-6 pb-8">
-               <PaymentContent />
+            <div className="p-4 pb-8">
+              <PaymentContent />
             </div>
           </motion.div>
         ) : (
@@ -635,20 +709,24 @@ export function ClientTariffsPage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.2 }}
-            className="space-y-8 max-w-6xl mx-auto"
+            className="space-y-6 max-w-6xl mx-auto"
           >
-            <div className="flex flex-col gap-2">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">{t("tariffs.title")}</h1>
+            {/* Header */}
+            <div className="flex flex-col gap-1.5">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                {t("tariffs.title")}
+              </h1>
               <p className="text-muted-foreground text-[15px] font-medium max-w-2xl">
                 {t("tariffs.subtitle")}
               </p>
             </div>
 
+            {/* Trial banner */}
             {showTrial && (
-              <Card className="rounded-3xl border border-green-500/30 bg-green-500/5 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="rounded-3xl border border-green-500/30 bg-green-500/5 backdrop-blur-xl shadow-lg">
                 <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-6">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-500/20 text-green-500 shadow-inner shrink-0">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-500/20 text-green-500 shrink-0">
                       <Gift className="h-6 w-6" />
                     </div>
                     <div>
@@ -661,108 +739,190 @@ export function ClientTariffsPage() {
                     </div>
                   </div>
                   <Button
-                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-lg h-12 rounded-xl text-md hover:scale-[1.02] transition-transform duration-300 shrink-0 gap-2"
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-lg h-12 rounded-xl gap-2 shrink-0"
                     onClick={activateTrial}
                     disabled={trialLoading}
                   >
-                    {trialLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Gift className="h-5 w-5" />}
+                    {trialLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Gift className="h-5 w-5" />
+                    )}
                     {t("tariffs.activateTrial")}
                   </Button>
                 </CardContent>
-                {trialError && <p className="text-sm text-destructive px-6 pb-4 font-medium">{trialError}</p>}
+                {trialError && (
+                  <p className="text-sm text-destructive px-6 pb-4 font-medium">{trialError}</p>
+                )}
               </Card>
             )}
 
+            {/* Tariffs */}
             {loading ? (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex items-center justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
               </div>
             ) : tariffs.length === 0 ? (
-              <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-sm">
+              <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-4">
                   <Package className="h-12 w-12 opacity-20" />
-                  <p className="text-base font-medium text-center">{t("tariffs.noTariffs")}</p>
+                  <p className="text-base font-medium">{t("tariffs.noTariffs")}</p>
                 </CardContent>
               </Card>
-            ) : useCategoryCardLayout ? (
-              <div className="space-y-1">
-                {tariffs.map((cat, catIndex) => (
-                  <Collapsible
-                    key={cat.id}
-                    open={expandedCategoryId === cat.id}
-                    onOpenChange={(open) => setExpandedCategoryId(open ? cat.id : null)}
-                  >
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, delay: catIndex * 0.03 }}
-                      className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg overflow-hidden transition-all duration-300"
-                    >
-                      <CollapsibleTrigger asChild>
-                        <button
-                          type="button"
-                          className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-muted/20 active:bg-muted/30 transition-colors"
+            ) : isMobileOrMiniapp ? (
+              // ── MOBILE: full-width vertical stacked cards ─────────────
+              <div className="space-y-4">
+                {tariffs.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    {tariffs.map((cat, idx) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCatIndex(idx)}
+                        className={cn(
+                          "shrink-0 px-4 py-2 rounded-full text-sm font-semibold border transition-all duration-200",
+                          selectedCatIndex === idx
+                            ? "bg-primary text-primary-foreground border-primary shadow-md"
+                            : "bg-card/40 border-border/50 text-muted-foreground"
+                        )}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {tariffs[selectedCatIndex] && (
+                  <div className="space-y-3">
+                    {tariffs[selectedCatIndex].tariffs.map((tariffItem, tidx) => {
+                      const catLength = tariffs[selectedCatIndex].tariffs.length;
+                      const isPopular = catLength >= 2 && tidx === 1;
+                      const dailyPrice =
+                        tariffItem.durationDays && tariffItem.durationDays > 0
+                          ? formatDailyPrice(tariffItem.price, tariffItem.durationDays, tariffItem.currency)
+                          : null;
+                      const trafficLabel =
+                        tariffItem.trafficLimitBytes != null && tariffItem.trafficLimitBytes > 0
+                          ? `${(tariffItem.trafficLimitBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
+                          : "∞";
+
+                      return (
+                        <motion.div
+                          key={tariffItem.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.25, delay: tidx * 0.06 }}
+                          className={cn(
+                            "relative rounded-3xl overflow-hidden flex flex-col",
+                            isPopular
+                              ? "shadow-2xl shadow-primary/30 ring-2 ring-primary/60"
+                              : "border border-border/50 shadow-md bg-card/50 backdrop-blur-sm"
+                          )}
                         >
-                          <span className="flex items-center gap-3 font-bold text-[16px] text-foreground">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary shadow-inner shrink-0">
-                              <Package className="h-4 w-4" />
+                          {isPopular && (
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-primary/70 pointer-events-none" />
+                          )}
+
+                          <div className="relative flex flex-col p-5 gap-4">
+                            {/* Header row */}
+                            <div className="flex items-start justify-between gap-2">
+                              <p className={cn(
+                                "text-[15px] font-bold",
+                                isPopular ? "text-primary-foreground/75" : "text-muted-foreground"
+                              )}>
+                                {tariffItem.name}
+                              </p>
+                              {isPopular && (
+                                <span className="shrink-0 flex items-center gap-1 bg-primary-foreground/20 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-primary-foreground">
+                                  <Flame className="h-3 w-3" />
+                                  {t("tariffs.popular")}
+                                </span>
+                              )}
                             </div>
-                            {cat.name}
-                          </span>
-                          <ChevronDown
-                            className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-300 ${expandedCategoryId === cat.id ? "rotate-180" : ""}`}
-                          />
-                        </button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="px-3 pb-4 pt-1 flex flex-col gap-3">
-                          {cat.tariffs.map((tariffItem) => (
-                            <Card key={tariffItem.id} className="rounded-2xl border border-border/50 bg-background/50 backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-300">
-                              <CardContent className="flex flex-row items-center gap-4 py-4 px-4 min-h-0 min-w-0">
-                                <div className="flex-1 min-w-0 space-y-1.5">
-                                  <p className="text-[15px] font-bold leading-tight truncate text-foreground">{tariffItem.name}</p>
-                                  {tariffItem.description?.trim() ? (
-                                    <p className="text-xs text-muted-foreground font-medium line-clamp-2">{tariffItem.description}</p>
-                                  ) : null}
-                                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                                    <span className="flex items-center gap-1.5 bg-background/50 px-2 py-1 rounded-md border border-border/50">
-                                      <Calendar className="h-3 w-3 text-primary" />
-                                      {tariffItem.durationDays} {t("tariffs.daysShort")}
-                                    </span>
-                                    <span className="flex items-center gap-1.5 bg-background/50 px-2 py-1 rounded-md border border-border/50">
-                                      <Wifi className="h-3 w-3 text-primary" />
-                                      {tariffItem.trafficLimitBytes != null && tariffItem.trafficLimitBytes > 0 ? `${(tariffItem.trafficLimitBytes / 1024 / 1024 / 1024).toFixed(1)} GB` : "∞"}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="flex flex-col items-center justify-center gap-2.5 shrink-0 min-w-[90px]">
-                                  <span className="text-lg font-bold tabular-nums whitespace-nowrap text-foreground" title={formatMoney(tariffItem.price, tariffItem.currency)}>
-                                    {formatMoney(tariffItem.price, tariffItem.currency)}
-                                  </span>
-                                  {token ? (
-                                    <Button
-                                      size="sm"
-                                      className="w-full h-9 rounded-xl shadow-md text-xs font-semibold gap-1.5 hover:scale-105 transition-transform"
-                                      onClick={() => setPayModal({ tariff: { ...tariffItem } })}
-                                    >
-                                      <CreditCard className="h-3.5 w-3.5 shrink-0" />
-                                      {t("tariffs.pay")}
-                                    </Button>
-                                  ) : (
-                                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">{t("tariffs.inBot")}</span>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </motion.div>
-                  </Collapsible>
-                ))}
+
+                            {/* Price — HERO */}
+                            <div>
+                              <p className={cn(
+                                "font-black tabular-nums leading-none",
+                                isPopular ? "text-primary-foreground" : "text-foreground"
+                              )} style={{ fontSize: 52 }}>
+                                {formatMoney(tariffItem.price, tariffItem.currency)}
+                              </p>
+                              {dailyPrice && (
+                                <p className={cn(
+                                  "text-[13px] font-medium mt-1.5",
+                                  isPopular ? "text-primary-foreground/55" : "text-muted-foreground"
+                                )}>
+                                  {dailyPrice} / {t("tariffs.day")}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Spec chips */}
+                            <div className="flex flex-wrap gap-2">
+                              {[
+                                { icon: <Calendar className="h-3 w-3" />, label: `${tariffItem.durationDays} ${t("tariffs.daysShort")}` },
+                                { icon: <Wifi className="h-3 w-3" />, label: trafficLabel },
+                                ...(tariffItem.deviceLimit != null && tariffItem.deviceLimit > 0
+                                  ? [{ icon: <Smartphone className="h-3 w-3" />, label: String(tariffItem.deviceLimit) }]
+                                  : []),
+                              ].map((chip, ci) => (
+                                <span key={ci} className={cn(
+                                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold",
+                                  isPopular
+                                    ? "bg-primary-foreground/15 text-primary-foreground"
+                                    : "bg-background/60 border border-border/50 text-foreground"
+                                )}>
+                                  {chip.icon}{chip.label}
+                                </span>
+                              ))}
+                            </div>
+
+                            {tariffItem.description?.trim() && (
+                              <p className={cn(
+                                "text-[12px] leading-relaxed line-clamp-2",
+                                isPopular ? "text-primary-foreground/55" : "text-muted-foreground"
+                              )}>
+                                {tariffItem.description}
+                              </p>
+                            )}
+
+                            {/* CTA */}
+                            {token ? (
+                              <Button
+                                className={cn(
+                                  "w-full h-13 rounded-2xl font-bold text-base",
+                                  isPopular
+                                    ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
+                                    : "shadow-md"
+                                )}
+                                onClick={() => setPayModal({ tariff: { ...tariffItem } })}
+                              >
+                                {t("tariffs.pay")}
+                              </Button>
+                            ) : (
+                              <div className={cn(
+                                "w-full h-13 rounded-2xl flex items-center justify-center",
+                                isPopular ? "bg-primary-foreground/10" : "bg-muted/40 border border-border/50"
+                              )}>
+                                <span className={cn(
+                                  "text-[12px] font-bold uppercase tracking-wider",
+                                  isPopular ? "text-primary-foreground/60" : "text-muted-foreground"
+                                )}>
+                                  {t("tariffs.inBot")}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="space-y-8">
+              // ── DESKTOP: category sections + card grid ───────────────
+              <div className="space-y-10">
                 {tariffs.map((cat, catIndex) => (
                   <motion.section
                     key={cat.id}
@@ -770,70 +930,133 @@ export function ClientTariffsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: catIndex * 0.05 }}
                   >
-                    <h2 className="text-xl font-bold mb-4 flex items-center gap-3 text-foreground">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary shadow-inner shrink-0">
-                        <Package className="h-5 w-5" />
-                      </div>
-                      {cat.name}
-                    </h2>
-                    <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {cat.tariffs.map((tariffItem) => (
-                        <Card key={tariffItem.id} className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col group hover:-translate-y-1">
-                          <CardContent className="flex-1 flex flex-col p-5 min-h-0 min-w-0">
-                            <div className="mb-4">
-                              <p className="text-lg font-bold leading-tight line-clamp-2 text-foreground group-hover:text-primary transition-colors">{tariffItem.name}</p>
-                              {tariffItem.description?.trim() ? (
-                                <p className="text-sm text-muted-foreground font-medium mt-1.5 line-clamp-2">{tariffItem.description}</p>
-                              ) : null}
-                            </div>
+                    {tariffs.length > 1 && (
+                      <h2 className="text-xl font-bold mb-6 text-foreground">{cat.name}</h2>
+                    )}
+                    <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 items-stretch">
+                      {cat.tariffs.map((tariffItem, tidx) => {
+                        const catLength = cat.tariffs.length;
+                        const isPopular = catLength >= 2 && tidx === 1;
+                        const dailyPrice =
+                          tariffItem.durationDays && tariffItem.durationDays > 0
+                            ? formatDailyPrice(tariffItem.price, tariffItem.durationDays, tariffItem.currency)
+                            : null;
+                        const trafficLabel =
+                          tariffItem.trafficLimitBytes != null && tariffItem.trafficLimitBytes > 0
+                            ? `${(tariffItem.trafficLimitBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
+                            : t("tariffs.unlimitedTraffic");
 
-                            <div className="flex flex-col gap-2.5 mt-auto mb-5 text-sm font-semibold text-muted-foreground">
-                              <div className="flex items-center gap-3 bg-background/50 px-3 py-2 rounded-xl border border-border/50">
-                                <div className="bg-primary/20 p-1.5 rounded-lg text-primary">
-                                  <Calendar className="h-4 w-4 shrink-0" />
-                                </div>
-                                <span>{tariffItem.durationDays} {t("tariffs.daysLong")}</span>
-                              </div>
-                              <div className="flex items-center gap-3 bg-background/50 px-3 py-2 rounded-xl border border-border/50">
-                                <div className="bg-primary/20 p-1.5 rounded-lg text-primary">
-                                  <Wifi className="h-4 w-4 shrink-0" />
-                                </div>
-                                <span>
-                                  {tariffItem.trafficLimitBytes != null && tariffItem.trafficLimitBytes > 0
-                                    ? `${(tariffItem.trafficLimitBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
-                                    : t("tariffs.unlimitedTraffic")}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3 bg-background/50 px-3 py-2 rounded-xl border border-border/50">
-                                <div className="bg-primary/20 p-1.5 rounded-lg text-primary">
-                                  <Smartphone className="h-4 w-4 shrink-0" />
-                                </div>
-                                <span>{tariffItem.deviceLimit != null && tariffItem.deviceLimit > 0 ? `${tariffItem.deviceLimit}` : "∞"} {t("tariffs.devices")}</span>
-                              </div>
-                            </div>
+                        return (
+                          <div
+                            key={tariffItem.id}
+                            className={cn(
+                              "relative rounded-3xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1",
+                              isPopular
+                                ? "shadow-2xl shadow-primary/30 ring-2 ring-primary/60 hover:-translate-y-2"
+                                : "border border-border/50 shadow-lg hover:shadow-xl bg-card/50 backdrop-blur-xl"
+                            )}
+                          >
+                            {isPopular && (
+                              <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-primary/70 pointer-events-none" />
+                            )}
 
-                            <div className="pt-4 border-t border-border/50 mt-auto flex flex-col gap-3 min-w-0">
-                              <span className="text-2xl font-black tabular-nums truncate min-w-0 text-foreground text-center" title={formatMoney(tariffItem.price, tariffItem.currency)}>
-                                {formatMoney(tariffItem.price, tariffItem.currency)}
-                              </span>
-                              {token ? (
-                                <Button
-                                  size="lg"
-                                  className="w-full h-12 rounded-xl shadow-md text-[15px] font-bold gap-2 hover:scale-[1.02] transition-transform"
-                                  onClick={() => setPayModal({ tariff: { ...tariffItem } })}
-                                >
-                                  <CreditCard className="h-5 w-5 shrink-0" />
-                                  {t("tariffs.pay")}
-                                </Button>
-                              ) : (
-                                <div className="w-full h-12 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center">
-                                  <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{t("tariffs.inBot")}</span>
-                                </div>
+                            <div className="relative flex flex-col flex-1 p-6 gap-5">
+                              {/* Header */}
+                              <div className="flex items-start justify-between gap-2 min-h-[2rem]">
+                                <p className={cn(
+                                  "text-[15px] font-bold",
+                                  isPopular ? "text-primary-foreground/75" : "text-muted-foreground"
+                                )}>
+                                  {tariffItem.name}
+                                </p>
+                                {isPopular && (
+                                  <span className="shrink-0 flex items-center gap-1 bg-primary-foreground/20 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-primary-foreground">
+                                    <Flame className="h-3 w-3" />
+                                    {t("tariffs.popular")}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Price — HERO */}
+                              <div>
+                                <p className={cn(
+                                  "font-black tabular-nums leading-none",
+                                  isPopular ? "text-primary-foreground" : "text-foreground"
+                                )} style={{ fontSize: 44 }}>
+                                  {formatMoney(tariffItem.price, tariffItem.currency)}
+                                </p>
+                                {dailyPrice && (
+                                  <p className={cn(
+                                    "text-[13px] font-medium mt-1.5",
+                                    isPopular ? "text-primary-foreground/55" : "text-muted-foreground"
+                                  )}>
+                                    {dailyPrice} / {t("tariffs.day")}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Spec chips */}
+                              <div className="flex flex-wrap gap-2">
+                                {[
+                                  { icon: <Calendar className="h-3.5 w-3.5" />, label: `${tariffItem.durationDays} ${t("tariffs.daysShort")}` },
+                                  { icon: <Wifi className="h-3.5 w-3.5" />, label: trafficLabel },
+                                  ...(tariffItem.deviceLimit != null && tariffItem.deviceLimit > 0
+                                    ? [{ icon: <Smartphone className="h-3.5 w-3.5" />, label: `${tariffItem.deviceLimit}` }]
+                                    : []),
+                                ].map((chip, ci) => (
+                                  <span key={ci} className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold",
+                                    isPopular
+                                      ? "bg-primary-foreground/15 text-primary-foreground"
+                                      : "bg-background/60 border border-border/50 text-foreground"
+                                  )}>
+                                    {chip.icon}{chip.label}
+                                  </span>
+                                ))}
+                              </div>
+
+                              {tariffItem.description?.trim() && (
+                                <p className={cn(
+                                  "text-[13px] leading-relaxed line-clamp-2",
+                                  isPopular ? "text-primary-foreground/55" : "text-muted-foreground"
+                                )}>
+                                  {tariffItem.description}
+                                </p>
                               )}
+
+                              {/* CTA */}
+                              <div className="mt-auto pt-2">
+                                {token ? (
+                                  <Button
+                                    size="lg"
+                                    className={cn(
+                                      "w-full h-12 rounded-xl font-bold text-[15px]",
+                                      isPopular
+                                        ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-xl"
+                                        : "shadow-md"
+                                    )}
+                                    onClick={() => setPayModal({ tariff: { ...tariffItem } })}
+                                  >
+                                    {t("tariffs.pay")}
+                                  </Button>
+                                ) : (
+                                  <div className={cn(
+                                    "w-full h-12 rounded-xl flex items-center justify-center",
+                                    isPopular ? "bg-primary-foreground/10" : "bg-muted/50 border border-border/50"
+                                  )}>
+                                    <span className={cn(
+                                      "text-sm font-bold uppercase tracking-wider",
+                                      isPopular ? "text-primary-foreground/60" : "text-muted-foreground"
+                                    )}>
+                                      {t("tariffs.inBot")}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   </motion.section>
                 ))}
@@ -843,10 +1066,19 @@ export function ClientTariffsPage() {
         )}
       </AnimatePresence>
 
-      {/* DESKTOP VIEW: DIALOG БЕЗ СКРОЛЛИНГА */}
+      {/* Desktop payment dialog */}
       {!isMobileOrMiniapp && (
-        <Dialog open={!!payModal} onOpenChange={(open) => { if (!open && !payLoading) closePayment(); }}>
-          <DialogContent className="w-full max-w-md mx-auto sm:rounded-3xl p-5 sm:p-6 border border-border/50 bg-card/60 backdrop-blur-3xl shadow-2xl" showCloseButton={!payLoading} onOpenAutoFocus={(e) => e.preventDefault()}>
+        <Dialog
+          open={!!payModal}
+          onOpenChange={(open) => {
+            if (!open && !payLoading) closePayment();
+          }}
+        >
+          <DialogContent
+            className="w-full max-w-md mx-auto sm:rounded-3xl p-5 sm:p-6 border border-border/50 bg-card/60 backdrop-blur-3xl shadow-2xl"
+            showCloseButton={!payLoading}
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
             <DialogHeader className="mb-4 text-center sm:text-left">
               <DialogTitle className="text-2xl font-bold flex items-center justify-center sm:justify-start gap-2">
                 <div className="p-2 bg-primary/10 rounded-xl">
@@ -860,7 +1092,12 @@ export function ClientTariffsPage() {
             <PaymentContent />
 
             <DialogFooter className="mt-4 sm:justify-center border-t border-border/50 pt-4">
-              <Button variant="ghost" onClick={closePayment} disabled={payLoading} className="rounded-xl hover:bg-background/50 hover:text-foreground text-muted-foreground transition-colors">
+              <Button
+                variant="ghost"
+                onClick={closePayment}
+                disabled={payLoading}
+                className="rounded-xl hover:bg-background/50 hover:text-foreground text-muted-foreground"
+              >
                 {t("common.cancel")}
               </Button>
             </DialogFooter>
@@ -868,5 +1105,48 @@ export function ClientTariffsPage() {
         </Dialog>
       )}
     </>
+  );
+}
+
+// ── Reusable payment method button ─────────────────────────────────────────
+function PayMethodButton({
+  isMobile,
+  icon,
+  iconBg,
+  label,
+  onClick,
+  disabled,
+}: {
+  isMobile: boolean;
+  icon: React.ReactNode;
+  iconBg: string;
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex items-center gap-3 rounded-2xl border transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed",
+        isMobile
+          ? "flex-col items-center justify-center p-4 border-white/5 bg-card/50 hover:bg-card/70 hover:border-primary/30 active:scale-95"
+          : "px-4 py-3.5 border-border/50 bg-background/40 hover:bg-background/70 hover:border-primary/30 hover:-translate-y-0.5"
+      )}
+    >
+      {isMobile ? (
+        <>
+          <div className={cn("p-2.5 rounded-xl", iconBg)}>{icon}</div>
+          <p className="text-sm font-bold text-foreground text-center leading-tight">{label}</p>
+        </>
+      ) : (
+        <>
+          <div className={cn("p-1.5 rounded-lg shrink-0", iconBg)}>{icon}</div>
+          <span className="font-semibold text-sm text-foreground flex-1 text-left">{label}</span>
+        </>
+      )}
+    </button>
   );
 }

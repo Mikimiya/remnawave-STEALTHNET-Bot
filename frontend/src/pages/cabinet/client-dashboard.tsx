@@ -7,7 +7,7 @@ import {
   Wallet,
   Wifi,
   Calendar,
-  
+  Monitor,
   
   ArrowRight,
   PlusCircle,
@@ -28,7 +28,7 @@ import { api } from "@/lib/api";
 import { formatDays } from "@/i18n";
 import type { ClientPayment, ClientReferralStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useTranslation } from "react-i18next";
 
 function formatDate(s: string | null, lang?: string) {
@@ -114,6 +114,8 @@ export function ClientDashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [subscription, setSubscription] = useState<unknown>(null);
   const [tariffDisplayName, setTariffDisplayName] = useState<string | null>(null);
+  const [tariffCategoryName, setTariffCategoryName] = useState<string | null>(null);
+  const [isTrial, setIsTrial] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const [_payments, setPayments] = useState<ClientPayment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +170,8 @@ export function ClientDashboardPage() {
         if (cancelled) return;
         setSubscription(subRes.subscription ?? null);
         setTariffDisplayName(subRes.tariffDisplayName ?? null);
+        setTariffCategoryName(subRes.tariffCategoryName ?? null);
+        setIsTrial(subRes.isTrial ?? false);
         if (subRes.message) setSubscriptionError(subRes.message);
         setPayments(payRes.items ?? []);
       })
@@ -306,8 +310,15 @@ export function ClientDashboardPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{t("dashboard.plan")}</p>
-                      <p className="text-[14px] font-semibold truncate text-foreground" title={((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
-                        {((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                      <p className="text-[14px] font-semibold truncate text-foreground" title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
+                        {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 font-medium truncate">
+                        {isTrial
+                          ? t("dashboard.freeTrial")
+                          : tariffCategoryName
+                            ? tariffCategoryName
+                            : ""}
                       </p>
                     </div>
                   </div>
@@ -501,183 +512,244 @@ export function ClientDashboardPage() {
         </div>
       </motion.section>
 
-      {/* Cards grid */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Подписка / тариф */}
-        <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 sm:col-span-2 lg:col-span-1 flex flex-col">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl text-foreground">
-              <div className="p-2.5 bg-primary/20 rounded-xl">
-                <Package className="h-6 w-6 text-primary" />
-              </div>
-              {t("dashboard.mySubscription")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col justify-center">
-            {loading ? (
-              <div className="flex justify-center py-6"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-            ) : subscriptionError || !hasActiveSubscription ? (
-              <NoSubscriptionState />
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/20">
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {t("dashboard.active")}
-                  </span>
-                  {daysLeft != null && (
-                    <span className="text-sm font-semibold text-foreground bg-foreground/5 px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
-                      {t("dashboard.daysLeft_many", { count: daysLeft })}
+      {/* Bento grid — 12-col, 3 rows */}
+      <div className="grid gap-5 lg:grid-cols-12 auto-rows-auto">
+
+        {/* ═══ ROW 1: Subscription status hero — full width ═══ */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+          className="lg:col-span-12"
+        >
+          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden group">
+            <div className="absolute -top-20 -left-20 h-48 w-48 rounded-full bg-primary/15 blur-[90px] pointer-events-none group-hover:bg-primary/25 transition-colors duration-700" />
+            <div className="absolute -bottom-16 -right-16 h-40 w-40 rounded-full bg-primary/10 blur-[70px] pointer-events-none" />
+
+            <CardContent className="relative z-10 p-6 sm:p-8">
+              {loading ? (
+                <div className="flex justify-center py-10"><Loader2 className="h-10 w-10 animate-spin text-muted-foreground" /></div>
+              ) : subscriptionError || !hasActiveSubscription ? (
+                <NoSubscriptionState />
+              ) : (
+                <div className="flex flex-col gap-5">
+                  {/* Top row: title + active badge */}
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-primary/20 rounded-xl shadow-inner border border-primary/10">
+                        <Package className="h-6 w-6 text-primary" />
+                      </div>
+                      <h2 className="text-xl font-bold text-foreground">{t("dashboard.mySubscription")}</h2>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/20 shadow-sm">
+                      <span className="h-2 w-2 rounded-full bg-current animate-pulse" />
+                      {t("dashboard.active")}
                     </span>
-                  )}
+                  </div>
+
+                  {/* Main metrics row: 4 items in a row */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Plan — hero metric */}
+                    {((tariffDisplayName ?? subParsed.productName) || client?.trialUsed) && (
+                      <div className="relative rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border border-primary/20 p-5 overflow-hidden">
+                        <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-primary/20 blur-[40px] pointer-events-none" />
+                        <div className="relative flex flex-col justify-between h-full">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Package className="h-4 w-4 text-primary" />
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-primary/80">{t("dashboard.plan")}</p>
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold truncate text-foreground" title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
+                              {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-1 font-medium truncate">
+                              {isTrial
+                                ? t("dashboard.freeTrial")
+                                : tariffCategoryName
+                                  ? tariffCategoryName
+                                  : ""}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Days left */}
+                    {daysLeft != null && (
+                      <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col justify-between">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calendar className="h-4 w-4 text-primary" />
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.validUntil")}</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold text-foreground">
+                            {t("dashboard.daysLeft_many", { count: daysLeft })}
+                          </p>
+                          {subParsed.expireAt && (
+                            <p className="text-[12px] text-muted-foreground mt-1 font-medium">
+                              {formatDate(subParsed.expireAt, lang)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Traffic */}
+                    <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col justify-center">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wifi className="h-4 w-4 text-primary" />
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.traffic")}</p>
+                      </div>
+                      <p className="text-lg font-bold text-foreground">
+                        {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
+                          ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
+                          : t("dashboard.unlimited")}
+                      </p>
+                      {trafficPercent != null && (
+                        <div className="mt-2.5 h-2 w-full rounded-full bg-muted/30 overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${trafficPercent}%` }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Devices */}
+                    <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col justify-between">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Monitor className="h-4 w-4 text-primary" />
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.devices")}</p>
+                      </div>
+                      <p className="text-lg font-bold text-foreground">
+                        {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0
+                          ? subParsed.hwidDeviceLimit
+                          : "∞"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                {((tariffDisplayName ?? subParsed.productName) || client?.trialUsed) && (
-                  <div className="flex items-center gap-4 bg-background/40 p-4 rounded-2xl border border-border/50 transition-colors hover:bg-background/60 shadow-sm">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Package className="h-6 w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{t("dashboard.plan")}</p>
-                      <p className="text-[15px] font-semibold truncate text-foreground">
-                        {((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
-                      </p>
-                    </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* ═══ ROW 2: Balance (left 7) + Referral (right 5) ═══ */}
+
+        {/* Balance */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.12 }}
+          className="lg:col-span-7"
+        >
+          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 h-full relative overflow-hidden group">
+            <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-primary/10 blur-[70px] pointer-events-none group-hover:bg-primary/20 transition-colors duration-700" />
+
+            <CardContent className="relative z-10 p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-5">
+                  <div className="p-3 bg-primary/20 rounded-xl shadow-inner border border-primary/10">
+                    <Wallet className="h-7 w-7 text-primary" />
                   </div>
-                )}
-                {subParsed.expireAt && (
-                  <div className="flex items-center gap-4 bg-background/40 p-4 rounded-2xl border border-border/50 transition-colors hover:bg-background/60 shadow-sm">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Calendar className="h-6 w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{t("dashboard.validUntil")}</p>
-                      <p className="text-[15px] font-semibold text-foreground">
-                        {formatDate(subParsed.expireAt, lang)}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{t("dashboard.balance")}</p>
+                    <p className="text-4xl font-extrabold tracking-tight text-foreground drop-shadow-sm leading-none">
+                      {formatMoney(client.balance, client.preferredCurrency)}
+                    </p>
+                    <p className="text-[13px] text-muted-foreground mt-1">{t("dashboard.onAccount")}</p>
                   </div>
-                )}
-                <div className="bg-background/40 p-4 rounded-2xl border border-border/50 space-y-3 transition-colors hover:bg-background/60 shadow-sm">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Wifi className="h-6 w-6" />
+                </div>
+                <Button variant="default" size="lg" className="gap-2 shadow-lg h-13 rounded-xl text-[15px] hover:scale-105 transition-transform shrink-0 px-7 [&_svg]:self-center [&_span]:leading-none" asChild>
+                  <Link to="/cabinet/profile#topup" className="inline-flex items-center justify-center gap-2 leading-none">
+                    <PlusCircle className="h-5 w-5 shrink-0" />
+                    <span className="inline-flex items-center leading-none">{t("dashboard.topUpBalance")}</span>
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Referral / Connection */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="lg:col-span-5"
+        >
+          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 h-full relative overflow-hidden group">
+            <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-primary/10 blur-[60px] pointer-events-none group-hover:bg-primary/20 transition-colors duration-700" />
+
+            <CardContent className="relative z-10 p-6 sm:p-8 flex flex-col justify-center h-full">
+              {hasReferralLinks ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="p-2.5 bg-primary/20 rounded-xl shadow-inner border border-primary/10">
+                      <Users className="h-6 w-6 text-primary" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{t("dashboard.traffic")}</p>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[15px] font-semibold text-foreground">
-                          {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
-                            ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
-                            : t("dashboard.unlimited")}
-                        </p>
-                        {trafficPercent != null && <span className="text-[13px] font-bold text-muted-foreground">{trafficPercent}%</span>}
+                    <h3 className="text-lg font-bold text-foreground">{t("dashboard.referrals")}</h3>
+                  </div>
+                  <p className="text-[14px] text-muted-foreground leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: t("dashboard.referralShareDesc") }}
+                  />
+                  {referralLinkSite && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.site")}</p>
+                      <div className="flex items-center gap-2">
+                        <code className="rounded-xl bg-background/50 border border-border/50 px-3 py-2.5 text-[13px] font-mono flex-1 truncate block text-foreground/80" title={referralLinkSite}>
+                          {referralLinkSite}
+                        </code>
+                        <Button variant="secondary" size="icon" onClick={() => copyReferral("site")} className="shrink-0 h-10 w-10 rounded-xl hover:scale-105 transition-transform border border-border/50 bg-background/50" title={t("common.copy")}>
+                          {referralCopied === "site" ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-foreground/70" />}
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                  {trafficPercent != null && (
-                    <div className="h-2 w-full rounded-full bg-muted/30 overflow-hidden">
-                      <div className="h-full rounded-full bg-primary transition-all duration-500 ease-in-out" style={{ width: `${trafficPercent}%` }} />
-                    </div>
                   )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Баланс + пополнение */}
-        <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl text-foreground">
-              <div className="p-2.5 bg-primary/20 rounded-xl">
-                <Wallet className="h-6 w-6 text-primary" />
-              </div>
-              {t("dashboard.balance")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6 flex-1 flex flex-col justify-center text-center">
-            <div>
-              <p className="text-5xl font-extrabold tracking-tight text-foreground drop-shadow-sm">
-                {formatMoney(client.balance, client.preferredCurrency)}
-              </p>
-              <p className="text-[15px] text-muted-foreground mt-3">{t("dashboard.onAccount")}</p>
-            </div>
-            <Button variant="default" size="lg" className="w-full gap-2 shadow-lg h-14 rounded-xl text-[16px] hover:scale-105 transition-transform [&_svg]:self-center [&_span]:leading-none" asChild>
-              <Link to="/cabinet/profile#topup" className="inline-flex items-center justify-center gap-2 leading-none">
-                <PlusCircle className="h-5 w-5 shrink-0" />
-                <span className="inline-flex items-center leading-none">{t("dashboard.topUpBalance")}</span>
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Справа от баланса: Рефералы или Подключение */}
-        <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 sm:col-span-2 lg:col-span-1">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl text-foreground">
-              <div className="p-2.5 bg-primary/20 rounded-xl">
-                {hasReferralLinks ? <Users className="h-6 w-6 text-primary" /> : <Wifi className="h-6 w-6 text-primary" />}
-              </div>
-              {hasReferralLinks ? t("dashboard.referrals") : t("dashboard.connection")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5 pt-2 flex flex-col justify-center h-[calc(100%-5rem)]">
-            {hasReferralLinks ? (
-              <>
-                <p className="text-[15px] text-muted-foreground leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: t("dashboard.referralShareDesc") }}
-                />
-                {referralLinkSite && (
-                  <div className="space-y-2">
-                    <p className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">{t("dashboard.site")}</p>
-                    <div className="flex items-center gap-2">
-                      <code className="rounded-xl bg-background/50 border border-border/50 px-4 py-3 text-[15px] font-mono flex-1 truncate block text-foreground/80" title={referralLinkSite}>
-                        {referralLinkSite}
-                      </code>
-                      <Button variant="secondary" size="icon" onClick={() => copyReferral("site")} className="shrink-0 h-12 w-12 rounded-xl hover:scale-105 transition-transform border border-border/50 bg-background/50" title={t("common.copy")}>
-                        {referralCopied === "site" ? <Check className="h-5 w-5 text-green-500" /> : <Copy className="h-5 w-5 text-foreground/70" />}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                <div className="pt-3">
-                  <Button variant="outline" className="w-full rounded-xl h-12 text-[15px] bg-background/30 hover:bg-background/60 transition-colors border-border/50 [&_svg]:self-center [&_span]:leading-none" asChild>
+                  <Button variant="outline" className="w-full rounded-xl h-11 text-[14px] bg-background/30 hover:bg-background/60 transition-colors border-border/50 [&_svg]:self-center [&_span]:leading-none" asChild>
                      <Link to="/cabinet/referral" className="inline-flex items-center justify-center gap-2 leading-none">
                        <span className="inline-flex items-center leading-none">{t("dashboard.referralStats")}</span>
                        <ArrowRight className="h-4 w-4 shrink-0" />
                      </Link>
                   </Button>
                 </div>
-              </>
-            ) : vpnUrl ? (
-              <div className="flex flex-col h-full justify-between space-y-6">
-                <p className="text-[15px] text-muted-foreground leading-relaxed">{t("dashboard.vpnReadyDesc")}</p>
-                <div className="p-6 bg-primary/10 rounded-2xl border border-primary/20 text-center">
-                   <Wifi className="h-12 w-12 text-primary mx-auto mb-3 opacity-80" />
-                   <p className="text-[15px] text-foreground font-medium">{t("dashboard.vpnReady")}</p>
+              ) : vpnUrl ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="p-2.5 bg-primary/20 rounded-xl shadow-inner border border-primary/10">
+                      <Wifi className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-bold text-foreground">{t("dashboard.connection")}</h3>
+                  </div>
+                  <p className="text-[14px] text-muted-foreground leading-relaxed">{t("dashboard.vpnReadyDesc")}</p>
+                  <Button variant="default" size="lg" className="w-full gap-2 rounded-xl shadow-lg h-12 text-[15px] hover:scale-105 transition-transform [&_svg]:self-center [&_span]:leading-none" asChild>
+                    <Link to="/cabinet/subscribe" className="inline-flex items-center justify-center gap-2 leading-none">
+                      <Wifi className="h-5 w-5 shrink-0" />
+                      <span className="inline-flex items-center leading-none">{t("dashboard.setupVPN")}</span>
+                    </Link>
+                  </Button>
                 </div>
-                <Button variant="default" size="lg" className="w-full gap-2 rounded-xl shadow-lg h-14 text-[16px] hover:scale-105 transition-transform [&_svg]:self-center [&_span]:leading-none" asChild>
-                  <Link to="/cabinet/subscribe" className="inline-flex items-center justify-center gap-2 leading-none">
-                    <Wifi className="h-5 w-5 shrink-0" />
-                    <span className="inline-flex items-center leading-none">{t("dashboard.setupVPN")}</span>
-                  </Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col h-full justify-center space-y-6">
-                <div className="p-6 bg-background/30 rounded-2xl border border-border/50 text-center">
-                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
-                   <p className="text-[15px] text-muted-foreground">{t("dashboard.payToGetLink")}</p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="p-2.5 bg-background/50 rounded-xl shadow-inner border border-border/50">
+                      <Package className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-bold text-foreground">{t("dashboard.connection")}</h3>
+                  </div>
+                  <p className="text-[14px] text-muted-foreground leading-relaxed">{t("dashboard.payToGetLink")}</p>
+                  <Button variant="outline" size="lg" className="w-full rounded-xl h-12 text-[15px] bg-background/30 hover:bg-background/60 border-border/50 transition-colors [&_span]:leading-none" asChild>
+                    <Link to="/cabinet/tariffs" className="inline-flex items-center justify-center leading-none">
+                      <span className="inline-flex items-center leading-none">{t("dashboard.choosePlan")}</span>
+                    </Link>
+                  </Button>
                 </div>
-                <Button variant="outline" size="lg" className="w-full rounded-xl h-14 text-[16px] bg-background/30 hover:bg-background/60 border-border/50 transition-colors [&_span]:leading-none" asChild>
-                  <Link to="/cabinet/tariffs" className="inline-flex items-center justify-center leading-none">
-                    <span className="inline-flex items-center leading-none">{t("dashboard.choosePlan")}</span>
-                  </Link>
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );

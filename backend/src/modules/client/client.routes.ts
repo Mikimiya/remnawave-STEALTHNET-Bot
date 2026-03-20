@@ -1340,7 +1340,7 @@ clientRouter.post("/promo-code/activate", async (req, res) => {
 /** Определить отображаемое имя тарифа: Триал, название с сайта или «Тариф не выбран».
  *  Поддерживает activeInternalSquads как массив строк (uuid) или объектов { uuid }.
  *  Приоритет: сначала ищем совпадение с оплаченным тарифом, затем — триал. */
-async function resolveTariffDisplayName(remnaUserData: unknown): Promise<string> {
+async function resolveTariffInfo(remnaUserData: unknown): Promise<{ name: string; categoryName: string | null; isTrial: boolean }> {
   const raw = remnaUserData as { response?: { activeInternalSquads?: unknown[] }; activeInternalSquads?: unknown[] };
   const user = raw?.response ?? raw;
   const ais = user?.activeInternalSquads;
@@ -1351,17 +1351,17 @@ async function resolveTariffDisplayName(remnaUserData: unknown): Promise<string>
       if (typeof u === "string") squadUuids.push(u);
     }
   }
-  if (squadUuids.length === 0) return "Тариф не выбран";
+  if (squadUuids.length === 0) return { name: "Тариф не выбран", categoryName: null, isTrial: false };
   const config = await getSystemConfig();
   const trialUuid = config.trialSquadUuid?.trim() || null;
-  const tariffs = await prisma.tariff.findMany({ select: { name: true, internalSquadUuids: true } });
+  const tariffs = await prisma.tariff.findMany({ select: { name: true, internalSquadUuids: true, category: { select: { name: true } } } });
   for (const squadUuid of squadUuids) {
     if (trialUuid === squadUuid) continue;
     const match = tariffs.find((t) => t.internalSquadUuids.includes(squadUuid));
-    if (match?.name) return match.name;
+    if (match?.name) return { name: match.name, categoryName: match.category?.name ?? null, isTrial: false };
   }
-  if (trialUuid && squadUuids.includes(trialUuid)) return "Триал";
-  return "Тариф не выбран";
+  if (trialUuid && squadUuids.includes(trialUuid)) return { name: "Триал", categoryName: null, isTrial: true };
+  return { name: "Тариф не выбран", categoryName: null, isTrial: false };
 }
 
 clientRouter.get("/proxy-slots", async (req, res) => {
@@ -1440,24 +1440,31 @@ clientRouter.get("/singbox-slots", async (req, res) => {
 clientRouter.get("/subscription", async (req, res) => {
   const client = (req as unknown as { client: { id: string; remnawaveUuid: string | null } }).client;
   if (!client.remnawaveUuid) {
-    return res.json({ subscription: null, tariffDisplayName: null, message: "Подписка не привязана" });
+    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, isTrial: false, message: "Подписка не привязана" });
   }
   const result = await remnaGetUser(client.remnawaveUuid);
   if (result.error) {
-    return res.json({ subscription: null, tariffDisplayName: null, message: result.error });
+    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, isTrial: false, message: result.error });
   }
-  let tariffDisplayName = await resolveTariffDisplayName(result.data ?? null);
+  const tariffInfo = await resolveTariffInfo(result.data ?? null);
+  let tariffDisplayName = tariffInfo.name;
+  let tariffCategoryName = tariffInfo.categoryName;
+  let isTrial = tariffInfo.isTrial;
   // Если по Remna показывается «Триал» или «Тариф не выбран», но клиент оплачивал тариф — берём название из последней оплаты
   if (tariffDisplayName === "Триал" || tariffDisplayName === "Тариф не выбран") {
     const lastPaidTariff = await prisma.payment.findFirst({
       where: { clientId: client.id, status: "PAID", tariffId: { not: null } },
       orderBy: { paidAt: "desc" },
-      select: { tariff: { select: { name: true } } },
+      select: { tariff: { select: { name: true, category: { select: { name: true } } } } },
     });
     const name = lastPaidTariff?.tariff?.name?.trim();
-    if (name) tariffDisplayName = name;
+    if (name) {
+      tariffDisplayName = name;
+      tariffCategoryName = lastPaidTariff?.tariff?.category?.name ?? null;
+      isTrial = false;
+    }
   }
-  return res.json({ subscription: result.data ?? null, tariffDisplayName });
+  return res.json({ subscription: result.data ?? null, tariffDisplayName, tariffCategoryName, isTrial });
 });
 
 /** GET /api/client/devices — список устройств (HWID) пользователя в Remna */

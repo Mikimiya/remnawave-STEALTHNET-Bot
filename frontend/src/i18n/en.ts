@@ -168,6 +168,11 @@ const en: typeof import("./ru").default = {
     yookassaRubOnly: "YooKassa only accepts rubles (RUB).",
     youMoneyRubOnly: "YooMoney only accepts rubles. Choose a RUB plan or pay by card via Platega.",
     cryptoBot: "⚡ Crypto Bot (Cryptocurrency)",
+    sbp: "Card / Bank transfer",
+    sbpShort: "Card",
+    cards: "Bank cards",
+    popular: "Popular",
+    day: "day",
   },
   profile: {
     title: "Profile",
