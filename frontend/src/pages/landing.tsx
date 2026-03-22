@@ -306,7 +306,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
 
   const title = lc?.heroTitle || config.serviceName || "STEALTHNET";
   const subtitle =
-    lc?.heroSubtitle ||
+    lc?.heroSubtitle?.trim() ||
     t("landing.hero.subtitle");
   const ctaText = lc?.heroCtaText || t("landing.hero.cta");
   const heroBadge = lc?.heroBadge ?? t("landing.hero.badge");

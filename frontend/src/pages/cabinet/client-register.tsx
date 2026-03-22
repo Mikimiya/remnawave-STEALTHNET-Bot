@@ -326,7 +326,7 @@ export function ClientRegisterPage() {
           <input type="text" name="prevent_autofill" autoComplete="off" tabIndex={-1} className="absolute h-0 w-0 overflow-hidden opacity-0 pointer-events-none" aria-hidden />
 
           {error && (
-            <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+            <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -345,7 +345,7 @@ export function ClientRegisterPage() {
               required
               autoComplete="email"
               className={cn(
-                "h-12 rounded-2xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5",
+                "h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5",
                 emailError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40"
               )}
             />
@@ -364,7 +364,7 @@ export function ClientRegisterPage() {
               required
               autoComplete="new-password"
               className={cn(
-                "h-12 rounded-2xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5",
+                "h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5",
                 passwordError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40"
               )}
             />
@@ -375,13 +375,13 @@ export function ClientRegisterPage() {
           </div>
 
           {emailSent && (
-            <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 shadow-sm dark:text-emerald-400">
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 shadow-sm dark:text-emerald-400">
               <Mail className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{t("auth.emailVerificationSent")}</span>
             </div>
           )}
 
-          <Button type="submit" className="h-12 w-full rounded-2xl text-sm font-semibold shadow-lg shadow-primary/20 transition-transform hover:scale-[1.01]" disabled={loading || !email || !password}>
+          <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 transition-transform hover:scale-[1.01]" disabled={loading || !email || !password}>
             {loading ? t("auth.registerLoading") : t("auth.register")}
           </Button>
 
@@ -401,7 +401,7 @@ export function ClientRegisterPage() {
                     disabled={loading}
                     title={t("auth.registerViaGoogle")}
                     className={cn(
-                      "flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/50 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10",
+                      "flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/50 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10",
                       "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     )}
                   >
@@ -414,7 +414,7 @@ export function ClientRegisterPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-12 w-full rounded-2xl gap-3 border-white/10 bg-white/50 text-sm font-medium shadow-sm backdrop-blur hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10"
+                    className="h-12 w-full rounded-xl gap-3 border-white/10 bg-white/50 text-sm font-medium shadow-sm backdrop-blur hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10"
                     onClick={handleAppleLogin}
                     disabled={loading}
                   >
@@ -424,7 +424,7 @@ export function ClientRegisterPage() {
                 )}
 
                 {telegramBotUsername && (
-                  <div className="rounded-2xl border border-white/10 bg-white/35 px-3 py-3 shadow-sm backdrop-blur dark:bg-white/5">
+                  <div className="rounded-xl border border-white/10 bg-white/35 px-3 py-3 shadow-sm backdrop-blur dark:bg-white/5">
                     <div ref={telegramWidgetRef} className="flex min-h-[44px] justify-center" />
                   </div>
                 )}

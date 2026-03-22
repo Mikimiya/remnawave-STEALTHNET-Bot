@@ -1,5 +1,6 @@
 import { randomBytes, createHmac } from "crypto";
 import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 import { generateSecret, generateURI, verify } from "otplib";
 import { env } from "../../config/index.js";
 import { Router } from "express";
@@ -25,7 +26,7 @@ import {
 } from "../notification/telegram-notify.service.js";
 import { requireClientAuth } from "./client.middleware.js";
 import { remnaCreateUser, remnaUpdateUser, isRemnaConfigured, remnaGetUser, remnaGetUserByUsername, remnaGetUserByEmail, remnaGetUserByTelegramId, extractRemnaUuid, remnaUsernameFromClient, remnaGetUserHwidDevices, remnaDeleteUserHwidDevice } from "../remna/remna.client.js";
-import { sendVerificationEmail, sendLinkEmailVerification, isSmtpConfigured } from "../mail/mail.service.js";
+import { sendVerificationEmail, sendLinkEmailVerification, sendPasswordResetEmail, isSmtpConfigured } from "../mail/mail.service.js";
 import { createPlategaTransaction, isPlategaConfigured } from "../platega/platega.service.js";
 import { activateTariffForClient, activateTariffByPaymentId } from "../tariff/tariff-activation.service.js";
 import { createProxySlotsByPaymentId } from "../proxy/proxy-slots-activation.service.js";
@@ -58,6 +59,13 @@ function extractCurrentExpireAt(data: unknown): Date | null {
 function calculateExpireAt(currentExpireAt: Date | null, durationDays: number): string {
   const base = currentExpireAt ?? new Date();
   return new Date(base.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function isClientEmailUniqueConflict(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError
+    && error.code === "P2002"
+    && Array.isArray(error.meta?.target)
+    && error.meta.target.includes("email");
 }
 
 export const clientAuthRouter = Router();
@@ -111,24 +119,30 @@ clientAuthRouter.post("/register", async (req, res) => {
         if (referrer) referrerId = referrer.id;
       }
       const passwordHash = await hashPassword(data.password!);
-      const client = await prisma.client.create({
-        data: {
-          email: data.email!,
-          passwordHash,
-          remnawaveUuid: null,
-          referralCode,
-          referrerId,
-          preferredLang: data.preferredLang,
-          preferredCurrency: data.preferredCurrency,
-          telegramId: null,
-          telegramUsername: null,
-          utmSource: data.utm_source ?? null,
-          utmMedium: data.utm_medium ?? null,
-          utmCampaign: data.utm_campaign ?? null,
-          utmContent: data.utm_content ?? null,
-          utmTerm: data.utm_term ?? null,
-        },
-      });
+      let client;
+      try {
+        client = await prisma.client.create({
+          data: {
+            email: data.email!,
+            passwordHash,
+            remnawaveUuid: null,
+            referralCode,
+            referrerId,
+            preferredLang: data.preferredLang,
+            preferredCurrency: data.preferredCurrency,
+            telegramId: null,
+            telegramUsername: null,
+            utmSource: data.utm_source ?? null,
+            utmMedium: data.utm_medium ?? null,
+            utmCampaign: data.utm_campaign ?? null,
+            utmContent: data.utm_content ?? null,
+            utmTerm: data.utm_term ?? null,
+          },
+        });
+      } catch (error) {
+        if (!isClientEmailUniqueConflict(error)) throw error;
+        return res.status(400).json({ message: "Email already registered" });
+      }
       notifyAdminsAboutNewClient(client.id).catch(() => {});
       const token = signClientToken(client.id);
       return res.status(201).json({ token, client: toClientShape(client) });
@@ -185,7 +199,8 @@ clientAuthRouter.post("/register", async (req, res) => {
       smtpConfig,
       data.email!,
       verificationLink,
-      config.serviceName
+      config.serviceName,
+      data.preferredLang,
     );
     console.log(`[register] Email send result to ${data.email}:`, sendResult);
     if (!sendResult.ok) {
@@ -299,24 +314,39 @@ clientAuthRouter.post("/verify-email", async (req, res) => {
     if (referrer) referrerId = referrer.id;
   }
 
-  const client = await prisma.client.create({
-    data: {
-      email: pending.email,
-      passwordHash: pending.passwordHash,
-      remnawaveUuid: null,
-      referralCode,
-      referrerId,
-      preferredLang: pending.preferredLang,
-      preferredCurrency: pending.preferredCurrency,
-      telegramId: null,
-      telegramUsername: null,
-      utmSource: pending.utmSource,
-      utmMedium: pending.utmMedium,
-      utmCampaign: pending.utmCampaign,
-      utmContent: pending.utmContent,
-      utmTerm: pending.utmTerm,
-    },
-  });
+  let client;
+  try {
+    client = await prisma.client.create({
+      data: {
+        email: pending.email,
+        passwordHash: pending.passwordHash,
+        remnawaveUuid: null,
+        referralCode,
+        referrerId,
+        preferredLang: pending.preferredLang,
+        preferredCurrency: pending.preferredCurrency,
+        telegramId: null,
+        telegramUsername: null,
+        utmSource: pending.utmSource,
+        utmMedium: pending.utmMedium,
+        utmCampaign: pending.utmCampaign,
+        utmContent: pending.utmContent,
+        utmTerm: pending.utmTerm,
+      },
+    });
+  } catch (error) {
+    if (!isClientEmailUniqueConflict(error)) throw error;
+    const existingByEmail = await prisma.client.findUnique({
+      where: { email: pending.email },
+      select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpEnabled: true, createdAt: true },
+    });
+    await prisma.pendingEmailRegistration.delete({ where: { id: pending.id } }).catch(() => {});
+    if (!existingByEmail) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+    const auth = buildAuthResponse(existingByEmail);
+    return res.json(auth);
+  }
 
   await prisma.pendingEmailRegistration.delete({ where: { id: pending.id } }).catch(() => {});
 
@@ -327,6 +357,201 @@ clientAuthRouter.post("/verify-email", async (req, res) => {
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const verifyPasswordResetSchema = z.object({
+  token: z.string().min(1),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+function getPasswordResetSuccessMessage(lang?: string | null): string {
+  switch ((lang ?? "").trim().toLowerCase()) {
+    case "zh":
+      return "如果该邮箱已注册，我们已向您发送重置密码邮件。";
+    case "en":
+      return "If an account with this email exists, we've sent a password reset email.";
+    default:
+      return "Если аккаунт с этой почтой существует, мы отправили письмо для сброса пароля.";
+  }
+}
+
+function getPasswordResetValidationMessage(lang?: string | null): string {
+  switch ((lang ?? "").trim().toLowerCase()) {
+    case "zh":
+      return "链接有效。您可以设置新密码。";
+    case "en":
+      return "Link is valid. You can set a new password.";
+    default:
+      return "Ссылка действительна. Можно задать новый пароль.";
+  }
+}
+
+function isMissingPasswordResetTokensTable(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError
+    && error.code === "P2010"
+    && typeof error.meta?.message === "string"
+    && error.meta.message.includes("password_reset_tokens")
+    && error.meta.message.includes("does not exist");
+}
+
+type PasswordResetTokenRow = {
+  id: string;
+  clientId: string;
+  token: string;
+  expiresAt: Date;
+  createdAt: Date;
+  email: string | null;
+  preferredLang: string;
+  isBlocked: boolean;
+};
+
+async function deletePasswordResetTokensByClientId(clientId: string): Promise<void> {
+  await prisma.$executeRaw`
+    DELETE FROM password_reset_tokens
+    WHERE client_id = ${clientId}
+  `;
+}
+
+async function deletePasswordResetTokenById(id: string): Promise<void> {
+  await prisma.$executeRaw`
+    DELETE FROM password_reset_tokens
+    WHERE id = ${id}
+  `;
+}
+
+async function deletePasswordResetTokenByToken(token: string): Promise<void> {
+  await prisma.$executeRaw`
+    DELETE FROM password_reset_tokens
+    WHERE token = ${token}
+  `;
+}
+
+async function createPasswordResetTokenRecord(clientId: string, token: string, expiresAt: Date): Promise<void> {
+  await prisma.$executeRaw`
+    INSERT INTO password_reset_tokens (id, client_id, token, expires_at, created_at)
+    VALUES (${randomUUID()}, ${clientId}, ${token}, ${expiresAt}, NOW())
+  `;
+}
+
+async function findPasswordResetTokenRecord(token: string): Promise<PasswordResetTokenRow | null> {
+  const rows = await prisma.$queryRaw<PasswordResetTokenRow[]>`
+    SELECT
+      prt.id,
+      prt.client_id AS "clientId",
+      prt.token,
+      prt.expires_at AS "expiresAt",
+      prt.created_at AS "createdAt",
+      c.email,
+      c.preferred_lang AS "preferredLang",
+      c.is_blocked AS "isBlocked"
+    FROM password_reset_tokens prt
+    INNER JOIN clients c ON c.id = prt.client_id
+    WHERE prt.token = ${token}
+    LIMIT 1
+  `;
+
+  return rows[0] ?? null;
+}
+
+clientAuthRouter.post("/forgot-password", async (req, res) => {
+  const body = forgotPasswordSchema.safeParse(req.body);
+  if (!body.success) {
+    return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+  }
+
+  const client = await prisma.client.findUnique({
+    where: { email: body.data.email },
+    select: { id: true, email: true, preferredLang: true, isBlocked: true },
+  });
+
+  const successLang = client?.preferredLang ?? "ru";
+  const successMessage = getPasswordResetSuccessMessage(successLang);
+
+  if (!client?.email || client.isBlocked) {
+    return res.json({ message: successMessage });
+  }
+
+  const config = await getSystemConfig();
+  const smtpConfig = {
+    host: config.smtpHost || "",
+    port: config.smtpPort,
+    secure: config.smtpSecure,
+    user: config.smtpUser,
+    password: config.smtpPassword,
+    fromEmail: config.smtpFromEmail,
+    fromName: config.smtpFromName,
+  };
+
+  if (!isSmtpConfigured(smtpConfig)) {
+    return res.status(503).json({ message: "Password recovery email is not configured. Contact administrator." });
+  }
+
+  const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
+  if (!appUrl) {
+    return res.status(503).json({ message: "Public app URL is not set in settings." });
+  }
+
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  try {
+    await deletePasswordResetTokensByClientId(client.id);
+    await createPasswordResetTokenRecord(client.id, token, expiresAt);
+  } catch (error) {
+    if (!isMissingPasswordResetTokensTable(error)) throw error;
+    return res.status(503).json({ message: "Password recovery is temporarily unavailable. Please contact administrator." });
+  }
+
+  const resetLink = `${appUrl}/cabinet/reset-password?token=${token}`;
+  const sendResult = await sendPasswordResetEmail(
+    smtpConfig,
+    client.email,
+    resetLink,
+    config.serviceName,
+    client.preferredLang,
+  );
+
+  if (!sendResult.ok) {
+    await deletePasswordResetTokenByToken(token).catch(() => {});
+    return res.status(500).json({ message: "Failed to send password reset email. Try again later." });
+  }
+
+  return res.json({ message: successMessage });
+});
+
+clientAuthRouter.post("/verify-password-reset", async (req, res) => {
+  const body = verifyPasswordResetSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ message: "Invalid input" });
+
+  let resetToken;
+  try {
+    resetToken = await findPasswordResetTokenRecord(body.data.token);
+  } catch (error) {
+    if (!isMissingPasswordResetTokensTable(error)) throw error;
+    return res.status(400).json({ message: "Invalid or expired link" });
+  }
+
+  if (!resetToken || resetToken.isBlocked) {
+    return res.status(400).json({ message: "Invalid or expired link" });
+  }
+
+  if (new Date() > resetToken.expiresAt) {
+    await deletePasswordResetTokenById(resetToken.id).catch(() => {});
+    return res.status(400).json({ message: "Invalid or expired link" });
+  }
+
+  return res.json({
+    message: getPasswordResetValidationMessage(resetToken.preferredLang),
+    email: resetToken.email,
+  });
 });
 
 clientAuthRouter.post("/login", async (req, res) => {
@@ -865,6 +1090,39 @@ clientRouter.post("/set-password", requireClientAuth, async (req, res) => {
   return res.json({ message: "Пароль установлен" });
 });
 
+clientAuthRouter.post("/reset-password", async (req, res) => {
+  const body = resetPasswordSchema.safeParse(req.body);
+  if (!body.success) {
+    return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+  }
+
+  let resetToken;
+  try {
+    resetToken = await findPasswordResetTokenRecord(body.data.token);
+  } catch (error) {
+    if (!isMissingPasswordResetTokensTable(error)) throw error;
+    return res.status(400).json({ message: "Invalid or expired link" });
+  }
+
+  if (!resetToken || resetToken.isBlocked) {
+    return res.status(400).json({ message: "Invalid or expired link" });
+  }
+
+  if (new Date() > resetToken.expiresAt) {
+    await deletePasswordResetTokenById(resetToken.id).catch(() => {});
+    return res.status(400).json({ message: "Invalid or expired link" });
+  }
+
+  const passwordHash = await hashPassword(body.data.newPassword);
+  await prisma.client.update({
+    where: { id: resetToken.clientId },
+    data: { passwordHash },
+  });
+  await deletePasswordResetTokensByClientId(resetToken.clientId).catch(() => {});
+
+  return res.json({ message: "Password reset successful" });
+});
+
 const updateProfileSchema = z.object({
   preferredLang: z.string().max(10).optional(),
   preferredCurrency: z.string().max(10).optional(),
@@ -955,6 +1213,10 @@ clientRouter.post("/link-email-request", async (req, res) => {
     fromName: config.smtpFromName ?? null,
   };
   if (!isSmtpConfigured(smtpConfig)) return res.status(503).json({ message: "Отправка писем не настроена. Обратитесь в поддержку." });
+  const currentClient = await prisma.client.findUnique({
+    where: { id: client.id },
+    select: { preferredLang: true },
+  });
   const existing = await prisma.client.findUnique({ where: { email } });
   if (existing && existing.id !== client.id) return res.status(400).json({ message: "Эта почта уже используется другим аккаунтом" });
   await prisma.pendingEmailLink.deleteMany({ where: { clientId: client.id } });
@@ -966,7 +1228,13 @@ clientRouter.post("/link-email-request", async (req, res) => {
   const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
   const verificationLink = appUrl ? `${appUrl}/cabinet/verify-link-email?token=${verificationToken}` : "";
   if (!verificationLink) return res.status(500).json({ message: "Не задан URL приложения в настройках" });
-  const sendResult = await sendLinkEmailVerification(smtpConfig, email, verificationLink, config.serviceName ?? "STEALTHNET");
+  const sendResult = await sendLinkEmailVerification(
+    smtpConfig,
+    email,
+    verificationLink,
+    config.serviceName ?? "STEALTHNET",
+    currentClient?.preferredLang,
+  );
   if (!sendResult.ok) {
     await prisma.pendingEmailLink.deleteMany({ where: { verificationToken } }).catch(() => {});
     return res.status(500).json({ message: "Не удалось отправить письмо. Попробуйте позже." });
@@ -3437,9 +3705,35 @@ publicConfigRouter.get("/config", async (_req, res) => {
 publicConfigRouter.get("/deeplink", (req, res) => {
   const url = typeof req.query.url === "string" ? req.query.url : "";
   if (!url) return res.status(400).send("Missing url parameter");
+  const langRaw = typeof req.query.lang === "string" ? req.query.lang.trim().toLowerCase() : "";
+  const lang = langRaw === "en" || langRaw === "zh" ? langRaw : "ru";
   const skipAuto = req.query.skip_auto === "1" || req.query.skip_auto === "true";
   const safeUrl = url.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const safeUrlJs = url.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r");
+  const dict = {
+    ru: {
+      title: "Открытие приложения…",
+      opening: "Открываем приложение…",
+      openButton: "Открыть приложение",
+      description: "Если приложение не открылось — нажмите кнопку выше.<br>Ссылка подписки скопирована в буфер обмена.",
+      androidHint: "На Android или в Telegram на ПК: если страница открылась внутри Telegram, зайдите в Настройки → Чаты → «Открывать ссылки во внешнем браузере» и нажмите кнопку ещё раз.",
+    },
+    en: {
+      title: "Opening app…",
+      opening: "Opening the app…",
+      openButton: "Open app",
+      description: "If the app didn’t open, tap the button above.<br>Your subscription link has been copied to the clipboard.",
+      androidHint: "On Android or Telegram Desktop: if this page opened inside Telegram, go to Settings → Chat Settings → “Open links in external browser” and tap the button again.",
+    },
+    zh: {
+      title: "正在打开应用…",
+      opening: "正在打开应用…",
+      openButton: "打开应用",
+      description: "如果应用没有自动打开，请点击上方按钮。<br>订阅链接已经复制到剪贴板。",
+      androidHint: "在 Android 或 Telegram 桌面版中：如果此页面仍在 Telegram 内打开，请前往 设置 → 聊天设置 →“在外部浏览器中打开链接”，然后再次点击按钮。",
+    },
+  } as const;
+  const text = dict[lang];
   const autoRedirectScript = skipAuto
     ? "/* skip_auto: только кнопка, без авто-редиректа (из мини-аппа) */"
     : `setTimeout(function(){ try { window.location.href = "${safeUrlJs}"; } catch (e) {} }, 300);`;
@@ -3447,7 +3741,7 @@ publicConfigRouter.get("/deeplink", (req, res) => {
 <html><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Открытие приложения…</title>
+<title>${text.title}</title>
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0d1117;color:#e6edf3;padding:16px;box-sizing:border-box}
   .btn{display:inline-block;margin-top:24px;padding:14px 32px;background:#2ea043;color:#fff;border:none;border-radius:12px;font-size:17px;text-decoration:none;cursor:pointer}
@@ -3456,10 +3750,10 @@ publicConfigRouter.get("/deeplink", (req, res) => {
   .hint{margin-top:12px;font-size:12px;color:#8b949e;max-width:90%;text-align:center}
 </style>
 </head><body>
-<p>Открываем приложение…</p>
-<a class="btn" href="${safeUrl}" id="open">Открыть приложение</a>
-<p class="sub">Если приложение не открылось — нажмите кнопку выше.<br>Ссылка подписки скопирована в буфер обмена.</p>
-<p class="hint" id="androidHint" style="display:none">На Android или в Telegram на ПК: если страница открылась внутри Telegram, зайдите в Настройки → Чаты → «Открывать ссылки во внешнем браузере» и нажмите кнопку ещё раз.</p>
+<p>${text.opening}</p>
+<a class="btn" href="${safeUrl}" id="open">${text.openButton}</a>
+<p class="sub">${text.description}</p>
+<p class="hint" id="androidHint" style="display:none">${text.androidHint}</p>
 <script>
   (function(){
     var ua = navigator.userAgent || "";

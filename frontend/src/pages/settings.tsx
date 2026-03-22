@@ -1876,7 +1876,7 @@ export function SettingsPage() {
                       <div className="flex items-center justify-between pr-2">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-5 w-5 text-primary" />
-                          <CardTitle>Platega</CardTitle>
+                          <CardTitle>{t("admin.settings.payments.platega.title")}</CardTitle>
                           <span className="text-xs font-normal text-muted-foreground">{t("admin.settings.payments.platega.expand")}</span>
                         </div>
                         <ChevronDown className="chevron h-5 w-5 shrink-0 text-muted-foreground" />
@@ -2170,7 +2170,7 @@ export function SettingsPage() {
                       <div className="flex items-center justify-between pr-2">
                         <div className="flex items-center gap-2">
                           <Wallet className="h-5 w-5 text-primary" />
-                          <CardTitle>Crypto Pay (Crypto Bot)</CardTitle>
+                          <CardTitle>{t("admin.settings.payments.cryptopay.title")}</CardTitle>
                           <span className="text-xs font-normal text-muted-foreground">{t("admin.settings.payments.cryptopay.expand")}</span>
                         </div>
                         <ChevronDown className="chevron h-5 w-5 shrink-0 text-muted-foreground" />
@@ -2259,7 +2259,7 @@ export function SettingsPage() {
                       <div className="flex items-center justify-between pr-2">
                         <div className="flex items-center gap-2">
                           <Wallet className="h-5 w-5 text-primary" />
-                          <CardTitle>Heleket</CardTitle>
+                          <CardTitle>{t("admin.settings.payments.heleket.title")}</CardTitle>
                           <span className="text-xs font-normal text-muted-foreground">{t("admin.settings.payments.heleket.expand")}</span>
                         </div>
                         <ChevronDown className="chevron h-5 w-5 shrink-0 text-muted-foreground" />
@@ -2344,7 +2344,7 @@ export function SettingsPage() {
                       <div className="flex items-center justify-between pr-2">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-5 w-5 text-primary" />
-                          <CardTitle>ePay</CardTitle>
+                          <CardTitle>{t("admin.settings.payments.epay.title")}</CardTitle>
                           <span className="text-xs font-normal text-muted-foreground">{t("admin.settings.payments.epay.expand")}</span>
                         </div>
                         <ChevronDown className="chevron h-5 w-5 shrink-0 text-muted-foreground" />

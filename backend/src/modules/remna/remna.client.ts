@@ -111,7 +111,7 @@ export function extractRemnaUuid(d: unknown): string | null {
 
 /**
  * Формирует username для Remna (3–36 символов, только [a-zA-Z0-9_-]).
- * Приоритет: Telegram username → Telegram ID (tg123) → email (local part) → fallback.
+ * Приоритет: Telegram username → Telegram ID (tg123) → email (full, sanitized) → fallback.
  */
 export function remnaUsernameFromClient(opts: {
   telegramUsername?: string | null;
@@ -129,11 +129,6 @@ export function remnaUsernameFromClient(opts: {
     if (t.length >= 3) return t.slice(0, 36);
   }
   if (opts.email?.trim()) {
-    const local = opts.email.split("@")[0]?.trim();
-    if (local) {
-      const e = sanitize(local);
-      if (e.length >= 3) return e;
-    }
     const full = sanitize(opts.email.trim());
     if (full.length >= 3) return full;
   }

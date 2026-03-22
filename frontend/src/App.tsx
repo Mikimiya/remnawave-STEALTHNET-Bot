@@ -37,6 +37,8 @@ import { ClientRegisterPage } from "@/pages/cabinet/client-register";
 import { ClientOnboardingPage } from "@/pages/cabinet/client-onboarding";
 import { ClientVerifyEmailPage } from "@/pages/cabinet/client-verify-email";
 import { ClientVerifyLinkEmailPage } from "@/pages/cabinet/client-verify-link-email";
+import { ClientForgotPasswordPage } from "@/pages/cabinet/client-forgot-password";
+import { ClientResetPasswordPage } from "@/pages/cabinet/client-reset-password";
 import { ClientDashboardPage } from "@/pages/cabinet/client-dashboard";
 import { ClientTariffsPage } from "@/pages/cabinet/client-tariffs";
 import { ClientProfilePage } from "@/pages/cabinet/client-profile";
@@ -214,6 +216,8 @@ function AppRoutes() {
         <Route index element={<CabinetIndexRedirect />} />
         <Route path="login" element={<ClientLoginPage />} />
         <Route path="register" element={<ClientRegisterPage />} />
+  <Route path="forgot-password" element={<ClientForgotPasswordPage />} />
+  <Route path="reset-password" element={<ClientResetPasswordPage />} />
         <Route path="verify-email" element={<ClientVerifyEmailPage />} />
         <Route path="verify-link-email" element={<ClientVerifyLinkEmailPage />} />
         <Route

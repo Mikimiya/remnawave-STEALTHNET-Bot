@@ -141,7 +141,7 @@ const ALL_NAV_ITEMS = [
   { to: "/cabinet/proxy", labelKey: "nav.proxy", icon: Globe, alwaysMore: false },
   { to: "/cabinet/singbox", labelKey: "nav.singbox", icon: KeyRound, alwaysMore: false },
   { to: "/cabinet/referral", labelKey: "nav.referral", icon: Users, alwaysMore: false },
-  { to: "/cabinet/profile", labelKey: "nav.profile", icon: User, alwaysMore: false },
+  { to: "/cabinet/profile", labelKey: "nav.profile", icon: User, alwaysMore: true },
   { to: "/cabinet/extra-options", labelKey: "nav.extraOptions", icon: PlusCircle, alwaysMore: true },
   { to: "/cabinet/tickets", labelKey: "nav.tickets", icon: MessageSquare, alwaysMore: true },
 ];
@@ -463,11 +463,14 @@ function MobileCabinetShell() {
           <div className="flex items-center gap-1.5 shrink-0">
             <ThemePopover />
             <SettingsPopover />
-            <Button variant="ghost" size="icon" className="shrink-0 bg-background/20 hover:bg-background/40 text-muted-foreground hover:text-foreground" asChild>
-              <Link to="/cabinet/login" onClick={() => logout()} title={t("auth.logout")}>
-                <LogOut className="h-5 w-5" />
-              </Link>
-            </Button>
+            <Link
+              to="/cabinet/login"
+              onClick={() => logout()}
+              title={t("auth.logout")}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-background/20 text-muted-foreground transition-colors hover:bg-background/40 hover:text-foreground"
+            >
+              <LogOut className="h-5 w-5" />
+            </Link>
           </div>
         </div>
       </header>
@@ -550,7 +553,11 @@ function MobileCabinetShell() {
 
         {/* User info card */}
         {state.client && (
-          <div className="relative mx-4 mb-4 rounded-2xl bg-primary/5 border border-primary/10 p-4">
+          <Link
+            to="/cabinet/profile"
+            onClick={() => setMoreMenuOpen(false)}
+            className="relative mx-4 mb-4 block rounded-2xl border border-primary/10 bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+          >
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
                 <User className="h-5 w-5" />
@@ -567,7 +574,7 @@ function MobileCabinetShell() {
                 </div>
               </div>
             </div>
-          </div>
+          </Link>
         )}
 
         {/* Nav items */}
@@ -592,7 +599,7 @@ function MobileCabinetShell() {
                 )}>
                   <Icon className="h-[18px] w-[18px]" />
                 </div>
-                <span className="text-[15px] font-medium">{t(labelKey)}</span>
+                <span className="text-[15px] font-medium">{to === "/cabinet/profile" ? t("profile.title") : t(labelKey)}</span>
                 {active && (
                   <div className="ml-auto h-2 w-2 rounded-full bg-primary shadow-[0_0_8px] shadow-primary/50" />
                 )}
@@ -688,19 +695,21 @@ function CabinetShell() {
             {visibleNav.map(({ to, labelKey, icon: Icon }) => {
               const active = location.pathname === to;
               return (
-                <Link key={to} to={to}>
-                  <Button
-                    variant={active ? "secondary" : "ghost"}
-                    size="sm"
-                    className={cn(
-                      "inline-flex items-center gap-2 whitespace-nowrap transition-all duration-300",
-                      active ? "bg-primary/20 hover:bg-primary/30 text-primary shadow-sm scale-105" : "hover:scale-105 hover:bg-background/40"
-                    )}
-                  >
+                <Button
+                  key={to}
+                  variant={active ? "secondary" : "ghost"}
+                  size="sm"
+                  asChild
+                  className={cn(
+                    "inline-flex h-10 items-center gap-2.5 rounded-xl px-4 whitespace-nowrap text-[13px] font-medium transition-all duration-300",
+                    active ? "bg-primary/20 hover:bg-primary/30 text-primary shadow-sm" : "text-foreground/80 hover:bg-background/40 hover:text-foreground"
+                  )}
+                >
+                  <Link to={to} className="inline-flex items-center gap-2.5 leading-none">
                     <Icon className="h-4 w-4 shrink-0" />
-                    {t(labelKey)}
-                  </Button>
-                </Link>
+                    <span className="inline-flex items-center leading-none">{t(labelKey)}</span>
+                  </Link>
+                </Button>
               );
             })}
             {moreNav.length > 0 && (
@@ -709,12 +718,12 @@ function CabinetShell() {
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "inline-flex items-center gap-2 whitespace-nowrap transition-all duration-300 hover:scale-105 hover:bg-background/40",
-                    moreNav.some((i) => location.pathname === i.to) ? "bg-primary/20 text-primary" : ""
+                    "inline-flex h-10 items-center gap-2.5 rounded-xl px-4 whitespace-nowrap text-[13px] font-medium transition-all duration-300 hover:bg-background/40",
+                    moreNav.some((i) => location.pathname === i.to) ? "bg-primary/20 text-primary shadow-sm" : "text-foreground/80 hover:text-foreground"
                   )}
                   onClick={() => setMoreOpen(!moreOpen)}
                 >
-                  {t("cabinetLayout.more")}
+                  <span className="inline-flex items-center leading-none">{t("cabinetLayout.more")}</span>
                   <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", moreOpen && "rotate-180")} />
                 </Button>
                 {moreOpen && (
@@ -732,7 +741,7 @@ function CabinetShell() {
                           )}
                         >
                           <Icon className="h-4 w-4 shrink-0" />
-                          {t(labelKey)}
+                          <span className="inline-flex items-center leading-none">{t(labelKey)}</span>
                         </Link>
                       );
                     })}
@@ -744,7 +753,10 @@ function CabinetShell() {
           <div className="flex items-center gap-2 shrink-0">
             <ThemePopover />
             <SettingsPopover />
-            <div className="hidden lg:flex h-9 items-center gap-3 rounded-full border border-border/60 bg-background/35 px-4 shadow-sm backdrop-blur-xl transition-all hover:bg-background/50">
+            <Link
+              to="/cabinet/profile"
+              className="hidden lg:flex h-9 items-center gap-3 rounded-full border border-border/60 bg-background/35 px-4 shadow-sm backdrop-blur-xl transition-all hover:bg-background/50"
+            >
               <span className="max-w-[120px] xl:max-w-[160px] truncate text-sm font-medium text-muted-foreground" title={state.client?.email?.trim() || (state.client?.telegramUsername ? `@${state.client.telegramUsername}` : "")}>
                 {state.client?.email?.trim() ? state.client.email : state.client?.telegramUsername ? `@${state.client.telegramUsername}` : "—"}
               </span>
@@ -753,7 +765,7 @@ function CabinetShell() {
                 <Wallet className="h-4 w-4 text-primary" />
                 <span>{headerBalance ?? "—"}</span>
               </div>
-            </div>
+            </Link>
             <Button
               variant="outline"
               className="group h-9 rounded-full border-border/60 bg-background/35 p-0 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive"

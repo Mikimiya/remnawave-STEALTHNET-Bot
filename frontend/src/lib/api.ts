@@ -806,6 +806,27 @@ export const api = {
     });
   },
 
+  async clientForgotPassword(email: string): Promise<{ message: string }> {
+    return request("/client/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async clientVerifyPasswordReset(token: string): Promise<{ message: string; email: string | null }> {
+    return request("/client/auth/verify-password-reset", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  async clientResetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    return request("/client/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, newPassword }),
+    });
+  },
+
   /** Авторизация по initData из Telegram Mini App (Web App) */
   async clientAuthByTelegramMiniapp(initData: string): Promise<ClientAuthResponse | ClientAuthRequires2FA> {
     return request("/client/auth/telegram-miniapp", {

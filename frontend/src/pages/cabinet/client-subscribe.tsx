@@ -399,9 +399,10 @@ export function ClientSubscribePage() {
                               : typeof window !== "undefined"
                                 ? `${window.location.protocol}//${window.location.host}`
                                 : "";
+                          const deeplinkLang = locale === "en" || locale === "zh" ? locale : "ru";
                           const skipAuto = isMiniapp ? "&skip_auto=1" : "";
                           const deeplinkUrl = baseUrl
-                            ? `${baseUrl}/api/public/deeplink?url=${encodeURIComponent(href)}${skipAuto}`
+                            ? `${baseUrl}/api/public/deeplink?url=${encodeURIComponent(href)}&lang=${encodeURIComponent(deeplinkLang)}${skipAuto}`
                             : "#";
                           const handleClick = (e: React.MouseEvent) => {
                             try {

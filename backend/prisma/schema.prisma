@@ -101,6 +101,7 @@ model Client {
   singboxSlots SingboxSlot[]
   tickets     Ticket[]
   contestWinners ContestWinner[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([telegramId])
   @@index([email])
@@ -187,6 +188,20 @@ model PendingEmailRegistration {
   @@index([verificationToken])
   @@index([email])
   @@map("pending_email_registrations")
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  clientId   String   @map("client_id")
+  token      String   @unique
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Payment {

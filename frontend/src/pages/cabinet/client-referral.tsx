@@ -71,6 +71,16 @@ export function ClientReferralPage() {
   }
 
   const s = stats!;
+  const examplePrice = 20;
+  const exampleLevel1Count = 10;
+  const exampleLevel2PerUser = 10;
+  const exampleLevel3PerUser = 10;
+  const exampleLevel2Count = exampleLevel1Count * exampleLevel2PerUser;
+  const exampleLevel3Count = exampleLevel2Count * exampleLevel3PerUser;
+  const exampleLevel1Reward = exampleLevel1Count * examplePrice * ((s.referralPercent ?? 0) / 100);
+  const exampleLevel2Reward = exampleLevel2Count * examplePrice * ((s.referralPercentLevel2 ?? 0) / 100);
+  const exampleLevel3Reward = exampleLevel3Count * examplePrice * ((s.referralPercentLevel3 ?? 0) / 100);
+  const exampleTotalReward = exampleLevel1Reward + exampleLevel2Reward + exampleLevel3Reward;
 
   return (
     <div className="space-y-6 w-full min-w-0 pb-10">
@@ -249,6 +259,58 @@ export function ClientReferralPage() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground mb-0.5">{t("referral.creditedToBalance")}</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">{t("referral.creditedDesc")}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-5 rounded-2xl bg-primary/5 border border-primary/10 shadow-sm w-full">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0 font-bold">
+                ¥
+              </div>
+              <div className="min-w-0 space-y-2">
+                <p className="text-sm font-semibold text-foreground">{t("referral.exampleTitle")}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {t("referral.exampleScenario", {
+                    level1Count: exampleLevel1Count,
+                    level2Count: exampleLevel2Count,
+                    level3Count: exampleLevel3Count,
+                    amount: examplePrice,
+                  })}
+                </p>
+                <div className="grid gap-1.5 text-xs text-muted-foreground">
+                  <p>
+                    {t("referral.exampleLevel1", {
+                      count: exampleLevel1Count,
+                      amount: examplePrice,
+                      percent: s.referralPercent,
+                      reward: formatMoney(exampleLevel1Reward, currency),
+                    })}
+                  </p>
+                  {(s.referralPercentLevel2 ?? 0) > 0 && (
+                    <p>
+                      {t("referral.exampleLevel2", {
+                        count: exampleLevel2Count,
+                        amount: examplePrice,
+                        percent: s.referralPercentLevel2,
+                        reward: formatMoney(exampleLevel2Reward, currency),
+                      })}
+                    </p>
+                  )}
+                  {(s.referralPercentLevel3 ?? 0) > 0 && (
+                    <p>
+                      {t("referral.exampleLevel3", {
+                        count: exampleLevel3Count,
+                        amount: examplePrice,
+                        percent: s.referralPercentLevel3,
+                        reward: formatMoney(exampleLevel3Reward, currency),
+                      })}
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-xl bg-background/70 border border-border/50 px-3 py-2.5">
+                  <p className="text-sm font-semibold text-foreground">
+                    {t("referral.exampleTotal", { total: formatMoney(exampleTotalReward, currency) })}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
