@@ -19,6 +19,7 @@ FRONTEND_DIST     ?= $(DEPLOY_DIR)/frontend
 .PHONY: help install env caddy-install caddy-config caddy-start \
         pull up down restart logs ps \
         frontend-pull frontend-extract \
+        db-backup db-restore \
         status clean
 
 # ── 帮助 ─────────────────────────────────────────────────────────
@@ -142,3 +143,45 @@ status: ## 检查所有服务状态
 clean: ## 清理未使用的 Docker 资源
 	@docker system prune -f
 	@echo "🧹  清理完成"
+
+# ── 数据库备份/恢复 ───────────────────────────────────────────────
+BACKUP_DIR  := ./backup
+BACKUP_FILE ?= $(BACKUP_DIR)/stealthnet.sql
+DB_CONTAINER := stealthnet-postgres
+
+db-backup: ## 备份数据库到 backup/stealthnet.sql
+	@mkdir -p $(BACKUP_DIR)
+	@echo "💾  备份数据库..."
+	@docker exec $(DB_CONTAINER) pg_dump \
+		-U $(POSTGRES_USER) \
+		-d $(POSTGRES_DB) \
+		--clean --if-exists --no-owner --no-privileges \
+		> $(BACKUP_FILE)
+	@echo "✅  数据库已备份到 $(BACKUP_FILE) ($$(wc -c < $(BACKUP_FILE) | tr -d ' ') bytes)"
+
+db-restore: ## 从 backup/stealthnet.sql 恢复数据库
+	@if [ ! -f "$(BACKUP_FILE)" ]; then \
+		echo "❌  备份文件不存在: $(BACKUP_FILE)"; \
+		exit 1; \
+	fi
+	@echo ""
+	@echo "  ⚠️  即将恢复数据库！当前数据将被覆盖！"
+	@echo "  📄  备份文件: $(BACKUP_FILE) ($$(wc -c < $(BACKUP_FILE) | tr -d ' ') bytes)"
+	@echo ""
+	@read -p "  确认恢复？(y/N) " confirm; \
+	if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ]; then \
+		echo "  取消恢复"; \
+		exit 0; \
+	fi
+	@echo "🔄  停止 API 和 Bot..."
+	@$(COMPOSE) stop api bot 2>/dev/null || true
+	@echo "🔄  恢复数据库..."
+	@docker exec -i $(DB_CONTAINER) psql \
+		-U $(POSTGRES_USER) \
+		-d $(POSTGRES_DB) \
+		< $(BACKUP_FILE)
+	@echo "🔄  重新启动 API 和 Bot..."
+	@$(COMPOSE) start api bot
+	@echo ""
+	@echo "  ✅  数据库恢复完成！"
+	@echo ""

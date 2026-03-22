@@ -8,13 +8,13 @@ name: stealthnet
 services:
   # ── PostgreSQL ──────────────────────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: stealthnet-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-stealthnet}
       POSTGRES_USER: ${POSTGRES_USER:-stealthnet}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CoolgoNetwork@2024!}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -27,7 +27,7 @@ services:
 
   # ── Backend API ─────────────────────────────────────────────────
   api:
-    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/mikimiya/stealthnet}-api:${IMAGE_TAG:-latest}
+    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/Mikimiya/remnawave-STEALTHNET-Bot}-api:${IMAGE_TAG:-latest}
     container_name: stealthnet-api
     restart: unless-stopped
     ports:
