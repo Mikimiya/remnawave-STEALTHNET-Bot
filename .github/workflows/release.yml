@@ -1,0 +1,126 @@
+###############################################################################
+#  STEALTHNET — Release
+#  推送 v* tag 时自动构建 Docker 镜像并创建 GitHub Release
+#  用法: git tag v3.2.4 && git push origin --tags
+###############################################################################
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/stealthnet
+
+jobs:
+  # ── 构建并推送 Docker 镜像 ─────────────────────────────────────
+  build-images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: api
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+          - name: bot
+            context: ./bot
+            dockerfile: ./bot/Dockerfile
+          - name: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  # ── 创建 GitHub Release ─────────────────────────────────────────
+  create-release:
+    needs: build-images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # 获取上一个 tag
+          PREV_TAG=$(git tag --sort=-version:refname | head -2 | tail -1)
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "Previous tag: $PREV_TAG"
+
+          # 生成 changelog
+          {
+            echo "## Docker 镜像"
+            echo ""
+            echo "| 组件 | 镜像 |"
+            echo "|------|------|"
+            echo "| API | \`${{ env.IMAGE_PREFIX }}-api:${{ github.ref_name }}\` |"
+            echo "| Bot | \`${{ env.IMAGE_PREFIX }}-bot:${{ github.ref_name }}\` |"
+            echo "| Frontend | \`${{ env.IMAGE_PREFIX }}-frontend:${{ github.ref_name }}\` |"
+            echo ""
+            echo "## 部署"
+            echo ""
+            echo '```bash'
+            echo "cd deploy"
+            echo 'sed -i "s/IMAGE_TAG=.*/IMAGE_TAG=${{ github.ref_name }}/" .env'
+            echo "make upgrade"
+            echo '```'
+            echo ""
+            echo "## 变更记录"
+            echo ""
+            git log ${PREV_TAG}..${{ github.ref_name }} --pretty=format:"- %s (%h)" --no-merges 2>/dev/null || echo "- 首次发布"
+          } > /tmp/changelog.md
+
+          cat /tmp/changelog.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "STEALTHNET ${{ github.ref_name }}"
+          body_path: /tmp/changelog.md
+          draft: false
+          prerelease: false
+          generate_release_notes: false
