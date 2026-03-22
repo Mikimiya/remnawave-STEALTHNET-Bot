@@ -196,7 +196,7 @@ export function ClientLoginPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }}>
+    <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}>
       <AuthShell
         brand={brand}
         icon={LogIn}
@@ -214,26 +214,65 @@ export function ClientLoginPage() {
       >
         <form onSubmit={handleSubmit} className="space-y-5">
           <input type="text" name="prevent_autofill" autoComplete="off" tabIndex={-1} className="absolute h-0 w-0 overflow-hidden opacity-0 pointer-events-none" aria-hidden />
-          {error && <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span></div>}
+
+          {error && (
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </motion.div>
+          )}
+
           <div className="space-y-2.5">
             <Label htmlFor="email" className="text-sm font-medium">{t("auth.email")}</Label>
-            <Input id="email" type="email" name="login_email" placeholder={t("auth.enterEmail")} value={email} onChange={handleEmailChange} onBlur={handleEmailBlur} required autoComplete="username" className={cn("h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5", emailError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40")} />
-            {emailError && <p className="px-1 text-xs text-destructive dark:text-red-400">{emailError}</p>}
+            <Input id="email" type="email" name="login_email" placeholder={t("auth.enterEmail")} value={email} onChange={handleEmailChange} onBlur={handleEmailBlur} required autoComplete="username" className={cn("h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/50 dark:bg-white/5 transition-all duration-200", emailError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40")} />
+            {emailError && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-1 text-xs text-destructive dark:text-red-400">{emailError}</motion.p>}
           </div>
+
           <div className="space-y-2.5">
             <Label htmlFor="password" className="text-sm font-medium">{t("auth.password")}</Label>
-            <Input id="password" type="password" name="login_password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" className="h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 focus-visible:ring-primary/40 dark:bg-white/5" />
+            <Input id="password" type="password" name="login_password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" className="h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/50 focus-visible:ring-primary/40 dark:bg-white/5 transition-all duration-200" />
             <div className="flex justify-end">
-              <Link
-                to="/cabinet/forgot-password"
-                className="text-xs font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
-              >
-                {t("auth.forgotPassword")}
-              </Link>
+              <Link to="/cabinet/forgot-password" className="text-xs font-medium text-primary transition-colors hover:text-primary/80 hover:underline">{t("auth.forgotPassword")}</Link>
             </div>
           </div>
-          <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 transition-transform hover:scale-[1.01]" disabled={loading}>{loading ? t("auth.loginLoading") : t("auth.login")}</Button>
-          {(telegramBotUsername || googleEnabled || appleEnabled) && <div className="space-y-4"><div className="relative flex items-center gap-3"><div className="h-px flex-1 bg-border/70" /><span className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground">{t("common.or")}</span><div className="h-px flex-1 bg-border/70" /></div><div className="grid gap-3">{googleEnabled && googleClientId && <button type="button" onClick={handleGoogleLogin} disabled={loading} title={t("auth.loginViaGoogle")} className={cn("flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/50 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10", "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2")}><GoogleIcon className="h-5 w-5" />{t("auth.loginViaGoogle")}</button>}{appleEnabled && <Button type="button" variant="outline" className="h-12 w-full rounded-xl gap-3 border-white/10 bg-white/50 text-sm font-medium shadow-sm backdrop-blur hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10" onClick={handleAppleLogin} disabled={loading}><svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>{t("auth.loginViaApple")}</Button>}{telegramBotUsername && <div className="rounded-xl border border-white/10 bg-white/35 px-3 py-3 shadow-sm backdrop-blur dark:bg-white/5"><div ref={telegramWidgetRef} className="flex min-h-[44px] justify-center" /></div>}</div></div>}
+
+          <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold shadow-lg shadow-primary/25 transition-all duration-200 hover:scale-[1.01] hover:shadow-primary/35" disabled={loading}>
+            {loading ? (
+              <span className="flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />{t("auth.loginLoading")}</span>
+            ) : t("auth.login")}
+          </Button>
+
+          {(telegramBotUsername || googleEnabled || appleEnabled) && (
+            <div className="space-y-4">
+              <div className="relative flex items-center gap-3">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground/60">{t("common.or")}</span>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+              </div>
+
+              <div className="grid gap-3">
+                {googleEnabled && googleClientId && (
+                  <button type="button" onClick={handleGoogleLogin} disabled={loading} title={t("auth.loginViaGoogle")} className={cn("flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/50 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all duration-200 hover:bg-white/70 hover:shadow-md dark:bg-white/5 dark:hover:bg-white/10", "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2")}>
+                    <GoogleIcon className="h-5 w-5" />
+                    {t("auth.loginViaGoogle")}
+                  </button>
+                )}
+
+                {appleEnabled && (
+                  <Button type="button" variant="outline" className="h-12 w-full rounded-xl gap-3 border-white/10 bg-white/50 text-sm font-medium shadow-sm backdrop-blur transition-all duration-200 hover:bg-white/70 hover:shadow-md dark:bg-white/5 dark:hover:bg-white/10" onClick={handleAppleLogin} disabled={loading}>
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                    {t("auth.loginViaApple")}
+                  </Button>
+                )}
+
+                {telegramBotUsername && (
+                  <div className="rounded-xl border border-white/10 bg-white/35 px-3 py-3 shadow-sm backdrop-blur dark:bg-white/5">
+                    <div ref={telegramWidgetRef} className="flex min-h-[44px] justify-center" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </form>
       </AuthShell>
     </motion.div>

@@ -299,7 +299,7 @@ export function ClientRegisterPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }}>
+    <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}>
       <AuthShell
         brand={brand}
         icon={UserPlus}
@@ -326,10 +326,10 @@ export function ClientRegisterPage() {
           <input type="text" name="prevent_autofill" autoComplete="off" tabIndex={-1} className="absolute h-0 w-0 overflow-hidden opacity-0 pointer-events-none" aria-hidden />
 
           {error && (
-            <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
-            </div>
+            </motion.div>
           )}
 
           <div className="space-y-2.5">
@@ -345,11 +345,11 @@ export function ClientRegisterPage() {
               required
               autoComplete="email"
               className={cn(
-                "h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5",
+                "h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/50 dark:bg-white/5 transition-all duration-200",
                 emailError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40"
               )}
             />
-            {emailError && <p className="px-1 text-xs text-destructive dark:text-red-400">{emailError}</p>}
+            {emailError && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-1 text-xs text-destructive dark:text-red-400">{emailError}</motion.p>}
           </div>
 
           <div className="space-y-2.5">
@@ -364,33 +364,40 @@ export function ClientRegisterPage() {
               required
               autoComplete="new-password"
               className={cn(
-                "h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/70 dark:bg-white/5",
+                "h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/50 dark:bg-white/5 transition-all duration-200",
                 passwordError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40"
               )}
             />
-            {passwordError && <p className="px-1 text-xs text-destructive dark:text-red-400">{passwordError}</p>}
+            {passwordError && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-1 text-xs text-destructive dark:text-red-400">{passwordError}</motion.p>}
             {!passwordError && password && (
-              <p className="px-1 text-xs font-medium text-emerald-500">{t("auth.passwordAccepted")}</p>
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-1.5 px-1 text-xs font-medium text-emerald-500">
+                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500/20">
+                  <svg className="h-2.5 w-2.5" viewBox="0 0 12 12" fill="none"><path d="M2.5 6l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </span>
+                {t("auth.passwordAccepted")}
+              </motion.p>
             )}
           </div>
 
           {emailSent && (
-            <div className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 shadow-sm dark:text-emerald-400">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 shadow-sm dark:text-emerald-400">
               <Mail className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{t("auth.emailVerificationSent")}</span>
-            </div>
+            </motion.div>
           )}
 
-          <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold shadow-lg shadow-primary/20 transition-transform hover:scale-[1.01]" disabled={loading || !email || !password}>
-            {loading ? t("auth.registerLoading") : t("auth.register")}
+          <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold shadow-lg shadow-primary/25 transition-all duration-200 hover:scale-[1.01] hover:shadow-primary/35" disabled={loading || !email || !password}>
+            {loading ? (
+              <span className="flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />{t("auth.registerLoading")}</span>
+            ) : t("auth.register")}
           </Button>
 
           {(telegramBotUsername || googleEnabled || appleEnabled) && (
             <div className="space-y-4">
               <div className="relative flex items-center gap-3">
-                <div className="h-px flex-1 bg-border/70" />
-                <span className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground">{t("common.or")}</span>
-                <div className="h-px flex-1 bg-border/70" />
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground/60">{t("common.or")}</span>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
               </div>
 
               <div className="grid gap-3">
@@ -401,7 +408,7 @@ export function ClientRegisterPage() {
                     disabled={loading}
                     title={t("auth.registerViaGoogle")}
                     className={cn(
-                      "flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/50 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10",
+                      "flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/50 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all duration-200 hover:bg-white/70 hover:shadow-md dark:bg-white/5 dark:hover:bg-white/10",
                       "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     )}
                   >
@@ -414,7 +421,7 @@ export function ClientRegisterPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-12 w-full rounded-xl gap-3 border-white/10 bg-white/50 text-sm font-medium shadow-sm backdrop-blur hover:bg-white/70 dark:bg-white/5 dark:hover:bg-white/10"
+                    className="h-12 w-full rounded-xl gap-3 border-white/10 bg-white/50 text-sm font-medium shadow-sm backdrop-blur transition-all duration-200 hover:bg-white/70 hover:shadow-md dark:bg-white/5 dark:hover:bg-white/10"
                     onClick={handleAppleLogin}
                     disabled={loading}
                   >

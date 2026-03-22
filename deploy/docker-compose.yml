@@ -1,0 +1,71 @@
+###############################################################################
+#  STEALTHNET — Docker Compose (部署用)
+#  只运行 postgres、api、bot — Caddy 在宿主机运行
+#  镜像从 GitHub Container Registry (GHCR) 拉取
+###############################################################################
+name: stealthnet
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: stealthnet-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-stealthnet}
+      POSTGRES_USER: ${POSTGRES_USER:-stealthnet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - stealthnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stealthnet} -d ${POSTGRES_DB:-stealthnet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend API ─────────────────────────────────────────────────
+  api:
+    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/mikimiya/stealthnet}-api:${IMAGE_TAG:-latest}
+    container_name: stealthnet-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-stealthnet}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-stealthnet}"
+      JWT_SECRET: "${JWT_SECRET:?请在 .env 中设置 JWT_SECRET}"
+      JWT_ACCESS_EXPIRES_IN: "${JWT_ACCESS_EXPIRES_IN:-15m}"
+      JWT_REFRESH_EXPIRES_IN: "${JWT_REFRESH_EXPIRES_IN:-7d}"
+      CORS_ORIGIN: "https://${DOMAIN:-localhost}"
+      REMNA_API_URL: "${REMNA_API_URL:-}"
+      REMNA_ADMIN_TOKEN: "${REMNA_ADMIN_TOKEN:-}"
+      INIT_ADMIN_EMAIL: "${INIT_ADMIN_EMAIL:-admin@stealthnet.local}"
+      INIT_ADMIN_PASSWORD: "${INIT_ADMIN_PASSWORD:-}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - stealthnet
+
+  # ── Telegram Bot ────────────────────────────────────────────────
+  bot:
+    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/mikimiya/stealthnet}-bot:${IMAGE_TAG:-latest}
+    container_name: stealthnet-bot
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: "${BOT_TOKEN:-}"
+      API_URL: "http://api:5000"
+    depends_on:
+      - api
+    networks:
+      - stealthnet
+
+volumes:
+  postgres_data:
+
+networks:
+  stealthnet:
+    driver: bridge
