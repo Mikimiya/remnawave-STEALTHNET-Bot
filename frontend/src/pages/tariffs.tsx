@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import type {
   TariffCategoryWithTariffs,
   TariffRecord,
+  TariffSubGroupRecord,
   CreateTariffPayload,
   UpdateTariffPayload,
 } from "@/lib/api";
@@ -22,6 +23,7 @@ import {
   ChevronDown,
   Check,
   GripVertical,
+  Layers,
 } from "lucide-react";
 import {
   DndContext,
@@ -48,6 +50,13 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 const BYTES_PER_GB = 1024 * 1024 * 1024;
+
+const TRAFFIC_RESET_STRATEGIES = [
+  { value: "NO_RESET", labelKey: "admin.tariffs.resetStrategyNoReset" },
+  { value: "DAY", labelKey: "admin.tariffs.resetStrategyDay" },
+  { value: "WEEK", labelKey: "admin.tariffs.resetStrategyWeek" },
+  { value: "MONTH", labelKey: "admin.tariffs.resetStrategyMonth" },
+];
 
 const CURRENCIES = [
   { value: "usd", label: "USD" },
@@ -80,6 +89,9 @@ function SortableCategoryCard({
   onEditTariff,
   onDeleteTariff,
   onTariffDragEnd,
+  onAddSubGroup,
+  onEditSubGroup,
+  onDeleteSubGroup,
   formatPrice,
   formatTraffic,
 }: {
@@ -90,6 +102,9 @@ function SortableCategoryCard({
   onEditTariff: (t: TariffRecord) => void;
   onDeleteTariff: (id: string) => void;
   onTariffDragEnd: (event: DragEndEvent) => void;
+  onAddSubGroup: () => void;
+  onEditSubGroup: (sg: TariffSubGroupRecord) => void;
+  onDeleteSubGroup: (id: string) => void;
   formatPrice: (amount: number, currency: string) => string;
   formatTraffic: (bytes: number | null) => string;
 }) {
@@ -127,6 +142,10 @@ function SortableCategoryCard({
             {cat.name}
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={onAddSubGroup} title={t("admin.tariffs.addSubGroup")}>
+              <Layers className="h-3.5 w-3.5 mr-1" />
+              {t("admin.tariffs.addSubGroup")}
+            </Button>
             <Button variant="outline" size="sm" className="rounded-lg" onClick={onEditCategory} title={t("admin.tariffs.editCategory")}>
               <Pencil className="h-3.5 w-3.5 mr-1" />
               {t("admin.tariffs.editCategory")}
@@ -149,35 +168,76 @@ function SortableCategoryCard({
         </div>
       </CardHeader>
       <CardContent>
-        {cat.tariffs.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-2">
-            {t("admin.tariffs.emptyTariffs")}
-          </p>
-        ) : (
-          <DndContext
-            sensors={tariffSensors}
-            collisionDetection={closestCenter}
-            onDragEnd={onTariffDragEnd}
-          >
-            <SortableContext
-              items={cat.tariffs.map((tr) => tr.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <ul className="space-y-2">
-                {cat.tariffs.map((tr) => (
-                  <SortableTariffRow
-                    key={tr.id}
-                    tariff={tr}
-                    onEdit={() => onEditTariff(tr)}
-                    onDelete={() => onDeleteTariff(tr.id)}
-                    formatPrice={formatPrice}
-                    formatTraffic={formatTraffic}
-                  />
-                ))}
-              </ul>
-            </SortableContext>
-          </DndContext>
-        )}
+        {(() => {
+          const subGroups = [...(cat.subGroups ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+          const ungrouped = cat.tariffs.filter((tr) => !tr.subGroupId);
+          const grouped = subGroups.map((sg) => ({
+            ...sg,
+            tariffs: cat.tariffs.filter((tr) => tr.subGroupId === sg.id),
+          }));
+
+          const hasAny = cat.tariffs.length > 0 || subGroups.length > 0;
+          if (!hasAny) {
+            return (
+              <p className="text-sm text-muted-foreground py-2">
+                {t("admin.tariffs.emptyTariffs")}
+              </p>
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              {/* Sub-groups */}
+              {grouped.map((sg) => (
+                <div key={sg.id} className="rounded-lg border border-dashed border-border/50 bg-muted/10">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted/20 rounded-t-lg">
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <Layers className="h-4 w-4 text-muted-foreground" />
+                      {sg.name}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEditSubGroup(sg)} title={t("admin.tariffs.editSubGroup")}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => onDeleteSubGroup(sg.id)} title={t("admin.tariffs.deleteSubGroup")}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  {sg.tariffs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-3 py-2">{t("admin.tariffs.emptySubGroup")}</p>
+                  ) : (
+                    <DndContext sensors={tariffSensors} collisionDetection={closestCenter} onDragEnd={onTariffDragEnd}>
+                      <SortableContext items={sg.tariffs.map((tr) => tr.id)} strategy={verticalListSortingStrategy}>
+                        <ul className="space-y-2 p-2">
+                          {sg.tariffs.map((tr) => (
+                            <SortableTariffRow key={tr.id} tariff={tr} onEdit={() => onEditTariff(tr)} onDelete={() => onDeleteTariff(tr.id)} formatPrice={formatPrice} formatTraffic={formatTraffic} />
+                          ))}
+                        </ul>
+                      </SortableContext>
+                    </DndContext>
+                  )}
+                </div>
+              ))}
+
+              {/* Ungrouped tariffs */}
+              {ungrouped.length > 0 && (
+                <DndContext sensors={tariffSensors} collisionDetection={closestCenter} onDragEnd={onTariffDragEnd}>
+                  <SortableContext items={ungrouped.map((tr) => tr.id)} strategy={verticalListSortingStrategy}>
+                    {subGroups.length > 0 && (
+                      <p className="text-xs font-medium text-muted-foreground px-1 pt-1">{t("admin.tariffs.ungroupedTariffs")}</p>
+                    )}
+                    <ul className="space-y-2">
+                      {ungrouped.map((tr) => (
+                        <SortableTariffRow key={tr.id} tariff={tr} onEdit={() => onEditTariff(tr)} onDelete={() => onDeleteTariff(tr.id)} formatPrice={formatPrice} formatTraffic={formatTraffic} />
+                      ))}
+                    </ul>
+                  </SortableContext>
+                </DndContext>
+              )}
+            </div>
+          );
+        })()}
       </CardContent>
     </Card>
   );
@@ -234,6 +294,11 @@ function SortableTariffRow({
         </span>
         <span className="text-muted-foreground text-sm">{t("admin.tariffs.squadsCount")}: {tariffItem.internalSquadUuids.length}</span>
         <span className="text-muted-foreground text-sm">{t("admin.tariffs.trafficLabel")}: {formatTraffic(tariffItem.trafficLimitBytes)}</span>
+        {tariffItem.trafficResetStrategy && tariffItem.trafficResetStrategy !== "NO_RESET" && (
+          <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded">
+            {t(TRAFFIC_RESET_STRATEGIES.find((s) => s.value === tariffItem.trafficResetStrategy)?.labelKey ?? "admin.tariffs.resetStrategyNoReset")}
+          </span>
+        )}
         {tariffItem.deviceLimit != null && (
           <span className="text-muted-foreground text-sm">{t("admin.tariffs.devicesLabel")}: {tariffItem.deviceLimit}</span>
         )}
@@ -273,6 +338,11 @@ export function TariffsPage() {
   const [tariffModal, setTariffModal] = useState<
     | { kind: "add"; categoryId: string }
     | { kind: "edit"; category: TariffCategoryWithTariffs; tariff: TariffRecord }
+    | null
+  >(null);
+  const [subGroupModal, setSubGroupModal] = useState<
+    | { kind: "add"; categoryId: string }
+    | { kind: "edit"; subGroup: TariffSubGroupRecord }
     | null
   >(null);
   const [saving, setSaving] = useState(false);
@@ -319,6 +389,16 @@ export function TariffsPage() {
       await api.deleteTariff(token, id);
       await load();
       setTariffModal(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("admin.tariffs.errorDelete"));
+    }
+  };
+
+  const handleDeleteSubGroup = async (id: string) => {
+    if (!token || !confirm(t("admin.tariffs.deleteSubGroupConfirm"))) return;
+    try {
+      await api.deleteTariffSubGroup(token, id);
+      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : t("admin.tariffs.errorDelete"));
     }
@@ -452,6 +532,9 @@ export function TariffsPage() {
                   onEditTariff={(t) => setTariffModal({ kind: "edit", category: cat, tariff: t })}
                   onDeleteTariff={handleDeleteTariff}
                   onTariffDragEnd={(e) => handleTariffDragEnd(e, cat)}
+                  onAddSubGroup={() => setSubGroupModal({ kind: "add", categoryId: cat.id })}
+                  onEditSubGroup={(sg) => setSubGroupModal({ kind: "edit", subGroup: sg })}
+                  onDeleteSubGroup={handleDeleteSubGroup}
                   formatPrice={formatPrice}
                   formatTraffic={formatTraffic}
                 />
@@ -482,9 +565,25 @@ export function TariffsPage() {
           token={token}
           squads={squads}
           modal={tariffModal}
+          categories={categories}
           onClose={() => setTariffModal(null)}
           onSaved={() => {
             setTariffModal(null);
+            load();
+          }}
+          saving={saving}
+          setSaving={setSaving}
+        />
+      )}
+
+      {/* Модалка подгруппы */}
+      {subGroupModal && (
+        <SubGroupModal
+          token={token}
+          modal={subGroupModal}
+          onClose={() => setSubGroupModal(null)}
+          onSaved={() => {
+            setSubGroupModal(null);
             load();
           }}
           saving={saving}
@@ -590,6 +689,7 @@ function TariffModal({
   token,
   squads,
   modal,
+  categories,
   onClose,
   onSaved,
   saving,
@@ -598,6 +698,7 @@ function TariffModal({
   token: string | null;
   squads: SquadOption[];
   modal: { kind: "add"; categoryId: string } | { kind: "edit"; category: TariffCategoryWithTariffs; tariff: TariffRecord };
+  categories: TariffCategoryWithTariffs[];
   onClose: () => void;
   onSaved: () => void;
   saving: boolean;
@@ -616,8 +717,13 @@ function TariffModal({
     tariff?.trafficLimitBytes != null ? String((tariff.trafficLimitBytes / BYTES_PER_GB).toFixed(2)) : ""
   );
   const [deviceLimit, setDeviceLimit] = useState<string>(tariff?.deviceLimit != null ? String(tariff.deviceLimit) : "");
+  const [trafficResetStrategy, setTrafficResetStrategy] = useState<string>(tariff?.trafficResetStrategy ?? "NO_RESET");
   const [price, setPrice] = useState<string>(tariff?.price != null ? String(tariff.price) : "0");
   const [currency, setCurrency] = useState<string>((tariff?.currency ?? "usd").toLowerCase());
+  const [subGroupId, setSubGroupId] = useState<string>(tariff?.subGroupId ?? "");
+
+  const currentCategory = categories.find((c) => c.id === categoryId);
+  const availableSubGroups = [...(currentCategory?.subGroups ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
 
   useEffect(() => {
     if (isEdit && tariff) {
@@ -629,6 +735,8 @@ function TariffModal({
       setDeviceLimit(tariff.deviceLimit != null ? String(tariff.deviceLimit) : "");
       setPrice(String(tariff.price ?? 0));
       setCurrency((tariff.currency ?? "usd").toLowerCase());
+      setTrafficResetStrategy(tariff.trafficResetStrategy ?? "NO_RESET");
+      setSubGroupId(tariff.subGroupId ?? "");
     } else {
       setName("");
       setDescription("");
@@ -638,6 +746,8 @@ function TariffModal({
       setDeviceLimit("");
       setPrice("0");
       setCurrency("usd");
+      setTrafficResetStrategy("NO_RESET");
+      setSubGroupId("");
     }
   }, [modal, isEdit, tariff]);
 
@@ -692,6 +802,8 @@ function TariffModal({
           deviceLimit: deviceLimitNum ?? null,
           price: priceNum,
           currency: currency || "usd",
+          trafficResetStrategy,
+          subGroupId: subGroupId || null,
         };
         await api.updateTariff(token, tariff.id, payload);
       } else {
@@ -705,6 +817,8 @@ function TariffModal({
           deviceLimit: deviceLimitNum ?? null,
           price: priceNum,
           currency: currency || "usd",
+          trafficResetStrategy,
+          subGroupId: subGroupId || null,
         };
         await api.createTariff(token, payload);
       }
@@ -735,6 +849,22 @@ function TariffModal({
               className="mt-1"
             />
           </div>
+          {availableSubGroups.length > 0 && (
+            <div>
+              <Label htmlFor="tariff-sub-group">{t("admin.tariffs.subGroupLabel")}</Label>
+              <select
+                id="tariff-sub-group"
+                value={subGroupId}
+                onChange={(e) => setSubGroupId(e.target.value)}
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="">{t("admin.tariffs.subGroupNone")}</option>
+                {availableSubGroups.map((sg) => (
+                  <option key={sg.id} value={sg.id}>{sg.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <Label htmlFor="tariff-desc">{t("admin.tariffs.tariffDescLabel")}</Label>
             <textarea
@@ -853,6 +983,22 @@ function TariffModal({
             <p className="text-xs text-muted-foreground mt-1">{t("admin.tariffs.trafficHint")}</p>
           </div>
           <div>
+            <Label htmlFor="tariff-reset-strategy">{t("admin.tariffs.resetStrategyLabel")}</Label>
+            <select
+              id="tariff-reset-strategy"
+              value={trafficResetStrategy}
+              onChange={(e) => setTrafficResetStrategy(e.target.value)}
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              {TRAFFIC_RESET_STRATEGIES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {t(s.labelKey)}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">{t("admin.tariffs.resetStrategyHint")}</p>
+          </div>
+          <div>
             <Label htmlFor="tariff-devices">{t("admin.tariffs.deviceLimitLabel")}</Label>
             <Input
               id="tariff-devices"
@@ -867,6 +1013,82 @@ function TariffModal({
           <DialogFooter className="mt-4">
             <Button type="button" variant="outline" onClick={onClose}>{t("admin.common.cancel")}</Button>
             <Button type="submit" disabled={saving || selectedSquadUuids.length === 0}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {isEdit ? t("admin.common.save") : t("admin.common.create")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SubGroupModal({
+  token,
+  modal,
+  onClose,
+  onSaved,
+  saving,
+  setSaving,
+}: {
+  token: string | null;
+  modal: { kind: "add"; categoryId: string } | { kind: "edit"; subGroup: TariffSubGroupRecord };
+  onClose: () => void;
+  onSaved: () => void;
+  saving: boolean;
+  setSaving: (v: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const isEdit = modal.kind === "edit";
+  const sg = isEdit ? modal.subGroup : null;
+  const [name, setName] = useState(sg?.name ?? "");
+
+  useEffect(() => {
+    if (isEdit && sg) {
+      setName(sg.name);
+    } else {
+      setName("");
+    }
+  }, [modal, isEdit, sg?.name]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !name.trim()) return;
+    setSaving(true);
+    try {
+      if (isEdit && sg) {
+        await api.updateTariffSubGroup(token, sg.id, { name: name.trim() });
+      } else if (modal.kind === "add") {
+        await api.createTariffSubGroup(token, { categoryId: modal.categoryId, name: name.trim() });
+      }
+      onSaved();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? t("admin.tariffs.subGroupModalTitleEdit") : t("admin.tariffs.subGroupModalTitleNew")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("admin.tariffs.subGroupModalTitleNew")}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit}>
+          <Label htmlFor="sg-name">{t("admin.tariffs.subGroupNameLabel")}</Label>
+          <Input
+            id="sg-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("admin.tariffs.subGroupNamePlaceholder")}
+            className="mt-1 mb-4"
+            required
+          />
+          <DialogFooter className="mt-4">
+            <Button type="button" variant="outline" onClick={onClose}>{t("admin.common.cancel")}</Button>
+            <Button type="submit" disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               {isEdit ? t("admin.common.save") : t("admin.common.create")}
             </Button>

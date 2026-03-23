@@ -317,6 +317,7 @@ function AppRoutes() {
 
 function TitleAndThemeSync() {
   const location = useLocation();
+  const { t } = useTranslation();
   const [config, setConfig] = useState<{ serviceName: string; favicon: string | null } | null>(null);
 
   // Подтягиваем конфиг при смене маршрута (в т.ч. после сохранения настроек), чтобы favicon обновился
@@ -340,7 +341,7 @@ function TitleAndThemeSync() {
     const base = config?.serviceName ?? "";
     let suffix = "";
     if (location.pathname.startsWith("/admin")) suffix = " — Admin";
-    else if (location.pathname.startsWith("/cabinet")) suffix = " — Кабинет";
+    else if (location.pathname.startsWith("/cabinet")) suffix = ` — ${t("common.cabinetTitle")}`;
     document.title = (base + suffix).trim() || suffix.replace(/^ — /, "").trim();
 
     const favicon = config?.favicon ?? null;

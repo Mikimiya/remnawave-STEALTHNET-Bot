@@ -493,7 +493,7 @@ export async function getSystemConfig() {
     groqFallback1: (map.groq_fallback_1 ?? "").trim() || null,
     groqFallback2: (map.groq_fallback_2 ?? "").trim() || null,
     groqFallback3: (map.groq_fallback_3 ?? "").trim() || null,
-    aiSystemPrompt: map.ai_system_prompt || "Ты — лучший менеджер техподдержки VPN-сервиса. Твоя цель — вежливо, быстро и точно помогать пользователям с настройкой VPN, тарифами и решением технических проблем. Отвечай кратко и по делу.",
+    aiSystemPrompt: map.ai_system_prompt || "你是一位优秀的VPN服务技术支持经理。你的目标是礼貌、快速、准确地帮助用户解决VPN设置、套餐和技术问题。请简洁明了地回复。",
     skipEmailVerification: map.skip_email_verification === "true" || map.skip_email_verification === "1",
     useRemnaSubscriptionPage: map.use_remna_subscription_page === "true" || map.use_remna_subscription_page === "1",
     aiChatEnabled: map.ai_chat_enabled !== "false" && map.ai_chat_enabled !== "0",

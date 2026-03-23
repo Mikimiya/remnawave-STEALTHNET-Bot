@@ -3,8 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { UserPlus, Mail, AlertCircle } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
-import { api } from "@/lib/api";
-import type { PublicConfig } from "@/lib/api";
+import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,16 +84,17 @@ export function ClientRegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const [brand, setBrand] = useState<{ serviceName: string; logo: string | null }>({
-    serviceName: "",
-    logo: null,
-  });
-  const [defaults, setDefaults] = useState<{ lang: string; currency: string }>({ lang: "ru", currency: "usd" });
-  const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null);
-  const [googleEnabled, setGoogleEnabled] = useState(false);
-  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
-  const [publicAppUrl, setPublicAppUrl] = useState<string | null>(null);
-  const [appleEnabled, setAppleEnabled] = useState(false);
+  const config = useCabinetConfig();
+  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? null };
+  const defaults = {
+    lang: config?.defaultLanguage || "ru",
+    currency: (config?.defaultCurrency || "usd").toLowerCase(),
+  };
+  const telegramBotUsername = config?.telegramBotUsername ?? null;
+  const googleEnabled = !!config?.googleLoginEnabled;
+  const googleClientId = config?.googleClientId ?? null;
+  const publicAppUrl = config?.publicAppUrl ?? null;
+  const appleEnabled = !!config?.appleLoginEnabled;
   const telegramWidgetRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref")?.trim() || undefined;
@@ -141,24 +141,6 @@ export function ClientRegisterPage() {
     setPasswordError(passwordErr);
     return !emailErr && !passwordErr;
   }
-
-  useEffect(() => {
-    api
-      .getPublicConfig()
-      .then((c: PublicConfig) => {
-        setBrand({ serviceName: c.serviceName ?? "", logo: c.logo ?? null });
-        setDefaults({
-          lang: c.defaultLanguage || "ru",
-          currency: (c.defaultCurrency || "usd").toLowerCase(),
-        });
-        setTelegramBotUsername(c.telegramBotUsername ?? null);
-        setGoogleEnabled(!!c.googleLoginEnabled);
-        setGoogleClientId(c.googleClientId ?? null);
-        setPublicAppUrl(c.publicAppUrl ?? null);
-        setAppleEnabled(!!c.appleLoginEnabled);
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!telegramBotUsername || !telegramWidgetRef.current) return;
@@ -230,14 +212,13 @@ export function ClientRegisterPage() {
   }, [loginByGoogle, navigate, t]);
 
   const handleAppleLogin = useCallback(async () => {
-    if (!appleEnabled) return;
+    if (!appleEnabled || !config) return;
     setError("");
     setLoading(true);
     try {
-      const cfg = await api.getPublicConfig();
-      const appleClientIdVal = cfg.appleClientId;
+      const appleClientIdVal = config.appleClientId;
       if (!appleClientIdVal) throw new Error("Apple Sign In not configured");
-      const baseUrl = (cfg.publicAppUrl ?? "").trim().replace(/\/$/, "") || window.location.origin;
+      const baseUrl = (config.publicAppUrl ?? "").trim().replace(/\/$/, "") || window.location.origin;
       const redirectUri = baseUrl + "/cabinet/register";
       const state = Math.random().toString(36).slice(2);
       const url = new URL("https://appleid.apple.com/auth/authorize");

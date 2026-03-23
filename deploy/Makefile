@@ -33,7 +33,13 @@ help: ## 显示帮助
 	@echo ""
 
 # ── 完整安装 ─────────────────────────────────────────────────────
-install: env caddy-install pull frontend-extract up caddy-config caddy-start ## 完整安装（首次部署用）
+install-all: env caddy-install pull frontend-extract up caddy-config caddy-start ## 完整安装（首次部署用）
+	@echo ""
+	@echo "  ✅  STEALTHNET 部署完成！"
+	@echo "  🌐  https://$(DOMAIN)"
+	@echo ""
+
+install: env pull up  ## 快速安装（已配置环境和 Caddy 的服务器用）
 	@echo ""
 	@echo "  ✅  STEALTHNET 部署完成！"
 	@echo "  🌐  https://$(DOMAIN)"

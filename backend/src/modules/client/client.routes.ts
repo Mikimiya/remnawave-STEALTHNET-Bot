@@ -1609,7 +1609,7 @@ clientRouter.post("/promo-code/activate", async (req, res) => {
 /** Определить отображаемое имя тарифа: Триал, название с сайта или «Тариф не выбран».
  *  Поддерживает activeInternalSquads как массив строк (uuid) или объектов { uuid }.
  *  Приоритет: сначала ищем совпадение с оплаченным тарифом, затем — триал. */
-async function resolveTariffInfo(remnaUserData: unknown): Promise<{ name: string; categoryName: string | null; isTrial: boolean }> {
+async function resolveTariffInfo(remnaUserData: unknown): Promise<{ name: string; categoryName: string | null; trafficResetStrategy: string; isTrial: boolean }> {
   const raw = remnaUserData as { response?: { activeInternalSquads?: unknown[] }; activeInternalSquads?: unknown[] };
   const user = raw?.response ?? raw;
   const ais = user?.activeInternalSquads;
@@ -1620,17 +1620,17 @@ async function resolveTariffInfo(remnaUserData: unknown): Promise<{ name: string
       if (typeof u === "string") squadUuids.push(u);
     }
   }
-  if (squadUuids.length === 0) return { name: "Тариф не выбран", categoryName: null, isTrial: false };
+  if (squadUuids.length === 0) return { name: "Тариф не выбран", categoryName: null, trafficResetStrategy: "NO_RESET", isTrial: false };
   const config = await getSystemConfig();
   const trialUuid = config.trialSquadUuid?.trim() || null;
-  const tariffs = await prisma.tariff.findMany({ select: { name: true, internalSquadUuids: true, category: { select: { name: true } } } });
+  const tariffs = await prisma.tariff.findMany({ select: { name: true, internalSquadUuids: true, trafficResetStrategy: true, category: { select: { name: true } } } });
   for (const squadUuid of squadUuids) {
     if (trialUuid === squadUuid) continue;
     const match = tariffs.find((t) => t.internalSquadUuids.includes(squadUuid));
-    if (match?.name) return { name: match.name, categoryName: match.category?.name ?? null, isTrial: false };
+    if (match?.name) return { name: match.name, categoryName: match.category?.name ?? null, trafficResetStrategy: (match as any).trafficResetStrategy ?? "NO_RESET", isTrial: false };
   }
-  if (trialUuid && squadUuids.includes(trialUuid)) return { name: "Триал", categoryName: null, isTrial: true };
-  return { name: "Тариф не выбран", categoryName: null, isTrial: false };
+  if (trialUuid && squadUuids.includes(trialUuid)) return { name: "Триал", categoryName: null, trafficResetStrategy: "NO_RESET", isTrial: true };
+  return { name: "Тариф не выбран", categoryName: null, trafficResetStrategy: "NO_RESET", isTrial: false };
 }
 
 clientRouter.get("/proxy-slots", async (req, res) => {
@@ -1709,18 +1709,18 @@ clientRouter.get("/singbox-slots", async (req, res) => {
 clientRouter.get("/subscription", async (req, res) => {
   const client = (req as unknown as { client: { id: string; remnawaveUuid: string | null } }).client;
   if (!client.remnawaveUuid) {
-    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, isTrial: false, message: "Подписка не привязана" });
+    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, trafficResetStrategy: null, isTrial: false, message: "Подписка не привязана" });
   }
   const result = await remnaGetUser(client.remnawaveUuid);
   if (result.error) {
-    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, isTrial: false, message: result.error });
+    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, trafficResetStrategy: null, isTrial: false, message: result.error });
   }
 
   // 1) 优先从最后一次已支付的套餐付款记录中获取（精确，不受 UUID 一对多影响）
   const lastPaidTariff = await prisma.payment.findFirst({
     where: { clientId: client.id, status: "PAID", tariffId: { not: null } },
     orderBy: { paidAt: "desc" },
-    select: { tariff: { select: { name: true, category: { select: { name: true } } } } },
+    select: { tariff: { select: { name: true, trafficResetStrategy: true, category: { select: { name: true } } } } },
   });
   const paidName = lastPaidTariff?.tariff?.name?.trim();
 
@@ -1730,6 +1730,7 @@ clientRouter.get("/subscription", async (req, res) => {
       subscription: result.data ?? null,
       tariffDisplayName: paidName,
       tariffCategoryName: lastPaidTariff?.tariff?.category?.name ?? null,
+      trafficResetStrategy: (lastPaidTariff?.tariff as any)?.trafficResetStrategy ?? "NO_RESET",
       isTrial: false,
     });
   }
@@ -1740,6 +1741,7 @@ clientRouter.get("/subscription", async (req, res) => {
     subscription: result.data ?? null,
     tariffDisplayName: tariffInfo.name,
     tariffCategoryName: tariffInfo.categoryName,
+    trafficResetStrategy: tariffInfo.trafficResetStrategy ?? "NO_RESET",
     isTrial: tariffInfo.isTrial,
   });
 });
@@ -2122,10 +2124,10 @@ clientRouter.post("/payments/balance", async (req, res) => {
   );
   if (!activateResult.ok) return res.status(activateResult.status).json({ message: activateResult.error });
 
-  // Списываем баланс
+  // Списываем баланс и помечаем триал использованным (чтобы не показывать кнопку «Бесплатный триал»)
   await prisma.client.update({
     where: { id: clientRaw.id },
-    data: { balance: { decrement: finalPrice } },
+    data: { balance: { decrement: finalPrice }, trialUsed: true },
   });
 
   // Создаём запись об оплате
@@ -2155,6 +2157,9 @@ clientRouter.post("/payments/balance", async (req, res) => {
 
   return res.json({
     message: `Тариф «${tariff.name}» активирован! Списано ${finalPrice.toFixed(2)} ${tariff.currency.toUpperCase()} с баланса.`,
+    tariffName: tariff.name,
+    amount: finalPrice,
+    currency: tariff.currency.toUpperCase(),
     paymentId: payment.id,
     newBalance: clientDb.balance - finalPrice,
   });
@@ -2273,7 +2278,7 @@ clientRouter.post("/custom-build/pay-balance", async (req, res) => {
 
   await prisma.client.update({
     where: { id: clientRaw.id },
-    data: { balance: { decrement: finalPrice } },
+    data: { balance: { decrement: finalPrice }, trialUsed: true },
   });
   if (promoCodeRecord) {
     await prisma.promoCodeUsage.create({ data: { promoCodeId: promoCodeRecord.id, clientId: clientRaw.id } });
@@ -3412,43 +3417,44 @@ clientRouter.post("/ai/chat", async (req, res) => {
     if (fallback2) modelsToTry.push(fallback2);
     if (fallback3) modelsToTry.push(fallback3);
 
-    const systemPromptText = (config as { aiSystemPrompt?: string | null }).aiSystemPrompt?.trim() || "Ты — лучший менеджер техподдержки VPN-сервиса. Твоя цель — вежливо, быстро и точно помогать пользователям с настройкой VPN, тарифами и решением технических проблем. Отвечай кратко и по делу.";
+    const systemPromptText = (config as { aiSystemPrompt?: string | null }).aiSystemPrompt?.trim() || "你是一位优秀的VPN服务技术支持经理。你的目标是礼貌、快速、准确地帮助用户解决VPN设置、套餐和技术问题。请简洁明了地回复。";
 
     const vpnTariffs = await prisma.tariff.findMany({ orderBy: { price: 'asc' } });
     const proxyTariffs = await prisma.proxyTariff.findMany({ where: { enabled: true }, orderBy: { price: 'asc' } });
     const singboxTariffs = await prisma.singboxTariff.findMany({ where: { enabled: true }, orderBy: { price: 'asc' } });
 
-    let tariffsContext = "\n\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ О ТАРИФАХ ДЛЯ ПОЛЬЗОВАТЕЛЯ:\nОбязательно используй только эти тарифы, если пользователь спрашивает про цены.\n";
-    if (vpnTariffs.length > 0) tariffsContext += "VPN Тарифы: " + vpnTariffs.map(t => `${t.name} (${t.price} ${t.currency.toUpperCase()} на ${t.durationDays} дней)`).join(", ") + ".\n";
-    if (proxyTariffs.length > 0) tariffsContext += "Прокси: " + proxyTariffs.map(t => `${t.name} (${t.price} ${t.currency.toUpperCase()} на ${t.durationDays} дней)`).join(", ") + ".\n";
-    if (singboxTariffs.length > 0) tariffsContext += "Sing-box: " + singboxTariffs.map(t => `${t.name} (${t.price} ${t.currency.toUpperCase()} на ${t.durationDays} дней)`).join(", ") + ".\n";
+    let tariffsContext = "\n\n当前套餐信息：\n当用户询问价格时，请务必只使用以下套餐信息回答。\n";
+    if (vpnTariffs.length > 0) tariffsContext += "VPN 套餐：" + vpnTariffs.map(t => `${t.name}（${t.price} ${t.currency.toUpperCase()}/${t.durationDays}天）`).join("、") + "。\n";
+    if (proxyTariffs.length > 0) tariffsContext += "代理套餐：" + proxyTariffs.map(t => `${t.name}（${t.price} ${t.currency.toUpperCase()}/${t.durationDays}天）`).join("、") + "。\n";
+    if (singboxTariffs.length > 0) tariffsContext += "Sing-box 套餐：" + singboxTariffs.map(t => `${t.name}（${t.price} ${t.currency.toUpperCase()}/${t.durationDays}天）`).join("、") + "。\n";
 
     const paymentMethods = [];
-    if (publicConfig.yookassaEnabled) paymentMethods.push("YooKassa (Банковские карты, СБП и др.)");
-    if (publicConfig.yoomoneyEnabled) paymentMethods.push("YooMoney (Кошелек, Карты)");
-    if (publicConfig.cryptopayEnabled) paymentMethods.push("Crypto Pay (Криптовалюта в Telegram)");
-    if (publicConfig.heleketEnabled) paymentMethods.push("Heleket (Криптовалюта)");
+    if (publicConfig.yookassaEnabled) paymentMethods.push("YooKassa（银行卡、SBP等）");
+    if (publicConfig.yoomoneyEnabled) paymentMethods.push("YooMoney（钱包、银行卡）");
+    if (publicConfig.cryptopayEnabled) paymentMethods.push("Crypto Pay（Telegram 加密货币）");
+    if (publicConfig.heleketEnabled) paymentMethods.push("Heleket（加密货币）");
     if (publicConfig.plategaMethods && publicConfig.plategaMethods.length > 0) {
-      paymentMethods.push("Platega (" + publicConfig.plategaMethods.map(m => m.label).join(", ") + ")");
+      paymentMethods.push("Platega（" + publicConfig.plategaMethods.map(m => m.label).join("、") + "）");
     }
+    if ((publicConfig as any).epayEnabled) paymentMethods.push("ePay（支付宝、微信支付）");
 
-    let paymentContext = "\n\nДОСТУПНЫЕ СПОСОБЫ ОПЛАТЫ НА САЙТЕ:\n";
+    let paymentContext = "\n\n网站可用支付方式：\n";
     if (paymentMethods.length > 0) {
-      paymentContext += "Пользователь может оплатить следующими способами:\n- " + paymentMethods.join("\n- ") + "\nЕсли спрашивают как оплатить, перечисли ТОЛЬКО эти способы. Не выдумывай Сбербанк Онлайн, QIWI, WebMoney, PayPal и т.д., если их нет в списке.\n";
+      paymentContext += "用户可通过以下方式付款：\n- " + paymentMethods.join("\n- ") + "\n当用户询问如何付款时，只列出以上方式。不要编造列表中没有的支付方式。\n";
     } else {
-      paymentContext += "В данный момент на сайте не настроено автоматических способов оплаты.\n";
+      paymentContext += "目前网站尚未配置自动支付方式。\n";
     }
 
-    const instructionsContext = `\n\nИНСТРУКЦИЯ ПО ПОДКЛЮЧЕНИЮ:
-Если пользователь спрашивает, как подключиться или настроить VPN, отвечай СТРОГО по следующему алгоритму (не придумывай свои методы):
-1. В личном кабинете на сайте нажать кнопку "Настроить VPN".
-2. Выбрать свою платформу и скачать предложенное приложение.
-3. Вернуться на сайт и нажать кнопку "Добавить подписку" (оная автоматически добавит конфигурацию в приложение) либо отсканировать QR-код.
+    const instructionsContext = `\n\nVPN 连接教程：
+当用户询问如何连接或设置 VPN 时，请严格按照以下步骤回答（不要自行编造其他方法）：
+1. 在网站个人中心点击"设置 VPN"按钮。
+2. 选择你的设备平台，下载推荐的应用程序。
+3. 返回网站，点击"添加订阅"按钮（会自动将配置导入应用）或扫描二维码。
 
-ПРАВИЛА ОТВЕТА О ЛИМИТАХ И ТАРИФАХ:
-Если пользователь спрашивает "какой у меня тариф", "сколько осталось дней", "какой лимит трафика", "сколько устройств", "какой у меня баланс" и т.д., ВСЕГДА используй данные из блока "ИНФОРМАЦИЯ О ТЕКУЩЕМ ПОЛЬЗОВАТЕЛЕ" ниже. НИКОГДА не говори, что ты не можешь найти информацию. Просто прочитай её из блока и ответь пользователю.\n`;
+回答用户订阅与限额问题的规则：
+当用户询问"我的套餐是什么"、"还剩多少天"、"流量限额是多少"、"能连几台设备"、"余额多少"等问题时，务必使用下方"当前用户信息"中的数据回答。绝对不要说找不到信息，直接读取数据并回复用户即可。\n`;
 
-    let userInfoContext = "\n\nИНФОРМАЦИЯ О ТЕКУЩЕМ ПОЛЬЗОВАТЕЛЕ:\nИспользуй эти данные, если пользователь спрашивает про свои текущие подписки или лимиты. Если написано, что чего-то нет, прямо скажи пользователю, что у него этого нет.\n";
+    let userInfoContext = "\n\n当前用户信息：\n当用户询问自己的订阅或限额时，请使用以下数据回答。如果显示没有某项服务，请直接告知用户。\n";
     try {
       const dbClient = await prisma.client.findUnique({
         where: { id: client.id },
@@ -3458,9 +3464,9 @@ clientRouter.post("/ai/chat", async (req, res) => {
         }
       });
       
-      userInfoContext += `- Баланс: ${dbClient?.balance || 0} ${(dbClient?.preferredCurrency || 'usd').toUpperCase()}\n`;
+      userInfoContext += `- 余额：${dbClient?.balance || 0} ${(dbClient?.preferredCurrency || 'usd').toUpperCase()}\n`;
 
-      let vpnInfo = "У пользователя НЕТ активной подписки VPN";
+      let vpnInfo = "用户当前没有有效的 VPN 订阅";
       if (client.remnawaveUuid) {
         const u = await remnaGetUser(client.remnawaveUuid);
         if (u && !u.error && u.data) {
@@ -3468,27 +3474,27 @@ clientRouter.post("/ai/chat", async (req, res) => {
           if (exp && exp > new Date()) {
              const resp = ((u.data as any).response ?? (u.data as any).data ?? u.data) as any;
              const tLimitRaw = resp?.trafficLimitBytes ?? resp?.trafficLimit;
-             const tLimit = (tLimitRaw != null && tLimitRaw > 0) ? (Number(tLimitRaw) / 1024**3).toFixed(2) + " GB" : "Безлимит";
+             const tLimit = (tLimitRaw != null && tLimitRaw > 0) ? (Number(tLimitRaw) / 1024**3).toFixed(2) + " GB" : "无限制";
              const tUsedRaw = resp?.trafficUsedBytes ?? resp?.trafficUsed;
              const tUsed = tUsedRaw != null ? (Number(tUsedRaw) / 1024**3).toFixed(2) + " GB" : "0 GB";
              const dLimitRaw = resp?.hwidDeviceLimit ?? resp?.deviceLimit;
-             const dLimit = (dLimitRaw != null && dLimitRaw > 0) ? dLimitRaw : "Безлимит";
-             vpnInfo = `Активна до ${exp.toISOString().split('T')[0]}, Трафик: ${tUsed} / ${tLimit}, Лимит устройств: ${dLimit}`;
+             const dLimit = (dLimitRaw != null && dLimitRaw > 0) ? dLimitRaw : "无限制";
+             vpnInfo = `有效期至 ${exp.toISOString().split('T')[0]}，流量：${tUsed} / ${tLimit}，设备限制：${dLimit}`;
           }
         }
       }
-      userInfoContext += `- VPN: ${vpnInfo}\n`;
+      userInfoContext += `- VPN：${vpnInfo}\n`;
       
       if (dbClient?.proxySlots?.length) {
-        userInfoContext += `- Прокси: ${dbClient.proxySlots.map((s: any) => `${s.proxyTariff?.name || 'Слот'} (до ${s.expiresAt.toISOString().split('T')[0]})`).join(', ')}\n`;
+        userInfoContext += `- 代理：${dbClient.proxySlots.map((s: any) => `${s.proxyTariff?.name || '插槽'}（到期 ${s.expiresAt.toISOString().split('T')[0]}）`).join('、')}\n`;
       } else {
-        userInfoContext += `- Прокси: У пользователя НЕТ прокси\n`;
+        userInfoContext += `- 代理：用户没有代理服务\n`;
       }
       
       if (dbClient?.singboxSlots?.length) {
-        userInfoContext += `- Sing-box: ${dbClient.singboxSlots.map((s: any) => `${s.singboxTariff?.name || 'Слот'} (до ${s.expiresAt.toISOString().split('T')[0]})`).join(', ')}\n`;
+        userInfoContext += `- Sing-box：${dbClient.singboxSlots.map((s: any) => `${s.singboxTariff?.name || '插槽'}（到期 ${s.expiresAt.toISOString().split('T')[0]}）`).join('、')}\n`;
       } else {
-        userInfoContext += `- Sing-box: У пользователя НЕТ подписок Sing-box\n`;
+        userInfoContext += `- Sing-box：用户没有 Sing-box 订阅\n`;
       }
     } catch (e) {
       console.error("[ai/chat] Error fetching user info:", e);
@@ -3816,7 +3822,7 @@ publicConfigRouter.get("/subscription-page", async (_req, res) => {
   }
 });
 
-function tariffToJson(t: { id: string; name: string; description: string | null; durationDays: number; internalSquadUuids: string[]; trafficLimitBytes: bigint | null; deviceLimit: number | null; price: number; currency: string }) {
+function tariffToJson(t: { id: string; name: string; description: string | null; durationDays: number; internalSquadUuids: string[]; trafficLimitBytes: bigint | null; deviceLimit: number | null; price: number; currency: string; trafficResetStrategy?: string; subGroupId?: string | null }) {
   return {
     id: t.id,
     name: t.name,
@@ -3826,6 +3832,8 @@ function tariffToJson(t: { id: string; name: string; description: string | null;
     deviceLimit: t.deviceLimit,
     price: t.price,
     currency: t.currency,
+    trafficResetStrategy: t.trafficResetStrategy ?? "NO_RESET",
+    subGroupId: (t as Record<string, unknown>).subGroupId ?? null,
   };
 }
 
@@ -3835,7 +3843,10 @@ publicConfigRouter.get("/tariffs", async (_req, res) => {
     const categoryEmojis = config.categoryEmojis ?? { ordinary: "📦", premium: "⭐" };
     const list = await prisma.tariffCategory.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      include: { tariffs: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
+      include: {
+        tariffs: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+        subGroups: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      },
     });
     return res.json({
       items: list.map((c) => {
@@ -3846,6 +3857,11 @@ publicConfigRouter.get("/tariffs", async (_req, res) => {
           emojiKey: c.emojiKey ?? null,
           emoji,
           tariffs: c.tariffs.map(tariffToJson),
+          subGroups: c.subGroups.map((sg) => ({
+            id: sg.id,
+            name: sg.name,
+            sortOrder: sg.sortOrder,
+          })),
         };
       }),
     });

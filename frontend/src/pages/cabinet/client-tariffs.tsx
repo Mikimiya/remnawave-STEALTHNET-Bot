@@ -16,6 +16,9 @@ import {
   ArrowLeft,
   ChevronDown,
   Flame,
+  RotateCcw,
+  Info,
+  AlertTriangle,
 } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
@@ -33,13 +36,54 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
+import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
 import { cn, formatMoney, translateBackendMessage, translatePlategaLabel } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { AiFillAlipaySquare, AiFillWechat } from "react-icons/ai";
 
-function formatDailyPrice(price: number, days: number, currency: string) {
-  if (!days || days <= 0) return null;
-  return formatMoney(price / days, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatPricePerGB(price: number, trafficLimitBytes: number | null, currency: string, durationDays?: number, trafficResetStrategy?: string) {
+  if (!trafficLimitBytes || trafficLimitBytes <= 0) return null;
+  const gb = trafficLimitBytes / 1024 / 1024 / 1024;
+  if (gb <= 0) return null;
+  let resetPeriods = 1;
+  if (durationDays && durationDays > 0 && trafficResetStrategy) {
+    if (trafficResetStrategy === "MONTH") resetPeriods = Math.max(1, Math.floor(durationDays / 30));
+    else if (trafficResetStrategy === "WEEK") resetPeriods = Math.max(1, Math.floor(durationDays / 7));
+    else if (trafficResetStrategy === "DAY") resetPeriods = Math.max(1, durationDays);
+  }
+  const effectiveGB = gb * resetPeriods;
+  return formatMoney(price / effectiveGB, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const RESET_STRATEGY_I18N: Record<string, string> = {
+  NO_RESET: "tariffs.resetNoReset",
+  DAY: "tariffs.resetDay",
+  WEEK: "tariffs.resetWeek",
+  MONTH: "tariffs.resetMonth",
+};
+
+function getEpayMethodPresentation(methodType: string) {
+  const key = methodType.trim().toLowerCase();
+
+  if (key === "alipay") {
+    return {
+      icon: <AiFillAlipaySquare className="h-5 w-5 text-[#1677FF]" />,
+      iconBg: "bg-blue-500/15",
+    };
+  }
+
+  if (key === "wxpay" || key === "wechat" || key === "wechatpay") {
+    return {
+      icon: <AiFillWechat className="h-5 w-5 text-[#07C160]" />,
+      iconBg: "bg-green-500/15",
+    };
+  }
+
+  return {
+    icon: <CreditCard className="h-5 w-5 text-blue-500" />,
+    iconBg: "bg-blue-500/15",
+  };
 }
 
 type TariffForPay = {
@@ -57,24 +101,24 @@ export function ClientTariffsPage() {
   const { state, refreshProfile } = useClientAuth();
   const token = state.token;
   const client = state.client;
+  const config = useCabinetConfig();
   const [tariffs, setTariffs] = useState<PublicTariffCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [plategaMethods, setPlategaMethods] = useState<{ id: number; label: string }[]>([]);
-  const [yoomoneyEnabled, setYoomoneyEnabled] = useState(false);
-  const [yookassaEnabled, setYookassaEnabled] = useState(false);
-  const [cryptopayEnabled, setCryptopayEnabled] = useState(false);
-  const [heleketEnabled, setHeleketEnabled] = useState(false);
-  const [epayMethods, setEpayMethods] = useState<{ type: string; label: string }[]>([]);
-  const [trialConfig, setTrialConfig] = useState<{ trialEnabled: boolean; trialDays: number }>({
-    trialEnabled: false,
-    trialDays: 0,
-  });
   const [payModal, setPayModal] = useState<{ tariff: TariffForPay } | null>(null);
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [trialLoading, setTrialLoading] = useState(false);
   const [trialError, setTrialError] = useState<string | null>(null);
   const { t, i18n } = useTranslation();
+
+  // Derive payment methods from shared config
+  const plategaMethods = config?.plategaMethods ?? [];
+  const yoomoneyEnabled = Boolean(config?.yoomoneyEnabled);
+  const yookassaEnabled = Boolean(config?.yookassaEnabled);
+  const cryptopayEnabled = Boolean(config?.cryptopayEnabled);
+  const heleketEnabled = Boolean(config?.heleketEnabled);
+  const epayMethods = config?.epayMethods ?? [];
+  const trialConfig = { trialEnabled: !!config?.trialEnabled, trialDays: config?.trialDays ?? 0 };
 
   // Promo code — collapsed by default
   const [promoOpen, setPromoOpen] = useState(false);
@@ -90,6 +134,9 @@ export function ClientTariffsPage() {
 
   // Mobile: selected category index
   const [selectedCatIndex, setSelectedCatIndex] = useState(0);
+  // Selected sub-group index per category (by category id)
+  const [selectedSubGroupIndex, setSelectedSubGroupIndex] = useState<Record<string, number>>({});
+  const [showPlanInfo, setShowPlanInfo] = useState(false);
 
   const showTrial = trialConfig.trialEnabled && !client?.trialUsed;
   const isMobileOrMiniapp = useCabinetMiniapp();
@@ -102,21 +149,6 @@ export function ClientTariffsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    api
-      .getPublicConfig()
-      .then((c) => {
-        setPlategaMethods(c.plategaMethods ?? []);
-        setYoomoneyEnabled(Boolean(c.yoomoneyEnabled));
-        setYookassaEnabled(Boolean(c.yookassaEnabled));
-        setCryptopayEnabled(Boolean(c.cryptopayEnabled));
-        setHeleketEnabled(Boolean(c.heleketEnabled));
-        setEpayMethods(c.epayMethods ?? []);
-        setTrialConfig({ trialEnabled: !!c.trialEnabled, trialDays: c.trialDays ?? 0 });
-      })
-      .catch(() => {});
   }, []);
 
   async function activateTrial() {
@@ -208,7 +240,10 @@ export function ClientTariffsPage() {
       setPayModal(null);
       setPromoInput("");
       setPromoResult(null);
-      alert(res.message);
+      const msg = res.tariffName && res.amount != null && res.currency
+        ? t("tariffs.balancePaySuccess", { name: res.tariffName, amount: res.amount.toFixed(2), currency: res.currency })
+        : res.message;
+      alert(msg);
       await refreshProfile();
     } catch (e) {
       setPayError(e instanceof Error ? translateBackendMessage(e.message, t) : t("tariffs.paymentError"));
@@ -437,6 +472,18 @@ export function ClientTariffsPage() {
           )}
         </div>
 
+        {/* Override warning */}
+        {client?.remnawaveUuid && (
+          <div className={cn(
+            "flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5",
+          )}>
+            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <p className="text-[13px] leading-relaxed text-amber-800 dark:text-amber-200 font-medium">
+              {t("tariffs.overrideWarning")}
+            </p>
+          </div>
+        )}
+
         {/* Promo code — collapsible */}
         <div>
           <button
@@ -622,17 +669,21 @@ export function ClientTariffsPage() {
             )}
 
             {/* ePay methods */}
-            {epayMethods.map((m) => (
-              <PayMethodButton
-                key={m.type}
-                isMobile={isMobileOrMiniapp}
-                icon={<CreditCard className="h-5 w-5 text-blue-500" />}
-                iconBg="bg-blue-500/15"
-                label={m.label}
-                onClick={() => startEpayPayment(tariff, m.type)}
-                disabled={payLoading}
-              />
-            ))}
+            {epayMethods.map((m) => {
+              const presentation = getEpayMethodPresentation(m.type);
+
+              return (
+                <PayMethodButton
+                  key={m.type}
+                  isMobile={isMobileOrMiniapp}
+                  icon={presentation.icon}
+                  iconBg={presentation.iconBg}
+                  label={m.label}
+                  onClick={() => startEpayPayment(tariff, m.type)}
+                  disabled={payLoading}
+                />
+              );
+            })}
 
             {/* YooKassa */}
             {yookassaEnabled && tariff.currency.toUpperCase() === "RUB" && (
@@ -686,9 +737,9 @@ export function ClientTariffsPage() {
         {isMobileOrMiniapp && payModal ? (
           <motion.div
             key="payment-view"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.2 }}
             className="flex flex-col w-full rounded-[2.5rem] border border-white/10 dark:border-white/5 bg-slate-50/60 dark:bg-slate-950/60 backdrop-blur-[32px] shadow-2xl relative"
           >
@@ -717,21 +768,55 @@ export function ClientTariffsPage() {
         ) : (
           <motion.div
             key="tariffs-list"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.2 }}
             className="space-y-6 max-w-6xl mx-auto"
           >
             {/* Header */}
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                {t("tariffs.title")}
-              </h1>
+              <div className="flex items-center justify-between gap-3">
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                  {t("tariffs.title")}
+                </h1>
+                <button
+                  type="button"
+                  onClick={() => setShowPlanInfo((v) => !v)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all duration-200 border shrink-0",
+                    showPlanInfo
+                      ? "bg-primary/15 text-primary border-primary/30"
+                      : "bg-background/60 text-muted-foreground border-border/50 hover:bg-background/80 hover:text-foreground"
+                  )}
+                >
+                  <Info className="h-3.5 w-3.5" />
+                  {t("tariffs.planInfoBtn")}
+                </button>
+              </div>
               <p className="text-muted-foreground text-[15px] font-medium max-w-2xl">
                 {t("tariffs.subtitle")}
               </p>
             </div>
+
+            {/* Plan info panel */}
+            <AnimatePresence>
+              {showPlanInfo && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="overflow-hidden"
+                >
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 backdrop-blur-xl px-4 py-3 space-y-1">
+                    <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoStandard")}</p>
+                    <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoPremium")}</p>
+                    <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoNoReset")}</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Trial banner */}
             {showTrial && (
@@ -785,7 +870,8 @@ export function ClientTariffsPage() {
               // ── MOBILE: full-width vertical stacked cards ─────────────
               <div className="space-y-4">
                 {tariffs.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  <div className="overflow-hidden">
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 pr-1">
                     {tariffs.map((cat, idx) => (
                       <button
                         key={cat.id}
@@ -801,18 +887,56 @@ export function ClientTariffsPage() {
                         {cat.name}
                       </button>
                     ))}
+                    </div>
                   </div>
                 )}
 
-                {tariffs[selectedCatIndex] && (
-                  <div className="space-y-3">
-                    {tariffs[selectedCatIndex].tariffs.map((tariffItem, tidx) => {
-                      const catLength = tariffs[selectedCatIndex].tariffs.length;
+                {tariffs[selectedCatIndex] && (() => {
+                  const currentCat = tariffs[selectedCatIndex];
+                  const subGroups = [...(currentCat.subGroups ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+                  const hasSubGroups = subGroups.length > 0;
+                  const selectedSgIdx = selectedSubGroupIndex[currentCat.id] ?? 0;
+
+                  // Determine which tariffs to display
+                  let displayTariffs: typeof currentCat.tariffs;
+                  if (hasSubGroups) {
+                    const selectedSg = subGroups[selectedSgIdx];
+                    displayTariffs = selectedSg
+                      ? currentCat.tariffs.filter((tr) => tr.subGroupId === selectedSg.id)
+                      : currentCat.tariffs;
+                  } else {
+                    displayTariffs = currentCat.tariffs;
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {/* Sub-group pills */}
+                      {hasSubGroups && (
+                        <div className="overflow-hidden">
+                          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                            {subGroups.map((sg, sgIdx) => (
+                              <button
+                                key={sg.id}
+                                type="button"
+                                onClick={() => setSelectedSubGroupIndex((prev) => ({ ...prev, [currentCat.id]: sgIdx }))}
+                                className={cn(
+                                  "shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-200",
+                                  selectedSgIdx === sgIdx
+                                    ? "bg-foreground text-background border-foreground shadow-sm"
+                                    : "bg-card/30 border-border/30 text-muted-foreground"
+                                )}
+                              >
+                                {sg.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {displayTariffs.map((tariffItem, tidx) => {
+                      const catLength = displayTariffs.length;
                       const isPopular = catLength >= 2 && tidx === 1;
-                      const dailyPrice =
-                        tariffItem.durationDays && tariffItem.durationDays > 0
-                          ? formatDailyPrice(tariffItem.price, tariffItem.durationDays, tariffItem.currency)
-                          : null;
+                      const pricePerGB = formatPricePerGB(tariffItem.price, tariffItem.trafficLimitBytes, tariffItem.currency, tariffItem.durationDays, tariffItem.trafficResetStrategy);
                       const trafficLabel =
                         tariffItem.trafficLimitBytes != null && tariffItem.trafficLimitBytes > 0
                           ? `${(tariffItem.trafficLimitBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
@@ -860,12 +984,12 @@ export function ClientTariffsPage() {
                               )} style={{ fontSize: 52 }}>
                                 {formatMoney(tariffItem.price, tariffItem.currency)}
                               </p>
-                              {dailyPrice && (
+                              {pricePerGB && (
                                 <p className={cn(
                                   "text-[13px] font-medium mt-1.5",
                                   isPopular ? "text-primary-foreground/55" : "text-muted-foreground"
                                 )}>
-                                  {dailyPrice} / {t("tariffs.day")}
+                                  {pricePerGB} / GB
                                 </p>
                               )}
                             </div>
@@ -877,6 +1001,9 @@ export function ClientTariffsPage() {
                                 { icon: <Wifi className="h-3 w-3" />, label: trafficLabel },
                                 ...(tariffItem.deviceLimit != null && tariffItem.deviceLimit > 0
                                   ? [{ icon: <Smartphone className="h-3 w-3" />, label: String(tariffItem.deviceLimit) }]
+                                  : []),
+                                ...(tariffItem.trafficResetStrategy && RESET_STRATEGY_I18N[tariffItem.trafficResetStrategy]
+                                  ? [{ icon: <RotateCcw className="h-3 w-3" />, label: t(RESET_STRATEGY_I18N[tariffItem.trafficResetStrategy]) }]
                                   : []),
                               ].map((chip, ci) => (
                                 <span key={ci} className={cn(
@@ -929,13 +1056,29 @@ export function ClientTariffsPage() {
                         </motion.div>
                       );
                     })}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               // ── DESKTOP: category sections + card grid ───────────────
               <div className="space-y-10">
-                {tariffs.map((cat, catIndex) => (
+                {tariffs.map((cat, catIndex) => {
+                  const subGroups = [...(cat.subGroups ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+                  const hasSubGroups = subGroups.length > 0;
+                  const selectedSgIdx = selectedSubGroupIndex[cat.id] ?? 0;
+
+                  let displayTariffs: typeof cat.tariffs;
+                  if (hasSubGroups) {
+                    const selectedSg = subGroups[selectedSgIdx];
+                    displayTariffs = selectedSg
+                      ? cat.tariffs.filter((tr) => tr.subGroupId === selectedSg.id)
+                      : cat.tariffs;
+                  } else {
+                    displayTariffs = cat.tariffs;
+                  }
+
+                  return (
                   <motion.section
                     key={cat.id}
                     initial={{ opacity: 0, y: 12 }}
@@ -943,16 +1086,35 @@ export function ClientTariffsPage() {
                     transition={{ duration: 0.3, delay: catIndex * 0.05 }}
                   >
                     {tariffs.length > 1 && (
-                      <h2 className="text-xl font-bold mb-6 text-foreground">{cat.name}</h2>
+                      <h2 className="text-xl font-bold mb-4 text-foreground">{cat.name}</h2>
                     )}
+
+                    {/* Sub-group tabs */}
+                    {hasSubGroups && (
+                      <div className="flex gap-2 mb-6 flex-wrap">
+                        {subGroups.map((sg, sgIdx) => (
+                          <button
+                            key={sg.id}
+                            type="button"
+                            onClick={() => setSelectedSubGroupIndex((prev) => ({ ...prev, [cat.id]: sgIdx }))}
+                            className={cn(
+                              "px-4 py-2 rounded-full text-sm font-bold border transition-all duration-200",
+                              selectedSgIdx === sgIdx
+                                ? "bg-foreground text-background border-foreground shadow-md"
+                                : "bg-card/50 border-border/50 text-muted-foreground hover:bg-card/70 hover:text-foreground"
+                            )}
+                          >
+                            {sg.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 items-stretch">
-                      {cat.tariffs.map((tariffItem, tidx) => {
-                        const catLength = cat.tariffs.length;
+                      {displayTariffs.map((tariffItem, tidx) => {
+                        const catLength = displayTariffs.length;
                         const isPopular = catLength >= 2 && tidx === 1;
-                        const dailyPrice =
-                          tariffItem.durationDays && tariffItem.durationDays > 0
-                            ? formatDailyPrice(tariffItem.price, tariffItem.durationDays, tariffItem.currency)
-                            : null;
+                        const pricePerGB = formatPricePerGB(tariffItem.price, tariffItem.trafficLimitBytes, tariffItem.currency, tariffItem.durationDays, tariffItem.trafficResetStrategy);
                         const trafficLabel =
                           tariffItem.trafficLimitBytes != null && tariffItem.trafficLimitBytes > 0
                             ? `${(tariffItem.trafficLimitBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
@@ -997,12 +1159,12 @@ export function ClientTariffsPage() {
                                 )} style={{ fontSize: 44 }}>
                                   {formatMoney(tariffItem.price, tariffItem.currency)}
                                 </p>
-                                {dailyPrice && (
+                                {pricePerGB && (
                                   <p className={cn(
                                     "text-[13px] font-medium mt-1.5",
                                     isPopular ? "text-primary-foreground/55" : "text-muted-foreground"
                                   )}>
-                                    {dailyPrice} / {t("tariffs.day")}
+                                    {pricePerGB} / GB
                                   </p>
                                 )}
                               </div>
@@ -1014,6 +1176,9 @@ export function ClientTariffsPage() {
                                   { icon: <Wifi className="h-3.5 w-3.5" />, label: trafficLabel },
                                   ...(tariffItem.deviceLimit != null && tariffItem.deviceLimit > 0
                                     ? [{ icon: <Smartphone className="h-3.5 w-3.5" />, label: `${tariffItem.deviceLimit}` }]
+                                    : []),
+                                  ...(tariffItem.trafficResetStrategy && RESET_STRATEGY_I18N[tariffItem.trafficResetStrategy]
+                                    ? [{ icon: <RotateCcw className="h-3.5 w-3.5" />, label: t(RESET_STRATEGY_I18N[tariffItem.trafficResetStrategy]) }]
                                     : []),
                                 ].map((chip, ci) => (
                                   <span key={ci} className={cn(
@@ -1071,7 +1236,8 @@ export function ClientTariffsPage() {
                       })}
                     </div>
                   </motion.section>
-                ))}
+                  );
+                })}
               </div>
             )}
           </motion.div>

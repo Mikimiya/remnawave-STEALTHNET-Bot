@@ -8,10 +8,11 @@ import {
   Wifi,
   Calendar,
   Monitor,
-  
+  Timer,
+  Link2,
   ArrowRight,
   PlusCircle,
-  
+  RotateCcw,
   Copy,
   Check,
   Gift,
@@ -98,6 +99,13 @@ function parseSubscription(sub: unknown): {
   };
 }
 
+const RESET_STRATEGY_I18N: Record<string, string> = {
+  NO_RESET: "tariffs.resetNoReset",
+  DAY: "tariffs.resetDay",
+  WEEK: "tariffs.resetWeek",
+  MONTH: "tariffs.resetMonth",
+};
+
 export function ClientDashboardPage() {
   const { state, refreshProfile } = useClientAuth();
   const config = useCabinetConfig();
@@ -107,6 +115,7 @@ export function ClientDashboardPage() {
   const [subscription, setSubscription] = useState<unknown>(null);
   const [tariffDisplayName, setTariffDisplayName] = useState<string | null>(null);
   const [tariffCategoryName, setTariffCategoryName] = useState<string | null>(null);
+  const [trafficResetStrategy, setTrafficResetStrategy] = useState<string | null>(null);
   const [isTrial, setIsTrial] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const [_payments, setPayments] = useState<ClientPayment[]>([]);
@@ -163,6 +172,7 @@ export function ClientDashboardPage() {
         setSubscription(subRes.subscription ?? null);
         setTariffDisplayName(subRes.tariffDisplayName ?? null);
         setTariffCategoryName(subRes.tariffCategoryName ?? null);
+        setTrafficResetStrategy(subRes.trafficResetStrategy ?? null);
         setIsTrial(subRes.isTrial ?? false);
         if (subRes.message) setSubscriptionError(subRes.message);
         setPayments(payRes.items ?? []);
@@ -266,98 +276,114 @@ export function ClientDashboardPage() {
           </div>
         )}
 
-        {/* 1. Статус, срок, тариф, трафик, устройства — с иконками */}
-        <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl p-5 shadow-sm overflow-hidden transition-all duration-300">
-          <h2 className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-5">
-            <div className="p-1.5 bg-primary/20 rounded-lg">
-              <Zap className="h-4 w-4 shrink-0 text-primary" />
-            </div>
-            {t("dashboard.subscriptionStatus")}
-          </h2>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
+        {/* 1. Mobile subscription status hero */}
+        {loading ? (
+          <section className="rounded-[2rem] border border-border/50 bg-card/45 px-4 py-10 shadow-sm backdrop-blur-xl">
+            <div className="flex items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
             </div>
-          ) : subscriptionError || !hasActiveSubscription ? (
+          </section>
+        ) : subscriptionError || !hasActiveSubscription ? (
+          <section className="rounded-[2rem] border border-border/50 bg-card/45 p-4 shadow-sm backdrop-blur-xl">
             <NoSubscriptionState />
-          ) : (
-            <div className="space-y-4 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/20">
-                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                  {t("dashboard.active")}
-                </span>
+          </section>
+        ) : (
+          <section className="min-w-0">
+            <div className="rounded-[1.85rem] border border-border/50 bg-card/45 p-4 shadow-sm backdrop-blur-xl">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                      <Zap className="h-3 w-3 shrink-0" />
+                      {t("dashboard.subscriptionStatus")}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {t("dashboard.active")}
+                    </span>
+                  </div>
+
+                  <p
+                    className="mt-3 text-xl font-bold tracking-tight text-foreground leading-tight break-words"
+                    title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                  >
+                    {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                  </p>
+
+                  {isTrial ? (
+                    <div className="mt-2 inline-flex max-w-full items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{t("dashboard.trialLimitedNodesShort")}</span>
+                    </div>
+                  ) : tariffCategoryName ? (
+                    <p className="mt-1 text-[13px] text-muted-foreground break-words">{tariffCategoryName}</p>
+                  ) : null}
+                </div>
+
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <Package className="h-5 w-5" />
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
                 {daysLeft != null && (
-                  <span className="text-sm font-semibold text-foreground bg-foreground/5 px-3 py-1.5 rounded-full border border-border/50">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-background/50 px-3 py-1.5 text-[12px] font-medium text-foreground">
+                    <Timer className="h-3.5 w-3.5 text-primary" />
                     {t("dashboard.daysLeft_many", { count: daysLeft })}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-background/50 px-3 py-1.5 text-[12px] font-medium text-foreground">
+                  <Monitor className="h-3.5 w-3.5 text-primary" />
+                  {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "∞"}
+                </span>
+                {subParsed.expireAt && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-background/50 px-3 py-1.5 text-[12px] font-medium text-foreground">
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                    {formatDate(subParsed.expireAt, lang)}
+                  </span>
+                )}
+                {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-background/50 px-3 py-1.5 text-[12px] font-medium text-foreground">
+                    <RotateCcw className="h-3.5 w-3.5 text-primary" />
+                    {t(RESET_STRATEGY_I18N[trafficResetStrategy])}
                   </span>
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-border/50 pt-4 mt-2">
-                {((tariffDisplayName ?? subParsed.productName) || client?.trialUsed) && (
-                  <div className="flex items-center gap-4 bg-background/40 p-3.5 rounded-2xl border border-border/50 transition-colors hover:bg-background/60 shadow-sm">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Package className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{t("dashboard.plan")}</p>
-                      <p className="text-[14px] font-semibold truncate text-foreground" title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
-                        {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
-                      </p>
-                      {isTrial ? (
-                        <div className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                          <AlertCircle className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{t("dashboard.trialLimitedNodesShort")}</span>
-                        </div>
-                      ) : tariffCategoryName ? (
-                        <p className="text-[10px] text-muted-foreground mt-0.5 font-medium truncate">
-                          {tariffCategoryName}
-                        </p>
-                      ) : null}
-                    </div>
+              <div className="mt-4 rounded-[1.35rem] bg-background/35 px-3.5 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {t("dashboard.traffic")}
+                    </p>
+                    <p className="mt-1 text-[14px] font-semibold text-foreground break-words">
+                      {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
+                        ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
+                        : t("dashboard.unlimited")}
+                    </p>
                   </div>
-                )}
-                {subParsed.expireAt && (
-                  <div className="flex items-center gap-4 bg-background/40 p-3.5 rounded-2xl border border-border/50 transition-colors hover:bg-background/60 shadow-sm">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Calendar className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{t("dashboard.validUntil")}</p>
-                      <p className="text-[14px] font-semibold text-foreground">
-                        {formatDate(subParsed.expireAt, lang)}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <div className="bg-background/40 p-3.5 rounded-2xl border border-border/50 space-y-3 transition-colors hover:bg-background/60 shadow-sm">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Wifi className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{t("dashboard.traffic")}</p>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[14px] font-semibold text-foreground">
-                          {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
-                            ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
-                            : t("dashboard.unlimited")}
-                        </p>
-                        {trafficPercent != null && <span className="text-[12px] font-bold text-muted-foreground">{trafficPercent}%</span>}
-                      </div>
-                    </div>
-                  </div>
+
                   {trafficPercent != null && (
-                    <div className="h-2 w-full rounded-full bg-muted/30 overflow-hidden">
-                      <div className="h-full rounded-full bg-primary transition-all duration-500 ease-in-out" style={{ width: `${trafficPercent}%` }} />
-                    </div>
+                    <span className="shrink-0 text-sm font-semibold text-primary">
+                      {trafficPercent}%
+                    </span>
                   )}
                 </div>
+
+                {trafficPercent != null && (
+                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted/30">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${trafficPercent}%` }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                      className="h-full rounded-full bg-primary"
+                    />
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
         {/* 2. Как подключиться — ссылка и кнопка */}
         <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl p-5 shadow-sm overflow-hidden transition-all duration-300">
@@ -387,7 +413,7 @@ export function ClientDashboardPage() {
                 </Button>
               </div>
               <Link to="/cabinet/subscribe" className="inline-flex w-full h-11 items-center justify-center gap-2.5 rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-lg transition-all duration-300 hover:bg-primary/90">
-                <Wifi className="h-5 w-5 shrink-0" />
+                <Link2 className="h-5 w-5 shrink-0" />
                 <span className="inline-flex items-center leading-none">{t("dashboard.connectVPN")}</span>
               </Link>
             </div>
@@ -480,7 +506,7 @@ export function ClientDashboardPage() {
               </Button>
             ) : vpnUrl ? (
               <Link to="/cabinet/subscribe" className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground shadow-xl transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
-                <Wifi className="h-5 w-5 shrink-0" />
+                <Link2 className="h-5 w-5 shrink-0" />
                 <span className="inline-flex items-center text-base font-medium leading-none">{t("dashboard.setupVPN")}</span>
               </Link>
             ) : (
@@ -557,6 +583,12 @@ export function ClientDashboardPage() {
                                 {tariffCategoryName}
                               </p>
                             ) : null}
+                            {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
+                              <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                <RotateCcw className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{t(RESET_STRATEGY_I18N[trafficResetStrategy])}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -708,7 +740,7 @@ export function ClientDashboardPage() {
                   </div>
                   <p className="text-[14px] text-muted-foreground leading-relaxed">{t("dashboard.vpnReadyDesc")}</p>
                   <Link to="/cabinet/subscribe" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] text-primary-foreground shadow-lg transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
-                    <Wifi className="h-5 w-5 shrink-0" />
+                    <Link2 className="h-5 w-5 shrink-0" />
                     <span className="inline-flex items-center leading-none">{t("dashboard.setupVPN")}</span>
                   </Link>
                 </div>

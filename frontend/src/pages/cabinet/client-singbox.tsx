@@ -17,8 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
+import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
 import { cn, formatMoney, translateBackendMessage, translatePlategaLabel } from "@/lib/utils";
+import { AiFillAlipaySquare, AiFillWechat } from "react-icons/ai";
 
 type SingboxTariff = { id: string; name: string; description?: string; slotCount: number; durationDays: number; trafficLimitBytes: string | null; price: number; currency: string };
 type SingboxCategory = { id: string; name: string; sortOrder: number; tariffs: SingboxTariff[] };
@@ -54,21 +56,45 @@ function formatDate(iso: string) {
   }
 }
 
+function getEpayMethodPresentation(methodType: string) {
+  const key = methodType.trim().toLowerCase();
+
+  if (key === "alipay") {
+    return {
+      icon: <AiFillAlipaySquare className="h-5 w-5 text-[#1677FF]" />,
+      iconBg: "bg-blue-500/15",
+    };
+  }
+
+  if (key === "wxpay" || key === "wechat" || key === "wechatpay") {
+    return {
+      icon: <AiFillWechat className="h-5 w-5 text-[#07C160]" />,
+      iconBg: "bg-green-500/15",
+    };
+  }
+
+  return {
+    icon: <CreditCard className="h-5 w-5 text-blue-500" />,
+    iconBg: "bg-blue-500/15",
+  };
+}
+
 export function ClientSingboxPage() {
   const { t } = useTranslation();
   const { state, refreshProfile } = useClientAuth();
   const token = state.token;
   const client = state.client;
+  const config = useCabinetConfig();
   const [categories, setCategories] = useState<SingboxCategory[]>([]);
   const [slots, setSlots] = useState<SingboxSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [slotsLoading, setSlotsLoading] = useState(true);
-  const [plategaMethods, setPlategaMethods] = useState<{ id: number; label: string }[]>([]);
-  const [yoomoneyEnabled, setYoomoneyEnabled] = useState(false);
-  const [yookassaEnabled, setYookassaEnabled] = useState(false);
-  const [cryptopayEnabled, setCryptopayEnabled] = useState(false);
-  const [heleketEnabled, setHeleketEnabled] = useState(false);
-  const [epayMethods, setEpayMethods] = useState<{ type: string; label: string }[]>([]);
+  const plategaMethods = config?.plategaMethods ?? [];
+  const yoomoneyEnabled = Boolean(config?.yoomoneyEnabled);
+  const yookassaEnabled = Boolean(config?.yookassaEnabled);
+  const cryptopayEnabled = Boolean(config?.cryptopayEnabled);
+  const heleketEnabled = Boolean(config?.heleketEnabled);
+  const epayMethods = config?.epayMethods ?? [];
   const [payModal, setPayModal] = useState<SingboxTariff | null>(null);
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
@@ -83,17 +109,6 @@ export function ClientSingboxPage() {
       setCategories(r.items ?? []);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    api.getPublicConfig().then((c) => {
-      setPlategaMethods(c.plategaMethods ?? []);
-      setYoomoneyEnabled(Boolean(c.yoomoneyEnabled));
-      setYookassaEnabled(Boolean(c.yookassaEnabled));
-      setCryptopayEnabled(Boolean(c.cryptopayEnabled));
-      setHeleketEnabled(Boolean(c.heleketEnabled));
-      setEpayMethods(c.epayMethods ?? []);
-    }).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -350,161 +365,75 @@ export function ClientSingboxPage() {
             )}
 
             {cryptopayEnabled && (
-              <Button
-                size="lg"
-                variant="outline"
+              <PayMethodButton
+                isMobile={isMobileOrMiniapp}
+                icon={<Zap className="h-5 w-5 text-yellow-500" />}
+                iconBg="bg-yellow-500/15"
+                label={t("common.cryptoBot")}
                 onClick={() => startCryptopayPayment(payModal)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-yellow-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-yellow-500" /> : <Zap className="h-6 w-6 text-yellow-500" />}
-                    </div>
-                    <span className="text-base font-bold">{t("common.cryptoBot")}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-yellow-500" /> : <Zap className="h-5 w-5 text-yellow-500" />}
-                    </div>
-                    <span className="text-base font-medium">⚡ {t("clientSingbox.payment.cryptoBot")}</span>
-                  </>
-                )}
-              </Button>
+              />
             )}
 
             {heleketEnabled && (
-              <Button
-                size="lg"
-                variant="outline"
+              <PayMethodButton
+                isMobile={isMobileOrMiniapp}
+                icon={<Zap className="h-5 w-5 text-orange-500" />}
+                iconBg="bg-orange-500/15"
+                label="Heleket"
                 onClick={() => startHeleketPayment(payModal)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-orange-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-orange-500" /> : <Zap className="h-6 w-6 text-orange-500" />}
-                    </div>
-                    <span className="text-base font-bold">Heleket</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-orange-500" /> : <Zap className="h-5 w-5 text-orange-500" />}
-                    </div>
-                    <span className="text-base font-medium">⚡ {t("clientSingbox.payment.heleket")}</span>
-                  </>
-                )}
-              </Button>
+              />
             )}
 
-            {epayMethods.map((m) => (
-              <Button
-                key={m.type}
-                size="lg"
-                variant="outline"
-                onClick={() => startEpayPayment(payModal, m.type)}
-                disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-blue-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-500" /> : <CreditCard className="h-6 w-6 text-blue-500" />}
-                    </div>
-                    <span className="text-base font-bold">{m.label}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> : <CreditCard className="h-5 w-5 text-blue-500" />}
-                    </div>
-                    <span className="text-base font-medium">💳 {m.label}</span>
-                  </>
-                )}
-              </Button>
-            ))}
+            {epayMethods.map((m) => {
+              const presentation = getEpayMethodPresentation(m.type);
+
+              return (
+                <PayMethodButton
+                  key={m.type}
+                  isMobile={isMobileOrMiniapp}
+                  icon={presentation.icon}
+                  iconBg={presentation.iconBg}
+                  label={m.label}
+                  onClick={() => startEpayPayment(payModal, m.type)}
+                  disabled={payLoading}
+                />
+              );
+            })}
 
             {yookassaEnabled && payModal.currency.toUpperCase() === "RUB" && (
-              <Button
-                size="lg"
-                variant="outline"
+              <PayMethodButton
+                isMobile={isMobileOrMiniapp}
+                icon={<CreditCard className="h-5 w-5 text-green-500" />}
+                iconBg="bg-green-500/15"
+                label={t("tariffs.sbp")}
                 onClick={() => startYookassaPayment(payModal)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                 {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-green-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
-                    </div>
-                    <span className="text-base font-bold">{t("clientSingbox.payment.sbpCards")}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
-                    </div>
-                    <span className="text-base font-medium">💳 {t("clientSingbox.payment.sbp")}</span>
-                  </>
-                )}
-              </Button>
+              />
             )}
 
             {yoomoneyEnabled && payModal.currency.toUpperCase() === "RUB" && (
-              <Button
-                size="lg"
-                variant="outline"
+              <PayMethodButton
+                isMobile={isMobileOrMiniapp}
+                icon={<CreditCard className="h-5 w-5 text-green-500" />}
+                iconBg="bg-green-500/15"
+                label={t("tariffs.yoomoney")}
                 onClick={() => startYoomoneyPayment(payModal)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                 {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-green-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
-                    </div>
-                    <span className="text-base font-bold">{t("clientSingbox.payment.yoomoneyCards")}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
-                    </div>
-                    <span className="text-base font-medium">💳 {t("clientSingbox.payment.cards")}</span>
-                  </>
-                )}
-              </Button>
+              />
             )}
 
             {plategaMethods.map((m) => (
-              <Button
+              <PayMethodButton
                 key={m.id}
-                size="lg"
-                variant="outline"
+                isMobile={isMobileOrMiniapp}
+                icon={<CreditCard className="h-5 w-5 text-green-500" />}
+                iconBg="bg-green-500/15"
+                label={translatePlategaLabel(m, t)}
                 onClick={() => startPlategaPayment(payModal, m.id)}
                 disabled={payLoading}
-                className={cn("w-full", isMobileOrMiniapp ? "justify-start gap-4 px-6 h-16 rounded-2xl border-white/5 bg-card/40 hover:bg-card/60" : "gap-3 hover:bg-background/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 rounded-xl h-14 border-border/50 group justify-center px-6 relative")}
-              >
-                {isMobileOrMiniapp ? (
-                  <>
-                    <div className="p-2 rounded-xl bg-green-500/10">
-                      {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-green-500" /> : <CreditCard className="h-6 w-6 text-green-500" />}
-                    </div>
-                    <span className="text-base font-bold">{translatePlategaLabel(m, t)}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="absolute left-6 p-1.5 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                      {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-green-500" /> : <CreditCard className="h-5 w-5 text-green-500" />}
-                    </div>
-                    <span className="text-base font-medium">💳 {translatePlategaLabel(m, t)}</span>
-                  </>
-                )}
-              </Button>
+              />
             ))}
           </div>
           {isMobileOrMiniapp && <div className="h-8" />}
@@ -841,5 +770,47 @@ export function ClientSingboxPage() {
         </Dialog>
       )}
     </div>
+  );
+}
+
+function PayMethodButton({
+  isMobile,
+  icon,
+  iconBg,
+  label,
+  onClick,
+  disabled,
+}: {
+  isMobile: boolean;
+  icon: React.ReactNode;
+  iconBg: string;
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex items-center gap-3 rounded-2xl border transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed",
+        isMobile
+          ? "flex-col items-center justify-center p-4 border-white/5 bg-card/50 hover:bg-card/70 hover:border-primary/30 active:scale-95"
+          : "px-4 py-3.5 border-border/50 bg-background/40 hover:bg-background/70 hover:border-primary/30 hover:-translate-y-0.5"
+      )}
+    >
+      {isMobile ? (
+        <>
+          <div className={cn("p-2.5 rounded-xl", iconBg)}>{icon}</div>
+          <p className="text-sm font-bold text-foreground text-center leading-tight">{label}</p>
+        </>
+      ) : (
+        <>
+          <div className={cn("p-1.5 rounded-lg shrink-0", iconBg)}>{icon}</div>
+          <span className="font-semibold text-sm text-foreground flex-1 text-left">{label}</span>
+        </>
+      )}
+    </button>
   );
 }

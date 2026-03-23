@@ -767,6 +767,19 @@ export const api = {
     return request(`/admin/tariff-categories/${id}`, { method: "DELETE", token });
   },
 
+  // ——— Под-группы тарифов ———
+  async createTariffSubGroup(token: string, data: { categoryId: string; name: string; sortOrder?: number }): Promise<TariffSubGroupRecord> {
+    return request("/admin/tariff-sub-groups", { method: "POST", body: JSON.stringify(data), token });
+  },
+
+  async updateTariffSubGroup(token: string, id: string, data: { name?: string; sortOrder?: number }): Promise<TariffSubGroupRecord> {
+    return request(`/admin/tariff-sub-groups/${id}`, { method: "PATCH", body: JSON.stringify(data), token });
+  },
+
+  async deleteTariffSubGroup(token: string, id: string): Promise<{ success: boolean }> {
+    return request(`/admin/tariff-sub-groups/${id}`, { method: "DELETE", token });
+  },
+
   async getTariffs(token: string, categoryId?: string): Promise<{ items: TariffRecord[] }> {
     const q = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : "";
     return request(`/admin/tariffs${q}`, { token });
@@ -860,7 +873,7 @@ export const api = {
     return request("/client/auth/me", { token });
   },
 
-  async clientSubscription(token: string): Promise<{ subscription: unknown; tariffDisplayName?: string | null; tariffCategoryName?: string | null; isTrial?: boolean; message?: string }> {
+  async clientSubscription(token: string): Promise<{ subscription: unknown; tariffDisplayName?: string | null; tariffCategoryName?: string | null; trafficResetStrategy?: string | null; isTrial?: boolean; message?: string }> {
     return request("/client/subscription", { token });
   },
 
@@ -953,7 +966,7 @@ export const api = {
   async clientPayByBalance(
     token: string,
     data: { tariffId?: string; proxyTariffId?: string; singboxTariffId?: string; promoCode?: string }
-  ): Promise<{ message: string; paymentId: string; newBalance: number }> {
+  ): Promise<{ message: string; tariffName?: string; amount?: number; currency?: string; paymentId: string; newBalance: number }> {
     return request("/client/payments/balance", { method: "POST", body: JSON.stringify(data), token });
   },
 
@@ -2012,13 +2025,24 @@ export interface TariffCategoryRecord {
   updatedAt: string;
 }
 
+export interface TariffSubGroupRecord {
+  id: string;
+  categoryId: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TariffCategoryWithTariffs extends TariffCategoryRecord {
   tariffs: TariffRecord[];
+  subGroups: TariffSubGroupRecord[];
 }
 
 export interface TariffRecord {
   id: string;
   categoryId: string;
+  subGroupId: string | null;
   name: string;
   description: string | null;
   durationDays: number;
@@ -2028,12 +2052,14 @@ export interface TariffRecord {
   price: number;
   currency: string;
   sortOrder: number;
+  trafficResetStrategy: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export type CreateTariffPayload = {
   categoryId: string;
+  subGroupId?: string | null;
   name: string;
   description?: string | null;
   durationDays: number;
@@ -2043,10 +2069,12 @@ export type CreateTariffPayload = {
   price?: number;
   currency?: string;
   sortOrder?: number;
+  trafficResetStrategy?: string;
 };
 
 export type UpdateTariffPayload = {
   name?: string;
+  subGroupId?: string | null;
   description?: string | null;
   durationDays?: number;
   internalSquadUuids?: string[];
@@ -2055,6 +2083,7 @@ export type UpdateTariffPayload = {
   price?: number;
   currency?: string;
   sortOrder?: number;
+  trafficResetStrategy?: string;
 };
 
 // ——— Кабинет клиента ———
@@ -2118,7 +2147,8 @@ export interface PublicTariffCategory {
   name: string;
   emojiKey: string | null;
   emoji: string;
-  tariffs: { id: string; name: string; description: string | null; durationDays: number; price: number; currency: string; trafficLimitBytes: number | null; deviceLimit: number | null }[];
+  tariffs: { id: string; name: string; description: string | null; durationDays: number; price: number; currency: string; trafficLimitBytes: number | null; deviceLimit: number | null; trafficResetStrategy: string; subGroupId: string | null }[];
+  subGroups?: { id: string; name: string; sortOrder: number }[];
 }
 
 // ——— Промо-группы ———

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wifi, Smartphone, Server, CreditCard, Loader2, Wallet, Layers, Shield, Zap, ArrowLeft } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
@@ -15,6 +15,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
+import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
 import { cn, formatMoney, translateBackendMessage, translatePlategaLabel } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
@@ -40,34 +41,21 @@ export function ClientExtraOptionsPage() {
   const { t } = useTranslation();
   const token = state.token;
   const balance = state.client?.balance ?? 0;
-  const [options, setOptions] = useState<PublicSellOption[]>([]);
-  const [sellOptionsEnabled, setSellOptionsEnabled] = useState(false);
-  const [plategaMethods, setPlategaMethods] = useState<{ id: number; label: string }[]>([]);
-  const [yoomoneyEnabled, setYoomoneyEnabled] = useState(false);
-  const [yookassaEnabled, setYookassaEnabled] = useState(false);
-  const [cryptopayEnabled, setCryptopayEnabled] = useState(false);
-  const [heleketEnabled, setHeleketEnabled] = useState(false);
-  const [epayMethods, setEpayMethods] = useState<{ type: string; label: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const config = useCabinetConfig();
+  const sellOptionsEnabled = Boolean(config?.sellOptionsEnabled);
+  const options = config?.sellOptions ?? [];
+  const plategaMethods = config?.plategaMethods ?? [];
+  const yoomoneyEnabled = Boolean(config?.yoomoneyEnabled);
+  const yookassaEnabled = Boolean(config?.yookassaEnabled);
+  const cryptopayEnabled = Boolean(config?.cryptopayEnabled);
+  const heleketEnabled = Boolean(config?.heleketEnabled);
+  const epayMethods = config?.epayMethods ?? [];
+  const loading = !config;
   const [payModal, setPayModal] = useState<PublicSellOption | null>(null);
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
 
   const isMobileOrMiniapp = useCabinetMiniapp();
-
-  useEffect(() => {
-    api.getPublicConfig().then((c) => {
-      setSellOptionsEnabled(Boolean(c.sellOptionsEnabled));
-      setOptions(c.sellOptions ?? []);
-      setPlategaMethods(c.plategaMethods ?? []);
-      setYoomoneyEnabled(Boolean(c.yoomoneyEnabled));
-      setYookassaEnabled(Boolean(c.yookassaEnabled));
-      setCryptopayEnabled(Boolean(c.cryptopayEnabled));
-      setHeleketEnabled(Boolean(c.heleketEnabled));
-      setEpayMethods(c.epayMethods ?? []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
 
   async function startYookassaPayment(option: PublicSellOption) {
     if (!token) return;

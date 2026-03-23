@@ -296,10 +296,11 @@ adminRouter.patch("/payments/:id", asyncRoute(async (req, res) => {
 }));
 
 /** Сериализация тарифа для JSON (BigInt → number) */
-function tariffToJson(t: { id: string; categoryId: string; name: string; description: string | null; durationDays: number; internalSquadUuids: string[]; trafficLimitBytes: bigint | null; deviceLimit: number | null; price: number; currency: string; sortOrder: number; createdAt: Date; updatedAt: Date }) {
+function tariffToJson(t: { id: string; categoryId: string; subGroupId?: string | null; name: string; description: string | null; durationDays: number; internalSquadUuids: string[]; trafficLimitBytes: bigint | null; deviceLimit: number | null; price: number; currency: string; sortOrder: number; trafficResetStrategy?: string; createdAt: Date; updatedAt: Date }) {
   return {
     id: t.id,
     categoryId: t.categoryId,
+    subGroupId: (t as Record<string, unknown>).subGroupId ?? null,
     name: t.name,
     description: t.description ?? null,
     durationDays: t.durationDays,
@@ -309,6 +310,7 @@ function tariffToJson(t: { id: string; categoryId: string; name: string; descrip
     price: t.price,
     currency: t.currency,
     sortOrder: t.sortOrder,
+    trafficResetStrategy: (t as Record<string, unknown>).trafficResetStrategy ?? "NO_RESET",
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
   };
@@ -321,7 +323,10 @@ adminRouter.get("/tariff-categories", async (_req, res) => {
   try {
     const list = await prisma.tariffCategory.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      include: { tariffs: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
+      include: {
+        tariffs: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+        subGroups: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      },
     });
     return res.json({
       items: list.map((c) => ({
@@ -332,6 +337,14 @@ adminRouter.get("/tariff-categories", async (_req, res) => {
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),
         tariffs: c.tariffs.map(tariffToJson),
+        subGroups: c.subGroups.map((sg) => ({
+          id: sg.id,
+          categoryId: sg.categoryId,
+          name: sg.name,
+          sortOrder: sg.sortOrder,
+          createdAt: sg.createdAt.toISOString(),
+          updatedAt: sg.updatedAt.toISOString(),
+        })),
       })),
     });
   } catch (e) {
@@ -407,10 +420,76 @@ adminRouter.delete("/tariff-categories/:id", async (req, res) => {
   return res.json({ success: true });
 });
 
+// ——— Под-группы тарифов ———
+const subGroupIdSchema = z.object({ id: z.string().min(1) });
+const createSubGroupSchema = z.object({
+  categoryId: z.string().min(1),
+  name: z.string().min(1).max(255),
+  sortOrder: z.number().int().optional(),
+});
+const updateSubGroupSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+adminRouter.post("/tariff-sub-groups", async (req, res) => {
+  const body = createSubGroupSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
+  const category = await prisma.tariffCategory.findUnique({ where: { id: body.data.categoryId } });
+  if (!category) return res.status(400).json({ message: "Категория не найдена" });
+  const created = await prisma.tariffSubGroup.create({
+    data: {
+      categoryId: body.data.categoryId,
+      name: body.data.name,
+      sortOrder: body.data.sortOrder ?? 0,
+    },
+  });
+  return res.status(201).json({
+    id: created.id,
+    categoryId: created.categoryId,
+    name: created.name,
+    sortOrder: created.sortOrder,
+    createdAt: created.createdAt.toISOString(),
+    updatedAt: created.updatedAt.toISOString(),
+  });
+});
+
+adminRouter.patch("/tariff-sub-groups/:id", async (req, res) => {
+  const idParse = subGroupIdSchema.safeParse({ id: req.params.id });
+  if (!idParse.success) return res.status(400).json({ message: "Invalid id" });
+  const body = updateSubGroupSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
+  const data: { name?: string; sortOrder?: number } = {};
+  if (body.data.name !== undefined) data.name = body.data.name;
+  if (body.data.sortOrder !== undefined) data.sortOrder = body.data.sortOrder;
+  const updated = await prisma.tariffSubGroup.update({
+    where: { id: idParse.data.id },
+    data,
+  });
+  return res.json({
+    id: updated.id,
+    categoryId: updated.categoryId,
+    name: updated.name,
+    sortOrder: updated.sortOrder,
+    createdAt: updated.createdAt.toISOString(),
+    updatedAt: updated.updatedAt.toISOString(),
+  });
+});
+
+adminRouter.delete("/tariff-sub-groups/:id", async (req, res) => {
+  const idParse = subGroupIdSchema.safeParse({ id: req.params.id });
+  if (!idParse.success) return res.status(400).json({ message: "Invalid id" });
+  // 删除子分组时，该子分组下的套餐的 subGroupId 会被设为 null (onDelete: SetNull)
+  await prisma.tariffSubGroup.delete({ where: { id: idParse.data.id } });
+  return res.json({ success: true });
+});
+
 // ——— Тарифы ———
 const tariffIdSchema = z.object({ id: z.string().min(1) });
+const TRAFFIC_RESET_STRATEGIES = ["NO_RESET", "DAY", "WEEK", "MONTH"] as const;
 const createTariffSchema = z.object({
   categoryId: z.string().min(1),
+  subGroupId: z.string().min(1).nullable().optional(),
   name: z.string().min(1).max(255),
   description: z.string().max(5000).nullable().optional(),
   durationDays: z.number().int().min(1).max(3650),
@@ -420,9 +499,11 @@ const createTariffSchema = z.object({
   price: z.number().min(0).optional(),
   currency: z.string().max(10).optional(),
   sortOrder: z.number().int().optional(),
+  trafficResetStrategy: z.enum(TRAFFIC_RESET_STRATEGIES).optional().default("NO_RESET"),
 });
 const updateTariffSchema = z.object({
   name: z.string().min(1).max(255).optional(),
+  subGroupId: z.string().min(1).nullable().optional(),
   description: z.string().max(5000).nullable().optional(),
   durationDays: z.number().int().min(1).max(3650).optional(),
   internalSquadUuids: z.array(z.string().uuid()).optional(),
@@ -431,6 +512,7 @@ const updateTariffSchema = z.object({
   price: z.number().min(0).optional(),
   currency: z.string().max(10).optional(),
   sortOrder: z.number().int().optional(),
+  trafficResetStrategy: z.enum(TRAFFIC_RESET_STRATEGIES).optional(),
 });
 
 adminRouter.get("/tariffs", async (req, res) => {
@@ -451,6 +533,7 @@ adminRouter.post("/tariffs", async (req, res) => {
   const created = await prisma.tariff.create({
     data: {
       categoryId: body.data.categoryId,
+      subGroupId: body.data.subGroupId ?? null,
       name: body.data.name,
       description: body.data.description ?? null,
       durationDays: body.data.durationDays,
@@ -460,7 +543,8 @@ adminRouter.post("/tariffs", async (req, res) => {
       price: body.data.price ?? 0,
       currency: (body.data.currency ?? "usd").toLowerCase(),
       sortOrder: body.data.sortOrder ?? 0,
-    },
+      trafficResetStrategy: body.data.trafficResetStrategy ?? "NO_RESET",
+    } as any,
   });
   return res.status(201).json(tariffToJson(created));
 });
@@ -470,8 +554,9 @@ adminRouter.patch("/tariffs/:id", async (req, res) => {
   if (!idParse.success) return res.status(400).json({ message: "Invalid id" });
   const body = updateTariffSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
-  const data: { name?: string; description?: string | null; durationDays?: number; internalSquadUuids?: string[]; trafficLimitBytes?: bigint | null; deviceLimit?: number | null; price?: number; currency?: string; sortOrder?: number } = {};
+  const data: { name?: string; subGroupId?: string | null; description?: string | null; durationDays?: number; internalSquadUuids?: string[]; trafficLimitBytes?: bigint | null; deviceLimit?: number | null; price?: number; currency?: string; sortOrder?: number; trafficResetStrategy?: string } = {};
   if (body.data.name != null) data.name = body.data.name;
+  if (body.data.subGroupId !== undefined) data.subGroupId = body.data.subGroupId ?? null;
   if (body.data.description !== undefined) data.description = body.data.description ?? null;
   if (body.data.durationDays != null) data.durationDays = body.data.durationDays;
   if (body.data.internalSquadUuids != null) data.internalSquadUuids = body.data.internalSquadUuids;
@@ -480,9 +565,10 @@ adminRouter.patch("/tariffs/:id", async (req, res) => {
   if (body.data.price !== undefined) data.price = body.data.price;
   if (body.data.currency !== undefined) data.currency = body.data.currency.toLowerCase();
   if (body.data.sortOrder != null) data.sortOrder = body.data.sortOrder;
+  if (body.data.trafficResetStrategy !== undefined) data.trafficResetStrategy = body.data.trafficResetStrategy;
   const updated = await prisma.tariff.update({
     where: { id: idParse.data.id },
-    data,
+    data: data as any,
   });
   return res.json(tariffToJson(updated));
 });

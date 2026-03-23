@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
-import type { PublicConfig } from "@/lib/api";
+import { useCabinetConfig } from "@/contexts/cabinet-config";
 
 export function ClientResetPasswordPage() {
   const { t } = useTranslation();
@@ -24,13 +24,8 @@ export function ClientResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
-  const [brand, setBrand] = useState<{ serviceName: string; logo: string | null }>({ serviceName: "", logo: null });
-
-  useEffect(() => {
-    api.getPublicConfig().then((c: PublicConfig) => {
-      setBrand({ serviceName: c.serviceName ?? "", logo: c.logo ?? null });
-    }).catch(() => {});
-  }, []);
+  const config = useCabinetConfig();
+  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? null };
 
   useEffect(() => {
     if (!token) {

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { useClientAuth } from "@/contexts/client-auth";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
+import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { api } from "@/lib/api";
 import type { SubscriptionPageConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -200,7 +201,8 @@ export function ClientSubscribePage() {
   const [subscription, setSubscription] = useState<unknown>(null);
   const { t } = useTranslation();
   const [pageConfig, setPageConfig] = useState<SubscriptionPageConfig | null>(null);
-  const [publicAppUrl, setPublicAppUrl] = useState<string | null>(null);
+  const cabinetConfig = useCabinetConfig();
+  const publicAppUrl = cabinetConfig?.publicAppUrl ?? null;
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
@@ -223,12 +225,10 @@ export function ClientSubscribePage() {
     Promise.all([
       api.clientSubscription(token),
       api.getPublicSubscriptionPageConfig(),
-      api.getPublicConfig().then((c) => c?.publicAppUrl ?? null).catch(() => null),
     ])
-      .then(([subRes, config, appUrl]) => {
+      .then(([subRes, config]) => {
         setSubscription(subRes.subscription ?? null);
         setPageConfig(config ?? null);
-        setPublicAppUrl(appUrl ?? null);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

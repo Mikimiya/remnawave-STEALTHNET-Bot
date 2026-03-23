@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { KeyRound, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
-import type { PublicConfig } from "@/lib/api";
+import { useCabinetConfig } from "@/contexts/cabinet-config";
 
 export function ClientForgotPasswordPage() {
   const { t } = useTranslation();
@@ -17,13 +17,8 @@ export function ClientForgotPasswordPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [brand, setBrand] = useState<{ serviceName: string; logo: string | null }>({ serviceName: "", logo: null });
-
-  useEffect(() => {
-    api.getPublicConfig().then((c: PublicConfig) => {
-      setBrand({ serviceName: c.serviceName ?? "", logo: c.logo ?? null });
-    }).catch(() => {});
-  }, []);
+  const config = useCabinetConfig();
+  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? null };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

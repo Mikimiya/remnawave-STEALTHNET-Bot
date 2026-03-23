@@ -38,12 +38,11 @@ function extractCurrentExpireAt(data: unknown): Date | null {
 }
 
 /**
- * Считает новый expireAt:
- * - Если у пользователя уже есть активная подписка (expireAt в будущем) — добавляет durationDays к текущему expireAt
- * - Иначе — от текущего момента + durationDays
+ * 计算新的 expireAt：
+ * 始终从当前时间 + durationDays，覆盖旧的到期日。
  */
-function calculateExpireAt(currentExpireAt: Date | null, durationDays: number): string {
-  const base = currentExpireAt ?? new Date();
+function calculateExpireAt(_currentExpireAt: Date | null, durationDays: number): string {
+  const base = new Date();
   return new Date(base.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
 }
 
@@ -83,12 +82,13 @@ export async function activateTariffForClient(
     telegramId: string | null;
     telegramUsername?: string | null;
   },
-  tariff: { durationDays: number; trafficLimitBytes: bigint | null; deviceLimit: number | null; internalSquadUuids: string[] },
+  tariff: { durationDays: number; trafficLimitBytes: bigint | null; deviceLimit: number | null; internalSquadUuids: string[]; trafficResetStrategy?: string },
 ): Promise<ActivationResult> {
   if (!isRemnaConfigured()) return { ok: false, error: "Сервис временно недоступен", status: 503 };
 
   const trafficLimitBytes = tariff.trafficLimitBytes != null ? Number(tariff.trafficLimitBytes) : 0;
   const hwidDeviceLimit = tariff.deviceLimit ?? null;
+  const trafficLimitStrategy = tariff.trafficResetStrategy ?? "NO_RESET";
 
   if (client.remnawaveUuid) {
     // Получаем текущие данные пользователя из Remnawave (expireAt и сквады для мержа)
@@ -102,6 +102,7 @@ export async function activateTariffForClient(
       uuid: client.remnawaveUuid,
       expireAt,
       trafficLimitBytes,
+      trafficLimitStrategy,
       hwidDeviceLimit,
       activeInternalSquads,
     });
@@ -136,7 +137,7 @@ export async function activateTariffForClient(
       const createRes = await remnaCreateUser({
         username: displayUsername,
         trafficLimitBytes,
-        trafficLimitStrategy: "NO_RESET",
+        trafficLimitStrategy,
         expireAt,
         hwidDeviceLimit: hwidDeviceLimit ?? undefined,
         activeInternalSquads: tariff.internalSquadUuids,
@@ -149,7 +150,7 @@ export async function activateTariffForClient(
 
     const currentSquads = existingUuid ? extractCurrentSquads((await remnaGetUser(existingUuid)).data) : [];
     const activeInternalSquads = mergeSquads(tariff.internalSquadUuids, currentSquads);
-    await remnaUpdateUser({ uuid: existingUuid, expireAt, trafficLimitBytes, hwidDeviceLimit, activeInternalSquads });
+    await remnaUpdateUser({ uuid: existingUuid, expireAt, trafficLimitBytes, trafficLimitStrategy, hwidDeviceLimit, activeInternalSquads });
     // Не вызываем add-users: по api-1.yaml эндпоинт добавляет ВСЕХ пользователей в сквад.
     await prisma.client.update({ where: { id: client.id }, data: { remnawaveUuid: existingUuid } });
   }
@@ -192,7 +193,7 @@ export async function activateTariffByPaymentId(paymentId: string): Promise<Acti
   return { ok: false, error: "Тариф не привязан к платежу", status: 400 };
 }
 
-function parseCustomBuildMetadata(metadata: string | null): { durationDays: number; trafficLimitBytes: bigint | null; deviceLimit: number | null; internalSquadUuids: string[] } | null {
+function parseCustomBuildMetadata(metadata: string | null): { durationDays: number; trafficLimitBytes: bigint | null; deviceLimit: number | null; internalSquadUuids: string[]; trafficResetStrategy?: string } | null {
   if (!metadata?.trim()) return null;
   try {
     const o = JSON.parse(metadata) as Record<string, unknown>;
@@ -210,7 +211,8 @@ function parseCustomBuildMetadata(metadata: string | null): { durationDays: numb
           ? BigInt(cb.trafficLimitBytes)
           : null;
     if (durationDays < 1 || internalSquadUuids.length === 0) return null;
-    return { durationDays, trafficLimitBytes, deviceLimit, internalSquadUuids };
+    const trafficResetStrategy = typeof cb.trafficResetStrategy === "string" ? cb.trafficResetStrategy : "NO_RESET";
+    return { durationDays, trafficLimitBytes, deviceLimit, internalSquadUuids, trafficResetStrategy };
   } catch {
     return null;
   }

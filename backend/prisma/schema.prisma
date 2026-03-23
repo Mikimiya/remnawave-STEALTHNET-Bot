@@ -337,21 +337,40 @@ model TariffCategory {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tariffs Tariff[]
+  tariffs   Tariff[]
+  subGroups TariffSubGroup[]
 
   @@map("tariff_categories")
+}
+
+// Под-группа внутри категории (напр. Star 128G, Standard 384G, Pro 768G)
+model TariffSubGroup {
+  id         String   @id @default(cuid())
+  categoryId String   @map("category_id")
+  name       String
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  category TariffCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tariffs  Tariff[]
+
+  @@index([categoryId])
+  @@map("tariff_sub_groups")
 }
 
 // Тариф внутри категории: название, описание (опционально), срок, сквады, лимиты, цена
 model Tariff {
   id                 String   @id @default(cuid())
   categoryId         String   @map("category_id")
+  subGroupId         String?  @map("sub_group_id")
   name               String
   description        String?  @db.Text
   durationDays       Int      @map("duration_days")
   internalSquadUuids String[] @map("internal_squad_uuids")
   trafficLimitBytes  BigInt?  @map("traffic_limit_bytes")
   deviceLimit        Int?     @map("device_limit")
+  trafficResetStrategy String @default("NO_RESET") @map("traffic_reset_strategy") // NO_RESET | DAY | WEEK | MONTH
   price              Float    @default(0)
   currency           String   @default("usd") @map("currency")
   sortOrder          Int      @default(0) @map("sort_order")
@@ -359,9 +378,11 @@ model Tariff {
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   category TariffCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subGroup TariffSubGroup? @relation(fields: [subGroupId], references: [id], onDelete: SetNull)
   payments Payment[]
 
   @@index([categoryId])
+  @@index([subGroupId])
   @@map("tariffs")
 }
 

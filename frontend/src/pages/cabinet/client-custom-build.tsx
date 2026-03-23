@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Layers, CreditCard, Wallet, Loader2, Calendar, Smartphone, Wifi, Zap, Tag } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
-import type { PublicConfig } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,17 +14,45 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
+import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
 import { cn, formatMoney, translateBackendMessage, translatePlategaLabel } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { AiFillAlipaySquare, AiFillWechat } from "react-icons/ai";
+
+function getEpayMethodPresentation(methodType: string) {
+  const key = methodType.trim().toLowerCase();
+
+  if (key === "alipay") {
+    return {
+      icon: <AiFillAlipaySquare className="h-5 w-5 text-[#1677FF]" />,
+      iconMobile: <AiFillAlipaySquare className="h-6 w-6 text-[#1677FF]" />,
+      iconBg: "bg-blue-500/10",
+    };
+  }
+
+  if (key === "wxpay" || key === "wechat" || key === "wechatpay") {
+    return {
+      icon: <AiFillWechat className="h-5 w-5 text-[#07C160]" />,
+      iconMobile: <AiFillWechat className="h-6 w-6 text-[#07C160]" />,
+      iconBg: "bg-green-500/10",
+    };
+  }
+
+  return {
+    icon: <CreditCard className="h-5 w-5 text-blue-500" />,
+    iconMobile: <CreditCard className="h-6 w-6 text-blue-500" />,
+    iconBg: "bg-blue-500/10",
+  };
+}
 
 export function ClientCustomBuildPage() {
   const { t } = useTranslation();
   const { state, refreshProfile } = useClientAuth();
   const token = state.token;
   const balance = state.client?.balance ?? 0;
-  const [config, setConfig] = useState<PublicConfig | null>(null);
-  const [loading, setLoading] = useState(true);
+  const config = useCabinetConfig();
+  const loading = !config;
   const [days, setDays] = useState(30);
   const [devices, setDevices] = useState(1);
   const [trafficGb, setTrafficGb] = useState(10);
@@ -33,21 +60,20 @@ export function ClientCustomBuildPage() {
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState("");
+  const [initialized, setInitialized] = useState(false);
 
   const cb = config?.customBuildConfig;
   const maxDays = cb?.maxDays ?? 360;
   const maxDevices = cb?.maxDevices ?? 10;
 
   useEffect(() => {
-    api.getPublicConfig().then((c) => {
-      setConfig(c);
-      if (c.customBuildConfig) {
-        setDays(Math.min(30, c.customBuildConfig.maxDays));
-        setDevices(Math.min(1, c.customBuildConfig.maxDevices));
-      }
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+    if (!config || initialized) return;
+    if (config.customBuildConfig) {
+      setDays(Math.min(30, config.customBuildConfig.maxDays));
+      setDevices(Math.min(1, config.customBuildConfig.maxDevices));
+    }
+    setInitialized(true);
+  }, [config, initialized]);
 
   const total = useMemo(() => {
     if (!cb) return 0;
@@ -463,7 +489,9 @@ export function ClientCustomBuildPage() {
                 </Button>
               )}
 
-              {(config?.epayMethods ?? []).map((m) => (
+              {(config?.epayMethods ?? []).map((m) => {
+                const ep = getEpayMethodPresentation(m.type);
+                return (
                 <Button
                   key={m.type}
                   size="lg"
@@ -474,21 +502,22 @@ export function ClientCustomBuildPage() {
                 >
                   {isMobileOrMiniapp ? (
                     <>
-                      <div className="p-2 rounded-xl bg-blue-500/10">
-                        {payLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-500" /> : <CreditCard className="h-6 w-6 text-blue-500" />}
+                      <div className={cn("p-2 rounded-xl", ep.iconBg)}>
+                        {payLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : ep.iconMobile}
                       </div>
                       <span className="text-base font-bold">{m.label}</span>
                     </>
                   ) : (
                     <>
-                      <div className="absolute left-6 p-1.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
-                        {payLoading ? <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> : <CreditCard className="h-5 w-5 text-blue-500" />}
+                      <div className={cn("absolute left-6 p-1.5 rounded-lg transition-colors", ep.iconBg)}>
+                        {payLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : ep.icon}
                       </div>
-                      <span className="text-base font-medium">💳 {m.label}</span>
+                      <span className="text-base font-medium">{m.label}</span>
                     </>
                   )}
                 </Button>
-              ))}
+                );
+              })}
 
               {config?.yookassaEnabled && cb.currency.toUpperCase() === "RUB" && (
                 <Button

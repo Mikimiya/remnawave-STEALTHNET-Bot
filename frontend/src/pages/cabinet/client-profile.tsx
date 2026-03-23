@@ -4,6 +4,7 @@ import { User, Wallet, Copy, Check, CreditCard, Loader2, Link2, Mail, Fingerprin
 import { QRCodeSVG } from "qrcode.react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
+import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { openPaymentInBrowser } from "@/lib/open-payment-url";
 import { cn, formatMoney, translateBackendMessage, translatePlategaLabel } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -12,6 +13,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "react-i18next";
+import { AiFillAlipaySquare, AiFillWechat } from "react-icons/ai";
+
+function getEpayMethodPresentation(methodType: string) {
+  const key = methodType.trim().toLowerCase();
+  if (key === "alipay") {
+    return {
+      icon: <AiFillAlipaySquare className="h-5 w-5 text-[#1677FF]" />,
+      iconBg: "bg-blue-500/10",
+    };
+  }
+  if (key === "wxpay" || key === "wechat" || key === "wechatpay") {
+    return {
+      icon: <AiFillWechat className="h-5 w-5 text-[#07C160]" />,
+      iconBg: "bg-green-500/10",
+    };
+  }
+  return {
+    icon: <CreditCard className="h-5 w-5 text-blue-500" />,
+    iconBg: "bg-blue-500/10",
+  };
+}
 function formatDate(s: string | null, lang?: string) {
   if (!s) return "—";
   try {
@@ -34,16 +56,17 @@ export function ClientProfilePage() {
   const { state, refreshProfile } = useClientAuth();
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [copiedRef, setCopiedRef] = useState<"site" | "bot" | null>(null);
-  const [plategaMethods, setPlategaMethods] = useState<{ id: number; label: string }[]>([]);
-  const [yoomoneyEnabled, setYoomoneyEnabled] = useState(false);
-  const [yookassaEnabled, setYookassaEnabled] = useState(false);
-  const [cryptopayEnabled, setCryptopayEnabled] = useState(false);
-  const [heleketEnabled, setHeleketEnabled] = useState(false);
-  const [epayMethods, setEpayMethods] = useState<{ type: string; label: string }[]>([]);
+  const config = useCabinetConfig();
+  const plategaMethods = config?.plategaMethods ?? [];
+  const yoomoneyEnabled = Boolean(config?.yoomoneyEnabled);
+  const yookassaEnabled = Boolean(config?.yookassaEnabled);
+  const cryptopayEnabled = Boolean(config?.cryptopayEnabled);
+  const heleketEnabled = Boolean(config?.heleketEnabled);
+  const epayMethods = config?.epayMethods ?? [];
+  const publicAppUrl = config?.publicAppUrl ?? null;
+  const telegramBotUsername = config?.telegramBotUsername ?? null;
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const [publicAppUrl, setPublicAppUrl] = useState<string | null>(null);
-  const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [topUpModalOpen, setTopUpModalOpen] = useState(false);
   const [topUpLoading, setTopUpLoading] = useState(false);
@@ -230,19 +253,6 @@ export function ClientProfilePage() {
     setChangePasswordError(null);
     setChangePasswordSuccess(false);
   }
-
-  useEffect(() => {
-    api.getPublicConfig().then((c) => {
-      setPlategaMethods(c.plategaMethods ?? []);
-      setYoomoneyEnabled(Boolean(c.yoomoneyEnabled));
-      setYookassaEnabled(Boolean(c.yookassaEnabled));
-      setCryptopayEnabled(Boolean(c.cryptopayEnabled));
-      setHeleketEnabled(Boolean(c.heleketEnabled));
-      setEpayMethods(c.epayMethods ?? []);
-      setPublicAppUrl(c.publicAppUrl ?? null);
-      setTelegramBotUsername(c.telegramBotUsername ?? null);
-    }).catch(() => { });
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
@@ -1035,7 +1045,9 @@ export function ClientProfilePage() {
                 <span className="text-base font-medium">Heleket</span>
               </Button>
             )}
-            {epayMethods.map((m) => (
+            {epayMethods.map((m) => {
+              const ep = getEpayMethodPresentation(m.type);
+              return (
               <Button
                 key={m.type}
                 size="lg"
@@ -1044,13 +1056,14 @@ export function ClientProfilePage() {
                 disabled={topUpLoading}
                 onClick={() => startTopUpEpay(m.type)}
               >
-                <div className="absolute left-6 p-1.5 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
-                  {topUpLoading ? <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> : <CreditCard className="h-5 w-5 text-blue-500" />}
+                <div className={cn("absolute left-6 p-1.5 rounded-lg transition-colors", ep.iconBg)}>
+                  {topUpLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : ep.icon}
                 </div>
-                <span className="text-base font-medium">💳 {m.label}</span>
+                <span className="text-base font-medium">{m.label}</span>
               </Button>
-            ))}
-            {yookassaEnabled && (
+              );
+            })}
+            {yookassaEnabled && currency.toUpperCase() === "RUB" && (
               <Button
                 size="lg"
                 variant="outline"
@@ -1064,7 +1077,7 @@ export function ClientProfilePage() {
                 <span className="text-base font-medium">{t("profile.paymentMethods.sbp")}</span>
               </Button>
             )}
-            {yoomoneyEnabled && (
+            {yoomoneyEnabled && currency.toUpperCase() === "RUB" && (
               <Button
                 size="lg"
                 variant="outline"

@@ -39,8 +39,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const compClassName = cn(buttonVariants({ variant, size, className }));
     if (asChild && React.Children.count(props.children) === 1 && React.isValidElement(props.children)) {
       const child = props.children as React.ReactElement<{ className?: string; ref?: React.Ref<unknown> }>;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { children: _, ...restProps } = props;
       return React.cloneElement(child, {
-        ...props,
+        ...restProps,
         className: cn(compClassName, child.props?.className),
         ref,
       });

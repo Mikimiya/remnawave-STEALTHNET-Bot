@@ -156,4 +156,13 @@
     color: hsl(var(--foreground));
     padding: 0.5rem;
   }
+
+  /* Hide scrollbar while keeping scroll functionality */
+  .no-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome/Safari/Opera */
+  }
 }

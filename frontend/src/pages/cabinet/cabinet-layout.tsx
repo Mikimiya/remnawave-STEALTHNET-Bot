@@ -15,33 +15,33 @@ import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "@/i18n";
 
 function AnalyticsScripts() {
+  const config = useCabinetConfig();
   useEffect(() => {
-    api.getPublicConfig().then((c) => {
-      if (c.googleAnalyticsId?.trim()) {
-        const id = c.googleAnalyticsId.trim();
-        if (document.getElementById("ga4-script")) return;
-        const script = document.createElement("script");
-        script.id = "ga4-script";
-        script.async = true;
-        script.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
-        document.head.appendChild(script);
-        const init = document.createElement("script");
-        init.id = "ga4-init";
-        init.textContent = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${id}');`;
-        document.head.appendChild(init);
-      }
-      if (c.yandexMetrikaId?.trim()) {
-        const id = c.yandexMetrikaId.trim();
-        const ymId = /^\d+$/.test(id) ? id : "0";
-        if (document.getElementById("ym-script")) return;
-        const script = document.createElement("script");
-        script.id = "ym-script";
-        script.async = true;
-        script.textContent = `(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r)return;}k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");ym(${ymId}, "init", {clickmap:true,trackLinks:true,accurateTrackBounce:true,webvisor:true});`;
-        document.head.appendChild(script);
-      }
-    }).catch(() => { });
-  }, []);
+    if (!config) return;
+    if (config.googleAnalyticsId?.trim()) {
+      const id = config.googleAnalyticsId.trim();
+      if (document.getElementById("ga4-script")) return;
+      const script = document.createElement("script");
+      script.id = "ga4-script";
+      script.async = true;
+      script.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
+      document.head.appendChild(script);
+      const init = document.createElement("script");
+      init.id = "ga4-init";
+      init.textContent = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${id}');`;
+      document.head.appendChild(init);
+    }
+    if (config.yandexMetrikaId?.trim()) {
+      const id = config.yandexMetrikaId.trim();
+      const ymId = /^\d+$/.test(id) ? id : "0";
+      if (document.getElementById("ym-script")) return;
+      const script = document.createElement("script");
+      script.id = "ym-script";
+      script.async = true;
+      script.textContent = `(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r)return;}k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");ym(${ymId}, "init", {clickmap:true,trackLinks:true,accurateTrackBounce:true,webvisor:true});`;
+      document.head.appendChild(script);
+    }
+  }, [config]);
   return null;
 }
 
@@ -270,13 +270,14 @@ function SettingsPopover() {
   const popoverRef = useRef<HTMLDivElement>(null);
   const { state, refreshProfile } = useClientAuth();
   const { t, i18n } = useTranslation();
+  const config = useCabinetConfig();
 
-  const [activeLanguages, setActiveLanguages] = useState<string[]>([]);
-  const [activeCurrencies, setActiveCurrencies] = useState<string[]>([]);
+  const defaultCurrencies = ["usd", "rub", "cny"];
+  const activeLanguages = config?.activeLanguages?.length ? config.activeLanguages : ["ru", "en"];
+  const activeCurrencies = config?.activeCurrencies?.length ? config.activeCurrencies : defaultCurrencies;
   const [preferredLang, setPreferredLang] = useState(state.client?.preferredLang ?? "ru");
   const [preferredCurrency, setPreferredCurrency] = useState(state.client?.preferredCurrency ?? "usd");
   const [saving, setSaving] = useState(false);
-  const defaultCurrencies = ["usd", "rub", "cny"];
 
   useEffect(() => {
     if (!show) {
@@ -286,13 +287,6 @@ function SettingsPopover() {
       }
       return;
     }
-
-    api.getPublicConfig()
-      .then((c) => {
-        setActiveLanguages(c.activeLanguages?.length ? c.activeLanguages : ["ru", "en"]);
-        setActiveCurrencies(c.activeCurrencies?.length ? c.activeCurrencies : defaultCurrencies);
-      })
-      .catch(() => { });
 
     function handleClick(e: MouseEvent) {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
@@ -753,39 +747,34 @@ function CabinetShell() {
           <div className="flex items-center gap-2 shrink-0">
             <ThemePopover />
             <SettingsPopover />
-            <Link
-              to="/cabinet/profile"
-              className="hidden lg:flex h-9 items-center gap-3 rounded-full border border-border/60 bg-background/35 px-4 shadow-sm backdrop-blur-xl transition-all hover:bg-background/50"
-            >
-              <span className="max-w-[120px] xl:max-w-[160px] truncate text-sm font-medium text-muted-foreground" title={state.client?.email?.trim() || (state.client?.telegramUsername ? `@${state.client.telegramUsername}` : "")}>
-                {state.client?.email?.trim() ? state.client.email : state.client?.telegramUsername ? `@${state.client.telegramUsername}` : "—"}
-              </span>
-              <div className="w-[1px] h-4 bg-border/80" />
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
-                <Wallet className="h-4 w-4 text-primary" />
-                <span>{headerBalance ?? "—"}</span>
-              </div>
-            </Link>
-            <Button
-              variant="outline"
-              className="group h-9 rounded-full border-border/60 bg-background/35 p-0 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive"
-              asChild
-            >
-              <Link to="/cabinet/login" onClick={() => logout()} className="flex h-full items-center">
-                <div className="flex h-full w-9 shrink-0 items-center justify-center">
-                  <LogOut className="h-[18px] w-[18px]" />
-                </div>
-                <div className="grid grid-cols-[0fr] opacity-0 transition-all duration-300 group-hover:grid-cols-[1fr] group-hover:opacity-100">
-                  <span className="overflow-hidden whitespace-nowrap text-sm font-medium">
-                    <span className="pr-4">{t("auth.logout")}</span>
-                  </span>
+            <div className="hidden lg:flex h-9 items-center rounded-full border border-border/60 bg-background/35 shadow-sm backdrop-blur-xl overflow-hidden">
+              <Link
+                to="/cabinet/profile"
+                className="flex h-full items-center gap-3 px-4 transition-colors hover:bg-background/45"
+              >
+                <span className="max-w-[120px] xl:max-w-[160px] truncate text-sm font-medium text-muted-foreground" title={state.client?.email?.trim() || (state.client?.telegramUsername ? `@${state.client.telegramUsername}` : "")}>
+                  {state.client?.email?.trim() ? state.client.email : state.client?.telegramUsername ? `@${state.client.telegramUsername}` : "—"}
+                </span>
+                <div className="h-4 w-px bg-border/80" />
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  <span>{headerBalance ?? "—"}</span>
                 </div>
               </Link>
-            </Button>
+              <div className="h-5 w-px bg-border/80" />
+              <Link
+                to="/cabinet/login"
+                onClick={() => logout()}
+                title={t("auth.logout")}
+                className="inline-flex h-full items-center justify-center px-3 text-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
+              >
+                <LogOut className="h-[18px] w-[18px]" />
+              </Link>
+            </div>
           </div>
         </div>
       </header>
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 transition-all duration-300">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 overflow-x-hidden transition-all duration-300">
         <Outlet />
       </main>
     </div>
@@ -800,18 +789,16 @@ export function CabinetLayout() {
   const needs2FA = !isLoggedIn && Boolean(state.pending2FAToken);
 
   return (
-    <>
+    <CabinetConfigProvider>
       <AnalyticsScripts />
       {needs2FA ? (
         <Client2FAStepScreen />
       ) : isAuthPage || !isLoggedIn ? (
         <Outlet />
       ) : (
-        <CabinetConfigProvider>
-          <CabinetShellWithMiniapp />
-        </CabinetConfigProvider>
+        <CabinetShellWithMiniapp />
       )}
-    </>
+    </CabinetConfigProvider>
   );
 }
 
