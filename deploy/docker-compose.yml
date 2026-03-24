@@ -27,7 +27,7 @@ services:
 
   # ── Backend API ─────────────────────────────────────────────────
   api:
-    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/Mikimiya/remnawave-STEALTHNET-Bot}-api:${IMAGE_TAG:-latest}
+    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/mikimiya/stealthnet}-api:${IMAGE_TAG:-latest}
     container_name: stealthnet-api
     restart: unless-stopped
     ports:

@@ -7,6 +7,9 @@
 node_modules/
 **/node_modules/
 
+stealthnet/
+stealthnet.zip
+
 # ── 前端构建产物 ──────────────────────────────────────────────────
 frontend/dist/
 frontend/.vite/

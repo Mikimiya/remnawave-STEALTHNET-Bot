@@ -6,8 +6,8 @@
 
 SHELL      := /bin/bash
 DEPLOY_DIR := /opt/stealthnet
-COMPOSE    := docker compose
 ENV_FILE   := .env
+COMPOSE    := docker compose --env-file $(ENV_FILE)
 
 # GHCR 镜像前缀（从 .env 读取）
 -include $(ENV_FILE)
@@ -19,7 +19,7 @@ FRONTEND_DIST     ?= $(DEPLOY_DIR)/frontend
 .PHONY: help install env caddy-install caddy-config caddy-start \
         pull up down restart logs ps \
         frontend-pull frontend-extract \
-        db-backup db-restore \
+        db-backup db-restore admin-reset-password \
         status clean
 
 # ── 帮助 ─────────────────────────────────────────────────────────
@@ -188,6 +188,41 @@ db-restore: ## 从 backup/stealthnet.sql 恢复数据库
 		< $(BACKUP_FILE)
 	@echo "🔄  重新启动 API 和 Bot..."
 	@$(COMPOSE) start api bot
+	@echo "🔄  等待 API 启动..."
+	@sleep 5
+	@echo "🔄  重置管理员密码..."
+	@docker exec stealthnet-api node -e " \
+		const bcrypt = require('bcryptjs'); \
+		const { PrismaClient } = require('@prisma/client'); \
+		const prisma = new PrismaClient(); \
+		const email = process.env.INIT_ADMIN_EMAIL || 'admin@stealthnet.local'; \
+		const password = process.env.INIT_ADMIN_PASSWORD; \
+		if (!password) { console.log('WARN: INIT_ADMIN_PASSWORD not set, skipping reset'); process.exit(0); } \
+		(async () => { \
+			const hash = await bcrypt.hash(password, 12); \
+			const r = await prisma.admin.updateMany({ where: { email }, data: { passwordHash: hash, mustChangePassword: true } }); \
+			console.log('Reset password for', r.count, 'admin(s):', email); \
+			await prisma.\$$disconnect(); \
+		})(); \
+	" 2>/dev/null || echo "⚠️  密码重置失败，请手动重置"
 	@echo ""
 	@echo "  ✅  数据库恢复完成！"
 	@echo ""
+
+admin-reset-password: ## 重置管理员密码（使用 .env 中的 INIT_ADMIN_PASSWORD）
+	@echo "🔄  重置管理员密码..."
+	@docker exec stealthnet-api node -e " \
+		const bcrypt = require('bcryptjs'); \
+		const { PrismaClient } = require('@prisma/client'); \
+		const prisma = new PrismaClient(); \
+		const email = process.env.INIT_ADMIN_EMAIL || 'admin@stealthnet.local'; \
+		const password = process.env.INIT_ADMIN_PASSWORD; \
+		if (!password) { console.log('ERROR: INIT_ADMIN_PASSWORD not set in .env'); process.exit(1); } \
+		(async () => { \
+			const hash = await bcrypt.hash(password, 12); \
+			const r = await prisma.admin.updateMany({ where: { email }, data: { passwordHash: hash, mustChangePassword: true } }); \
+			console.log('Reset password for', r.count, 'admin(s):', email); \
+			await prisma.\$$disconnect(); \
+		})(); \
+	"
+	@echo "✅  管理员密码已重置为 .env 中 INIT_ADMIN_PASSWORD 的值"

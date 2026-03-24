@@ -304,7 +304,7 @@ export function LandingPage({ config }: { config: PublicConfig }) {
     Heleket: "Heleket",
   };
 
-  const title = lc?.heroTitle || config.serviceName || "STEALTHNET";
+  const title = lc?.heroTitle || config.serviceName || "Coolgo Network";
   const subtitle =
     lc?.heroSubtitle?.trim() ||
     t("landing.hero.subtitle");

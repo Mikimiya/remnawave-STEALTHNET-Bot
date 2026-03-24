@@ -120,7 +120,7 @@ export function LoginPage() {
               <div className="mb-8 flex items-center justify-between">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/40 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:bg-white/5">
                   <Shield className="h-3.5 w-3.5 text-primary" />
-                  {brand.serviceName || "STEALTHNET"}
+                  {brand.serviceName || "Coolgo Network"}
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground dark:bg-white/5">
                   <span className="relative flex h-2 w-2">

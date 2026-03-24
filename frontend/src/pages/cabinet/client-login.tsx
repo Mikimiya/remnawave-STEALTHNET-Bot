@@ -86,6 +86,7 @@ export function ClientLoginPage() {
     script.setAttribute("data-radius", "8");
     script.setAttribute("data-onauth", "onTelegramLoginAuth(user)");
     script.async = true;
+    script.onerror = () => { /* telegram.org 不可达时静默失败 */ };
     (window as unknown as { onTelegramLoginAuth: (user: { id: number; username?: string }) => void }).onTelegramLoginAuth = (user) => {
       registerByTelegram({ telegramId: String(user.id), telegramUsername: user.username }).then(() => navigate("/cabinet/dashboard", { replace: true }));
     };
