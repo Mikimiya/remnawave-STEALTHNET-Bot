@@ -19,6 +19,7 @@ export default defineConfig({
       workbox: {
         // Не перехватывать запросы к /api/ — они должны идти на бэкенд
         navigateFallbackDenylist: [/^\/api\//],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
       },
     }),
   ],

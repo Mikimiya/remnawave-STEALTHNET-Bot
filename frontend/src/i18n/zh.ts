@@ -461,6 +461,9 @@ const zh: typeof import("./ru").default = {
       codeRequired: "请输入应用中的 6 位验证码",
       invalidCode: "验证码无效",
     },
+    announcement: {
+      defaultTitle: "系统公告",
+    },
     theme: {
       title: "主题",
       accent: "强调色",
@@ -1979,6 +1982,14 @@ const zh: typeof import("./ru").default = {
         aiChat: {
           title: "控制台中的 AI 聊天",
           description: "启用控制台内置 AI 助手（聊天图标）。关闭后聊天会完全隐藏。",
+        },
+        announcement: {
+          title: "客户端弹窗公告",
+          description: "启用后，客户进入个人中心时会弹出公告窗口。关闭后公告自动隐藏。",
+          titleLabel: "公告标题",
+          titlePlaceholder: "例如：系统维护通知",
+          contentLabel: "公告内容",
+          contentPlaceholder: "输入公告内容（支持 Markdown 格式）…",
         },
         notificationGroup: {
           label: "通知群组（Telegram Chat ID）",

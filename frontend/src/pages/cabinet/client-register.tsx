@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { UserPlus, Mail, AlertCircle } from "lucide-react";
@@ -68,14 +68,6 @@ function useUtmCapture(searchParams: URLSearchParams) {
   return { ...fromStorage, ...fromUrl };
 }
 
-declare global {
-  interface Window {
-    TelegramLoginWidget?: {
-      dataOnauth: (user: { id: number; first_name?: string; username?: string }) => void;
-    };
-  }
-}
-
 export function ClientRegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -90,16 +82,14 @@ export function ClientRegisterPage() {
     lang: config?.defaultLanguage || "ru",
     currency: (config?.defaultCurrency || "usd").toLowerCase(),
   };
-  const telegramBotUsername = config?.telegramBotUsername ?? null;
   const googleEnabled = !!config?.googleLoginEnabled;
   const googleClientId = config?.googleClientId ?? null;
   const publicAppUrl = config?.publicAppUrl ?? null;
   const appleEnabled = !!config?.appleLoginEnabled;
-  const telegramWidgetRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref")?.trim() || undefined;
   const utm = useUtmCapture(searchParams);
-  const { register, registerByTelegram, loginByGoogle, loginByApple } = useClientAuth();
+  const { register, loginByGoogle, loginByApple } = useClientAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -141,30 +131,6 @@ export function ClientRegisterPage() {
     setPasswordError(passwordErr);
     return !emailErr && !passwordErr;
   }
-
-  useEffect(() => {
-    if (!telegramBotUsername || !telegramWidgetRef.current) return;
-    const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.setAttribute("data-telegram-login", telegramBotUsername);
-    script.setAttribute("data-size", "large");
-    script.setAttribute("data-radius", "8");
-    script.setAttribute("data-onauth", "onTelegramAuth(user)");
-    script.async = true;
-    script.onerror = () => { /* telegram.org 不可达时静默失败 */ };
-    (window as unknown as { onTelegramAuth: (user: { id: number; first_name?: string; username?: string }) => void }).onTelegramAuth = (user) => {
-      registerByTelegram({
-        telegramId: String(user.id),
-        telegramUsername: user.username ?? undefined,
-        preferredLang: defaults.lang,
-        preferredCurrency: defaults.currency,
-        referralCode: refCode,
-        ...utm,
-      }).then(() => navigate("/cabinet/onboarding", { replace: true }));
-    };
-    telegramWidgetRef.current.innerHTML = "";
-    telegramWidgetRef.current.appendChild(script);
-  }, [telegramBotUsername, registerByTelegram, navigate, defaults.lang, defaults.currency, refCode, utm]);
 
   const handleGoogleLogin = useCallback(() => {
     if (!googleEnabled || !googleClientId) return;
@@ -374,7 +340,7 @@ export function ClientRegisterPage() {
             ) : t("auth.register")}
           </Button>
 
-          {(telegramBotUsername || googleEnabled || appleEnabled) && (
+          {(googleEnabled || appleEnabled) && (
             <div className="space-y-4">
               <div className="relative flex items-center gap-3">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
@@ -412,11 +378,6 @@ export function ClientRegisterPage() {
                   </Button>
                 )}
 
-                {telegramBotUsername && (
-                  <div className="rounded-xl border border-white/10 bg-white/35 px-3 py-3 shadow-sm backdrop-blur dark:bg-white/5">
-                    <div ref={telegramWidgetRef} className="flex min-h-[44px] justify-center" />
-                  </div>
-                )}
               </div>
             </div>
           )}

@@ -109,6 +109,7 @@ export function ClientTariffsPage() {
   const [payError, setPayError] = useState<string | null>(null);
   const [trialLoading, setTrialLoading] = useState(false);
   const [trialError, setTrialError] = useState<string | null>(null);
+  const [isTrial, setIsTrial] = useState(false);
   const { t, i18n } = useTranslation();
 
   // Derive payment methods from shared config
@@ -149,7 +150,11 @@ export function ClientTariffsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+    // 获取当前订阅状态（判断是否为试用）
+    if (token) {
+      api.clientSubscription(token).then((r) => setIsTrial(r.isTrial ?? false)).catch(() => {});
+    }
+  }, [token]);
 
   async function activateTrial() {
     if (!token) return;
@@ -472,8 +477,8 @@ export function ClientTariffsPage() {
           )}
         </div>
 
-        {/* Override warning */}
-        {client?.remnawaveUuid && (
+        {/* Override warning — 试用套餐不提示覆盖 */}
+        {client?.remnawaveUuid && !isTrial && (
           <div className={cn(
             "flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5",
           )}>

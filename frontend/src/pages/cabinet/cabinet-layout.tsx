@@ -7,12 +7,14 @@ import { useIsMiniapp } from "@/hooks/use-is-miniapp";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { GlassSelect } from "@/components/ui/glass-select";
-import { LayoutDashboard, Package, User, LogOut, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X } from "lucide-react";
+import { LayoutDashboard, Package, User, LogOut, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X, Megaphone } from "lucide-react";
 import { useTheme, ACCENT_PALETTES, type ThemeMode, type ThemeAccent } from "@/contexts/theme";
 import { cn, formatMoney } from "@/lib/utils";
 import { FloatingChat } from "@/components/floating-chat";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "@/i18n";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import ReactMarkdown from "react-markdown";
 
 function AnalyticsScripts() {
   const config = useCabinetConfig();
@@ -772,6 +774,68 @@ function CabinetShell() {
   );
 }
 
+/** 客户端弹窗公告（后台开关控制） */
+function AnnouncementDialog() {
+  const config = useCabinetConfig();
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!config?.announcementEnabled) return;
+    const content = config.announcementContent ?? "";
+    const title = config.announcementTitle ?? "";
+    if (!content && !title) return;
+    // 使用公告内容的哈希作为 key，内容变化后重新弹出
+    const hash = btoa(unescape(encodeURIComponent(title + "|" + content))).slice(0, 32);
+    const dismissedKey = "stealthnet_announcement_dismissed";
+    try {
+      const dismissed = sessionStorage.getItem(dismissedKey);
+      if (dismissed === hash) return;
+    } catch { /* ignore */ }
+    setOpen(true);
+  }, [config?.announcementEnabled, config?.announcementTitle, config?.announcementContent]);
+
+  if (!config?.announcementEnabled) return null;
+  const title = config.announcementTitle ?? t("cabinetLayout.announcement.defaultTitle");
+  const content = config.announcementContent ?? "";
+  if (!content && !config.announcementTitle) return null;
+
+  function handleClose(isOpen: boolean) {
+    setOpen(isOpen);
+    if (!isOpen) {
+      try {
+        const hash = btoa(unescape(encodeURIComponent((config?.announcementTitle ?? "") + "|" + (config?.announcementContent ?? "")))).slice(0, 32);
+        sessionStorage.setItem("stealthnet_announcement_dismissed", hash);
+      } catch { /* ignore */ }
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <Megaphone className="h-5 w-5 text-primary shrink-0" />
+            <DialogTitle>{title}</DialogTitle>
+          </div>
+          {content && (
+            <DialogDescription asChild className="pt-2 text-sm text-foreground/80">
+              <div className="prose prose-sm dark:prose-invert max-w-none break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-bold [&_p]:my-1.5 [&_hr]:my-3 [&_img]:max-w-full [&_img]:rounded-md">
+                <ReactMarkdown>{content}</ReactMarkdown>
+              </div>
+            </DialogDescription>
+          )}
+        </DialogHeader>
+        <div className="flex justify-end pt-2">
+          <Button onClick={() => handleClose(false)} className="rounded-xl">
+            {t("common.confirm")}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function CabinetLayout() {
   const location = useLocation();
   const { state } = useClientAuth();
@@ -782,6 +846,7 @@ export function CabinetLayout() {
   return (
     <CabinetConfigProvider>
       <AnalyticsScripts />
+      <AnnouncementDialog />
       {needs2FA ? (
         <Client2FAStepScreen />
       ) : isAuthPage || !isLoggedIn ? (

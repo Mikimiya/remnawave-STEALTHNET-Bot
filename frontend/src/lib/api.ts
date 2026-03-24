@@ -1505,6 +1505,10 @@ export type UpdateSettingsPayload = {
   landingReadyToConnectEyebrow?: string | null;
   landingReadyToConnectTitle?: string | null;
   landingReadyToConnectDesc?: string | null;
+  /** 客户端弹窗公告 */
+  announcementEnabled?: boolean;
+  announcementTitle?: string | null;
+  announcementContent?: string | null;
 };
 
 export interface ClientRecord {
@@ -1773,6 +1777,10 @@ export interface AdminSettings {
   landingReadyToConnectEyebrow?: string | null;
   landingReadyToConnectTitle?: string | null;
   landingReadyToConnectDesc?: string | null;
+  /** 客户端弹窗公告 */
+  announcementEnabled?: boolean;
+  announcementTitle?: string | null;
+  announcementContent?: string | null;
 }
 
 /** Конфиг страницы подписки (формат как sub.stealthnet.app) */
@@ -2335,4 +2343,8 @@ export interface PublicConfig {
     readyToConnectTitle?: string | null;
     readyToConnectDesc?: string | null;
   } | null;
+  /** 客户端弹窗公告 */
+  announcementEnabled?: boolean;
+  announcementTitle?: string | null;
+  announcementContent?: string | null;
 }

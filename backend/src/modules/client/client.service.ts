@@ -136,6 +136,8 @@ const SYSTEM_CONFIG_KEYS = [
   "landing_how_it_works_title", "landing_how_it_works_desc",
   "landing_stats_platforms", "landing_stats_tariffs_label", "landing_stats_access_label", "landing_stats_payment_methods",
   "landing_ready_to_connect_eyebrow", "landing_ready_to_connect_title", "landing_ready_to_connect_desc",
+  // Всплывающее объявление для клиентов (управляется из админки)
+  "announcement_enabled", "announcement_title", "announcement_content",
 ];
 
 /** Продукт «Доп. трафик»: объём в ГБ, цена, валюта */
@@ -645,6 +647,10 @@ export async function getSystemConfig() {
     landingReadyToConnectEyebrow: (map.landing_ready_to_connect_eyebrow ?? "").trim() || null,
     landingReadyToConnectTitle: (map.landing_ready_to_connect_title ?? "").trim() || null,
     landingReadyToConnectDesc: (map.landing_ready_to_connect_desc ?? "").trim() || null,
+    // Всплывающее объявление для клиентов
+    announcementEnabled: map.announcement_enabled === "true" || map.announcement_enabled === "1",
+    announcementTitle: (map.announcement_title ?? "").trim() || null,
+    announcementContent: (map.announcement_content ?? "").trim() || null,
   };
 }
 
@@ -1258,5 +1264,9 @@ export async function getPublicConfig() {
         readyToConnectDesc: (l.landingReadyToConnectDesc ?? "").trim() || null,
       };
     })(),
+    // Всплывающее объявление
+    announcementEnabled: full.announcementEnabled ?? false,
+    announcementTitle: full.announcementEnabled ? (full.announcementTitle ?? null) : null,
+    announcementContent: full.announcementEnabled ? (full.announcementContent ?? null) : null,
   };
 }

@@ -60,10 +60,9 @@ function extractCurrentSquads(data: unknown): string[] {
   return out;
 }
 
-/** Объединить сквады тарифа с текущими сквадами пользователя (тариф в приоритете, доп. сквады сохраняются). */
-function mergeSquads(tariffSquadUuids: string[], currentSquadUuids: string[]): string[] {
-  const extra = currentSquadUuids.filter((u) => !tariffSquadUuids.includes(u));
-  return [...tariffSquadUuids, ...extra];
+/** 购买套餐时直接使用套餐的内部分组，覆盖用户当前的分组（不保留旧分组）。 */
+function resolveSquads(tariffSquadUuids: string[], _currentSquadUuids: string[]): string[] {
+  return [...tariffSquadUuids];
 }
 
 /**
@@ -91,12 +90,12 @@ export async function activateTariffForClient(
   const trafficLimitStrategy = tariff.trafficResetStrategy ?? "NO_RESET";
 
   if (client.remnawaveUuid) {
-    // Получаем текущие данные пользователя из Remnawave (expireAt и сквады для мержа)
+    // Получаем текущие данные пользователя из Remnawave (expireAt 和分组)
     const userRes = await remnaGetUser(client.remnawaveUuid);
     const currentExpireAt = extractCurrentExpireAt(userRes.data);
     const currentSquads = extractCurrentSquads(userRes.data);
     const expireAt = calculateExpireAt(currentExpireAt, tariff.durationDays);
-    const activeInternalSquads = mergeSquads(tariff.internalSquadUuids, currentSquads);
+    const activeInternalSquads = resolveSquads(tariff.internalSquadUuids, currentSquads);
 
     const updateRes = await remnaUpdateUser({
       uuid: client.remnawaveUuid,
@@ -149,7 +148,7 @@ export async function activateTariffForClient(
     if (!existingUuid) return { ok: false, error: "Ошибка создания пользователя VPN", status: 502 };
 
     const currentSquads = existingUuid ? extractCurrentSquads((await remnaGetUser(existingUuid)).data) : [];
-    const activeInternalSquads = mergeSquads(tariff.internalSquadUuids, currentSquads);
+    const activeInternalSquads = resolveSquads(tariff.internalSquadUuids, currentSquads);
     await remnaUpdateUser({ uuid: existingUuid, expireAt, trafficLimitBytes, trafficLimitStrategy, hwidDeviceLimit, activeInternalSquads });
     // Не вызываем add-users: по api-1.yaml эндпоинт добавляет ВСЕХ пользователей в сквад.
     await prisma.client.update({ where: { id: client.id }, data: { remnawaveUuid: existingUuid } });

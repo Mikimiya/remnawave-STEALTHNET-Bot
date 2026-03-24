@@ -461,6 +461,9 @@ const en: typeof import("./ru").default = {
       codeRequired: "Enter the 6-digit code from the app",
       invalidCode: "Invalid code",
     },
+    announcement: {
+      defaultTitle: "Announcement",
+    },
     theme: {
       title: "Theme",
       accent: "Accent color",
@@ -1979,6 +1982,14 @@ const en: typeof import("./ru").default = {
         aiChat: {
           title: "AI chat in the cabinet",
           description: "Enable the built-in AI assistant in the cabinet (chat icon). If disabled, the chat is hidden completely.",
+        },
+        announcement: {
+          title: "Client popup announcement",
+          description: "When enabled, clients will see a popup announcement when entering the cabinet. Disabling hides it automatically.",
+          titleLabel: "Announcement title",
+          titlePlaceholder: "e.g. Scheduled maintenance",
+          contentLabel: "Announcement content",
+          contentPlaceholder: "Enter announcement text (Markdown supported)…",
         },
         notificationGroup: {
           label: "Notification group (Telegram Chat ID)",

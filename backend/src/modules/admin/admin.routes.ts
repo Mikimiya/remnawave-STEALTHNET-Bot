@@ -1181,6 +1181,10 @@ const updateSettingsSchema = z.object({
   landingReadyToConnectEyebrow: z.string().max(200).nullable().optional(),
   landingReadyToConnectTitle: z.string().max(500).nullable().optional(),
   landingReadyToConnectDesc: z.string().max(2000).nullable().optional(),
+  // Всплывающее объявление для клиентов
+  announcementEnabled: z.boolean().optional(),
+  announcementTitle: z.string().max(500).nullable().optional(),
+  announcementContent: z.string().max(5000).nullable().optional(),
 });
 
 adminRouter.patch("/settings", async (req, res) => {
@@ -1814,6 +1818,22 @@ adminRouter.patch("/settings", async (req, res) => {
     ["landingReadyToConnectDesc", "landing_ready_to_connect_desc"],
   ];
   for (const [key, dbKey] of landingKeys) {
+    const v = updates[key];
+    if (v === undefined) continue;
+    const val = typeof v === "boolean" ? (v ? "true" : "false") : (v === null ? "" : String(v));
+    await prisma.systemSetting.upsert({
+      where: { key: dbKey },
+      create: { key: dbKey, value: val },
+      update: { value: val },
+    });
+  }
+  // Всплывающее объявление для клиентов
+  const announcementKeys: [keyof typeof updates, string][] = [
+    ["announcementEnabled", "announcement_enabled"],
+    ["announcementTitle", "announcement_title"],
+    ["announcementContent", "announcement_content"],
+  ];
+  for (const [key, dbKey] of announcementKeys) {
     const v = updates[key];
     if (v === undefined) continue;
     const val = typeof v === "boolean" ? (v ? "true" : "false") : (v === null ? "" : String(v));

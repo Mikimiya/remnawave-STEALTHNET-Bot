@@ -706,6 +706,9 @@ export function SettingsPage() {
         landingReadyToConnectEyebrow: settings.landingReadyToConnectEyebrow ?? null,
         landingReadyToConnectTitle: settings.landingReadyToConnectTitle ?? null,
         landingReadyToConnectDesc: settings.landingReadyToConnectDesc ?? null,
+        announcementEnabled: settings.announcementEnabled ?? false,
+        announcementTitle: settings.announcementTitle ?? null,
+        announcementContent: settings.announcementContent ?? null,
       })
       .then((updated) => {
         const u = updated as AdminSettings;
@@ -854,6 +857,41 @@ export function SettingsPage() {
                       </p>
                     </div>
                   </div>
+                </div>
+                {/* 客户端弹窗公告 */}
+                <div className="space-y-3 rounded-lg border p-4 bg-muted/20">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="announcement-enabled"
+                      checked={!!settings.announcementEnabled}
+                      onCheckedChange={(checked: boolean) =>
+                        setSettings((s) => (s ? { ...s, announcementEnabled: checked === true } : s))
+                      }
+                    />
+                    <div>
+                      <Label htmlFor="announcement-enabled" className="text-base font-medium cursor-pointer">{t("admin.settings.general.announcement.title")}</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t("admin.settings.general.announcement.description")}
+                      </p>
+                    </div>
+                  </div>
+                  {settings.announcementEnabled && (
+                    <div className="space-y-2 pt-2">
+                      <Label>{t("admin.settings.general.announcement.titleLabel")}</Label>
+                      <Input
+                        value={settings.announcementTitle ?? ""}
+                        onChange={(e) => setSettings((s) => (s ? { ...s, announcementTitle: e.target.value || null } : s))}
+                        placeholder={t("admin.settings.general.announcement.titlePlaceholder")}
+                      />
+                      <Label>{t("admin.settings.general.announcement.contentLabel")}</Label>
+                      <Textarea
+                        value={settings.announcementContent ?? ""}
+                        onChange={(e) => setSettings((s) => (s ? { ...s, announcementContent: e.target.value || null } : s))}
+                        placeholder={t("admin.settings.general.announcement.contentPlaceholder")}
+                        rows={4}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2 rounded-lg border p-4 bg-muted/20">
                   <Label>{t("admin.settings.general.notificationGroup.label")}</Label>
