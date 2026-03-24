@@ -37,7 +37,7 @@ import { getAuthUrl, exchangeCodeForToken, requestPayment, processPayment } from
 import { createYookassaPayment } from "../yookassa/yookassa.service.js";
 import { createCryptopayInvoice, isCryptopayConfigured } from "../cryptopay/cryptopay.service.js";
 import { createHeleketInvoice, isHeleketConfigured } from "../heleket/heleket.service.js";
-import { createEpayPayment, isEpayConfigured } from "../epay/epay.service.js";
+import { createEpayPayment, buildEpaySubmitUrl, isEpayConfigured } from "../epay/epay.service.js";
 
 /** Извлекает текущий expireAt из ответа Remna. Возвращает Date если в будущем, иначе null. */
 function extractCurrentExpireAt(data: unknown): Date | null {
@@ -3347,25 +3347,29 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
     }
     const notifyUrl = `${appUrl}/api/webhooks/epay`;
     const returnUrl = `${appUrl}/cabinet?epay=success`;
-    const clientip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "";
 
-    const result = await createEpayPayment({
+    console.log(`[epay/create-payment] orderId=${orderId} type=${epayType || "(收银台)"} money=${amountRounded.toFixed(2)}`);
+
+    // 使用 submit.php 页面跳转方式（比 mapi.php 更可靠，尤其支付宝 H5 场景）
+    // submit.php 不接受 clientip / device 参数，收银台自动适配设备
+    const result = buildEpaySubmitUrl({
       config: epayConfig,
       outTradeNo: orderId,
       notifyUrl,
       returnUrl,
       name: serviceName,
       money: amountRounded.toFixed(2),
-      clientip,
       type: epayType || undefined,
       param: payment.id,
     });
 
     if (!result.ok) {
+      console.warn(`[epay/create-payment] FAILED orderId=${orderId}:`, result.error);
       await prisma.payment.delete({ where: { id: payment.id } }).catch(() => {});
       return res.status(500).json({ message: result.error });
     }
 
+    console.log(`[epay/create-payment] OK orderId=${orderId} payUrl=${result.payUrl}`);
     return res.status(201).json({
       paymentId: payment.id,
       payUrl: result.payUrl,

@@ -237,7 +237,15 @@ export function ClientDashboardPage() {
 
   const expireDate = subParsed.expireAt ? (() => { try { const d = new Date(subParsed.expireAt); return Number.isNaN(d.getTime()) ? null : d; } catch { return null; } })() : null;
   const daysLeft = expireDate && expireDate > new Date()
-    ? Math.max(0, Math.ceil((expireDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+    ? (() => {
+        // 按自然日计算剩余天数：将到期日和当前时间都归零到当天 00:00，再算天数差
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const expireStart = new Date(expireDate.getFullYear(), expireDate.getMonth(), expireDate.getDate());
+        const diffDays = Math.round((expireStart.getTime() - todayStart.getTime()) / (24 * 60 * 60 * 1000));
+        // 如果到期日和今天是同一天但还没过期，显示 0 天（即"今天到期"）
+        return Math.max(0, diffDays);
+      })()
     : null;
 
   // Компонент-состояние отсутствия подписки

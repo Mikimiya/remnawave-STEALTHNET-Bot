@@ -49,7 +49,52 @@ export type CreateEpayPaymentResult =
   | { ok: false; error: string; status?: number };
 
 /**
+ * 构建 submit.php 页面跳转 URL（推荐方式）。
+ * 用户浏览器直接跳转到易支付收银台，由收银台自动处理设备适配和支付渠道。
+ * 比 mapi.php API 接口更可靠，尤其是支付宝 H5 场景。
+ *
+ * submit.php 参数（文档）：pid, type, out_trade_no, notify_url, return_url, name, money, param, sign, sign_type
+ * 注意：submit.php 没有 clientip / device / rawurl 参数（那些是 mapi.php 独有的）
+ * type 不传则跳转收银台（用户自选支付方式）
+ */
+export function buildEpaySubmitUrl(params: CreateEpayPaymentParams): CreateEpayPaymentResult {
+  const { config, outTradeNo, notifyUrl, returnUrl, name, money, type, param } = params;
+  const pid = config.pid?.trim();
+  const key = config.key?.trim();
+  const apiUrl = config.apiUrl?.trim()?.replace(/\/$/, "");
+  if (!pid || !key || !apiUrl) return { ok: false, error: "ePay not configured" };
+  if (!returnUrl) return { ok: false, error: "ePay submit.php requires return_url" };
+
+  const reqParams: Record<string, string> = {
+    pid,
+    out_trade_no: outTradeNo,
+    notify_url: notifyUrl,
+    return_url: returnUrl,
+    name: name.slice(0, 127),
+    money,
+  };
+  // type 不传则跳收银台（用户自选），传了则直接跳对应支付方式
+  if (type) reqParams.type = type;
+  if (param) reqParams.param = param;
+
+  reqParams.sign = buildEpaySign(reqParams, key);
+  reqParams.sign_type = "MD5";
+
+  const qs = Object.entries(reqParams)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+
+  return {
+    ok: true,
+    tradeNo: outTradeNo,
+    payUrl: `${apiUrl}/submit.php?${qs}`,
+  };
+}
+
+/**
  * 通过 API 接口 (mapi.php) 创建订单，返回支付链接。
+ * 注意：mapi.php 返回的 payurl 在某些易支付平台上不稳定（尤其支付宝 H5），
+ *       推荐优先使用 buildEpaySubmitUrl (submit.php) 方式。
  */
 export async function createEpayPayment(params: CreateEpayPaymentParams): Promise<CreateEpayPaymentResult> {
   const { config, outTradeNo, notifyUrl, returnUrl, name, money, clientip, type, device, param } = params;

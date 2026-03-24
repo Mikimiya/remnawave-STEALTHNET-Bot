@@ -183,7 +183,7 @@ const zh: typeof import("./ru").default = {
     crypto: "加密货币",
     freeTrial: "免费试用",
     trialTitle: "免费试用",
-    trialDesc: "天免费试用",
+    trialDesc: "免费试用",
     trialDescNodays: "免费试用",
     activateTrial: "激活试用",
     activatingTrial: "激活中…",
