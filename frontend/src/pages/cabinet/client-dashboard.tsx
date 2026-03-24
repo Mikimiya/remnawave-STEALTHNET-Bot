@@ -252,7 +252,7 @@ export function ClientDashboardPage() {
           {t("dashboard.noSubscriptionDesc")}
         </p>
       </div>
-      <Link to="/cabinet/tariffs" className="inline-flex h-11 mt-2 items-center justify-center rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground shadow-lg transition-transform duration-300 hover:scale-105 hover:bg-primary/90">
+      <Link to="/cabinet/tariffs" className="inline-flex h-11 mt-2 items-center justify-center rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm transition-transform duration-300 hover:scale-105 hover:bg-primary/90">
         <span className="inline-flex items-center leading-none">{t("dashboard.choosePlan")}</span>
       </Link>
     </div>
@@ -412,7 +412,7 @@ export function ClientDashboardPage() {
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-              <Link to="/cabinet/subscribe" className="inline-flex w-full h-11 items-center justify-center gap-2.5 rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-lg transition-all duration-300 hover:bg-primary/90">
+              <Link to="/cabinet/subscribe" className="inline-flex w-full h-11 items-center justify-center gap-2.5 rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
                 <Link2 className="h-5 w-5 shrink-0" />
                 <span className="inline-flex items-center leading-none">{t("dashboard.connectVPN")}</span>
               </Link>
@@ -425,7 +425,7 @@ export function ClientDashboardPage() {
               <p className="text-[14px] text-muted-foreground">
                 {t("dashboard.trialDesc", { days: formatDays(trialDays, lang) })}
               </p>
-              <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white shadow-lg h-12 rounded-xl hover:scale-[1.02] transition-transform duration-300" onClick={activateTrial} disabled={trialLoading}>
+              <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white shadow-sm h-12 rounded-xl hover:scale-[1.02] transition-transform duration-300" onClick={activateTrial} disabled={trialLoading}>
                 {trialLoading ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" /> : <Gift className="h-5 w-5 shrink-0" />}
                 <span className="font-medium text-base">{t("dashboard.activateTrial")}</span>
               </Button>
@@ -437,7 +437,7 @@ export function ClientDashboardPage() {
                 <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
                 <p className="leading-relaxed">{t("dashboard.noLinkDesc")}</p>
               </div>
-              <Link to="/cabinet/tariffs" className="inline-flex w-full h-11 items-center justify-center rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-md transition-all duration-300 hover:bg-primary/90">
+              <Link to="/cabinet/tariffs" className="inline-flex w-full h-11 items-center justify-center rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
                 <span className="inline-flex items-center leading-none">{t("dashboard.choosePlan")}</span>
               </Link>
             </div>
@@ -450,7 +450,7 @@ export function ClientDashboardPage() {
             <h2 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-1">{t("dashboard.myBalance")}</h2>
             <p className="text-3xl font-bold tracking-tight text-foreground">{formatMoney(client.balance, client.preferredCurrency)}</p>
           </div>
-          <Link to="/cabinet/profile#topup" className="inline-flex h-11 items-center justify-center gap-2.5 rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-md transition-all duration-300 hover:bg-primary/90">
+          <Link to="/cabinet/profile#topup" className="inline-flex h-11 items-center justify-center gap-2.5 rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
             <PlusCircle className="h-5 w-5 shrink-0" />
             <span className="inline-flex items-center leading-none">{t("dashboard.topUp")}</span>
           </Link>
@@ -467,7 +467,7 @@ export function ClientDashboardPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-3xl bg-card/40 backdrop-blur-2xl border border-border/50 p-8 sm:p-10 shadow-xl"
+        className="relative overflow-hidden rounded-3xl bg-card/40 backdrop-blur-2xl border border-border/50 p-8 sm:p-10 shadow-sm"
       >
         {/* Декоративное свечение */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
@@ -500,17 +500,17 @@ export function ClientDashboardPage() {
 
           <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0 min-w-[240px]">
             {showTrial ? (
-              <Button size="lg" className="w-full gap-2 shadow-xl bg-green-600 hover:bg-green-700 text-white rounded-xl h-14 hover:scale-105 transition-transform [&_svg]:self-center [&_span]:leading-none" onClick={activateTrial} disabled={trialLoading}>
+              <Button size="lg" className="w-full gap-2 shadow-sm bg-green-600 hover:bg-green-700 text-white rounded-xl h-14 hover:scale-105 transition-transform [&_svg]:self-center [&_span]:leading-none" onClick={activateTrial} disabled={trialLoading}>
                 {trialLoading ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" /> : <Gift className="h-5 w-5 shrink-0" />}
                 <span className="inline-flex items-center text-base font-medium leading-none">{t("dashboard.freeTrial")}</span>
               </Button>
             ) : vpnUrl ? (
-              <Link to="/cabinet/subscribe" className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground shadow-xl transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
+              <Link to="/cabinet/subscribe" className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
                 <Link2 className="h-5 w-5 shrink-0" />
                 <span className="inline-flex items-center text-base font-medium leading-none">{t("dashboard.setupVPN")}</span>
               </Link>
             ) : (
-              <Link to="/cabinet/tariffs" className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground shadow-xl transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
+              <Link to="/cabinet/tariffs" className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
                 <Package className="h-5 w-5 shrink-0" />
                 <span className="inline-flex items-center text-base font-medium leading-none">{t("dashboard.choosePlan")}</span>
               </Link>
@@ -533,7 +533,7 @@ export function ClientDashboardPage() {
           transition={{ duration: 0.4, delay: 0.05 }}
           className="lg:col-span-12"
         >
-          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden group">
+          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-sm transition-all duration-300 relative overflow-hidden group">
             <div className="absolute -top-20 -left-20 h-48 w-48 rounded-full bg-primary/15 blur-[90px] pointer-events-none group-hover:bg-primary/25 transition-colors duration-700" />
             <div className="absolute -bottom-16 -right-16 h-40 w-40 rounded-full bg-primary/10 blur-[70px] pointer-events-none" />
 
@@ -664,7 +664,7 @@ export function ClientDashboardPage() {
           transition={{ duration: 0.4, delay: 0.12 }}
           className="lg:col-span-7"
         >
-          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 h-full relative overflow-hidden group">
+          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-sm transition-all duration-300 h-full relative overflow-hidden group">
             <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-primary/10 blur-[70px] pointer-events-none group-hover:bg-primary/20 transition-colors duration-700" />
 
             <CardContent className="relative z-10 p-6 sm:p-8">
@@ -681,7 +681,7 @@ export function ClientDashboardPage() {
                     <p className="text-[13px] text-muted-foreground mt-1">{t("dashboard.onAccount")}</p>
                   </div>
                 </div>
-                <Link to="/cabinet/profile#topup" className="inline-flex h-13 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-7 text-[15px] font-medium text-primary-foreground shadow-lg transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
+                <Link to="/cabinet/profile#topup" className="inline-flex h-13 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-7 text-[15px] font-medium text-primary-foreground shadow-sm transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
                   <PlusCircle className="h-5 w-5 shrink-0" />
                   <span className="inline-flex items-center leading-none">{t("dashboard.topUpBalance")}</span>
                 </Link>
@@ -697,7 +697,7 @@ export function ClientDashboardPage() {
           transition={{ duration: 0.4, delay: 0.2 }}
           className="lg:col-span-5"
         >
-          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300 h-full relative overflow-hidden group">
+          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-sm transition-all duration-300 h-full relative overflow-hidden group">
             <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-primary/10 blur-[60px] pointer-events-none group-hover:bg-primary/20 transition-colors duration-700" />
 
             <CardContent className="relative z-10 p-6 sm:p-8 flex flex-col justify-center h-full">
@@ -739,7 +739,7 @@ export function ClientDashboardPage() {
                     <h3 className="text-lg font-bold text-foreground">{t("dashboard.connection")}</h3>
                   </div>
                   <p className="text-[14px] text-muted-foreground leading-relaxed">{t("dashboard.vpnReadyDesc")}</p>
-                  <Link to="/cabinet/subscribe" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] text-primary-foreground shadow-lg transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
+                  <Link to="/cabinet/subscribe" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] text-primary-foreground shadow-sm transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
                     <Link2 className="h-5 w-5 shrink-0" />
                     <span className="inline-flex items-center leading-none">{t("dashboard.setupVPN")}</span>
                   </Link>

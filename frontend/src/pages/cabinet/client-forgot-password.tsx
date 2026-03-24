@@ -18,7 +18,7 @@ export function ClientForgotPasswordPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const config = useCabinetConfig();
-  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? null };
+  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? "/favicon.svg" };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

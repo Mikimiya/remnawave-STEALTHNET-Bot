@@ -7,7 +7,7 @@ import { useIsMiniapp } from "@/hooks/use-is-miniapp";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { GlassSelect } from "@/components/ui/glass-select";
-import { LayoutDashboard, Package, User, LogOut, Shield, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X } from "lucide-react";
+import { LayoutDashboard, Package, User, LogOut, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X } from "lucide-react";
 import { useTheme, ACCENT_PALETTES, type ThemeMode, type ThemeAccent } from "@/contexts/theme";
 import { cn, formatMoney } from "@/lib/utils";
 import { FloatingChat } from "@/components/floating-chat";
@@ -398,6 +398,7 @@ function MobileCabinetShell() {
   const location = useLocation();
   const { state, logout, refreshProfile } = useClientAuth();
   const config = useCabinetConfig();
+  const { resolvedMode } = useTheme();
   const { t } = useTranslation();
   const navItems = useMemo(() => resolveNavItems(config), [config?.sellOptionsEnabled, config?.showProxyEnabled, config?.showSingboxEnabled, config?.ticketsEnabled, config?.customBuildConfig]);
   const [logoError, setLogoError] = useState(false);
@@ -434,7 +435,7 @@ function MobileCabinetShell() {
   }, [moreMenuOpen]);
 
   const serviceName = config?.serviceName ?? "";
-  const logo = config?.logo && !logoError ? config.logo : null;
+  const logo = config?.logo && !logoError ? config.logo : (resolvedMode === "dark" ? "/favicon-white.svg" : "/favicon.svg");
 
   return (
     <div className="min-h-svh flex flex-col bg-transparent min-w-0 overflow-x-hidden pb-36 relative">
@@ -443,15 +444,9 @@ function MobileCabinetShell() {
         <div className="absolute inset-0 bg-card/40 backdrop-blur-xl -z-10 pointer-events-none" />
         <div className="relative flex h-14 items-center justify-between gap-3 px-4 min-w-0 w-full max-w-7xl mx-auto">
           <Link to="/cabinet/dashboard" className="flex items-center gap-2.5 font-semibold text-base tracking-tight shrink-0 min-w-0">
-            {logo ? (
-              <span className="flex items-center justify-center h-8 px-1.5 rounded-lg dark:bg-transparent bg-zinc-900 shrink-0">
-                <img src={logo} alt="" className="h-6 max-w-[100px] object-contain" onError={() => setLogoError(true)} />
-              </span>
-            ) : (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary shadow-sm">
-                <Shield className="h-4 w-4" />
-              </span>
-            )}
+            <span className="flex items-center justify-center shrink-0">
+              <img src={logo} alt="" className="h-8 max-w-[140px] object-contain" onError={() => setLogoError(true)} />
+            </span>
             {serviceName ? <span className="truncate">{serviceName}</span> : null}
           </Link>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -637,6 +632,7 @@ function CabinetShell() {
   const location = useLocation();
   const { state, logout, refreshProfile } = useClientAuth();
   const config = useCabinetConfig();
+  const { resolvedMode } = useTheme();
   const { t } = useTranslation();
   const navItems = useMemo(() => resolveNavItems(config), [config?.sellOptionsEnabled, config?.showProxyEnabled, config?.showSingboxEnabled, config?.ticketsEnabled, config?.customBuildConfig]);
   const isMiniapp = useIsMiniapp();
@@ -660,7 +656,7 @@ function CabinetShell() {
     if (state.token) refreshProfile().catch(() => { });
   }, [state.token, refreshProfile]);
   const serviceName = config?.serviceName ?? "";
-  const logo = config?.logo && !logoError ? config.logo : null;
+  const logo = config?.logo && !logoError ? config.logo : (resolvedMode === "dark" ? "/favicon-white.svg" : "/favicon.svg");
   const headerBalance = state.client ? formatMoney(state.client.balance, state.client.preferredCurrency) : null;
 
   if (isMiniapp || isMobile) {
@@ -674,15 +670,9 @@ function CabinetShell() {
         <div className="absolute inset-0 bg-card/40 backdrop-blur-xl -z-10 pointer-events-none" />
         <div className="relative w-full max-w-7xl mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link to="/cabinet/dashboard" className="flex items-center gap-2.5 font-semibold text-lg tracking-tight shrink-0 hover:opacity-80 transition-opacity">
-            {logo ? (
-              <span className="flex items-center justify-center h-9 px-2 rounded-lg dark:bg-transparent bg-zinc-900 shrink-0">
-                <img src={logo} alt="" className="h-6 max-w-[110px] object-contain" onError={() => setLogoError(true)} />
-              </span>
-            ) : (
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/20 text-primary shadow-sm">
-                <Shield className="h-5 w-5" />
-              </span>
-            )}
+            <span className="flex items-center justify-center shrink-0">
+              <img src={logo} alt="" className="h-8 max-w-[140px] object-contain" onError={() => setLogoError(true)} />
+            </span>
             {serviceName ? <span className="hidden sm:inline truncate">{serviceName}</span> : null}
           </Link>
           <nav className="flex items-center gap-1 flex-wrap justify-center flex-1">

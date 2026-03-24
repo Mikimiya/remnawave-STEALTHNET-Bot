@@ -85,7 +85,7 @@ export function ClientRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const config = useCabinetConfig();
-  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? null };
+  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? "/favicon.svg" };
   const defaults = {
     lang: config?.defaultLanguage || "ru",
     currency: (config?.defaultCurrency || "usd").toLowerCase(),

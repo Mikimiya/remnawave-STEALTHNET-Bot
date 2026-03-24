@@ -1,0 +1,50 @@
+﻿<svg width="360" height="120" viewBox="0 0 360 120" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    @font-face {
+      font-family: 'Orbitron';
+      font-weight: 700;
+      src: url(data:font/woff2;base64,d09GMgABAAAAAARgABAAAAAACVwAAAQGAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGiIbgTQcKAZgP1NUQVQqAHwRCAqGRIRhCxoAATYCJAMwBCAFhAoHIAwHG0cHyK4GbGM65EVR0mJ4QvSy1RG/zwNGOQNl8Dzp/XfuJHnIRGvlL8xKdBZSBakD3cnL79f2Ti2knQumsi+2Ey2VkAiFEKFGeJ7+vp23gbaAFElCO0WFm8YpBNrHTJqbJrr4/d9vwDn/YQEmrqmLFmpswKeJTyRToy2icThcAz9Q6SIxLXVAG9BuQMMH0p1tw/1NEL3RKI2/BAEOAFAMQhEmi9A0IcCWV4NtU/fwEkLXzn0LQkzAfwTIpXvXAg8QIExKgkgQWTlA0iCaV/cu7Vs1rcRGUQxg0RTFzls67ym2OM2kJPOJzgeKlQd0LhI6F4hEXlISeSqZn4TOR8KKc8EWysAlx3wAZBWbWiN1AifUW7UCaITAyJFGaUcjLZR/T4aEbzZw+xwXxY4+AwJQG3UNyMlG3v/MkJYAWdmePZW+AFAEIF2dAAAFDJCWnYC0HHoB0ouwi6lly4ET5y7dkBk4YAI4/hb5OOmIQw7Yb6/N1lub4EsIyX8+hmO/jIAA8ANkCQBgAgAJPYqBziTUzPHttIHlBUkva+ClC/TsK+fEPvn8VR3Ge2/B9toaI+jh43E5YnitdFtNtzP4trZK9b3TCdPuY24LBOdcPhv4z1yy36lhhRpabjuzl0bly/w2ujmh4VsJOF95iMmCg2JXLEd8nI6DfXTrtl1mL7tNqyshizo4NxBMIEkFwuHUJumrsSF1C7QML3E+fN3BsbDD67BWtA5ypZoU5A5SIuanFVHqjdumb9uYOmJuivJt/Zp3YejW8GqEiwjE1nzMTouOul40Jo55PmcPsB0jWQem7bJGWD2hBzTDn/o5/jjflau1fV0AcS7s+MVp/vXYwDPcOrJGjpbpzryDVXQtyteIPOd37s4HrX5yeM4dD+ZZV3v1PxqzXjGt/ehhNa+eft1e8bD963wVw9tNpEup8ios3bOY3hDmGmTnzxxqb/S0G88cOPXuV7WBeTusEL6WE5BNbqdUMKfkDwYAAUrNcr9wto5+5a8Jw3gHcMEIlgDgcY6mS1LHRkbjHiJGARB8MLt1mqF1D4QG65zyRdpWltn6T8WWjblWndlWmelWgdn6Xdq+hmTdTr7UpVUP0CSAoymnWhxn7aYISBrCTnoS+MZmxhOBL56SMJtnKO6eZ8psFW+RM/gYKcAn4MBknoH1N4hKpug70fVO1dfFLGXrmOHTNdLVo2IW1FBRU1NfT0Xd/NtacOzEsS0L52tQ+9nGDaxtogvRhRpnvmoWuqQgCMF0SiIa8rHesWaAXAp+hQvlzkHva+uZV1UlF+KKgXcVHy5TVfksYiBvZAOESarYz80rQaP9vxydIz2ka4h8QtuYpQ8de2Mi81ACdkZChV0j6/9rSD8i/6PNeQ==) format('woff2');
+    }
+    @font-face {
+      font-family: 'Orbitron';
+      font-weight: 400;
+      src: url(data:font/woff2;base64,d09GMgABAAAAAARkABAAAAAACXgAAAQIAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGiIbgTQcKAZgP1NUQVQuAHwRCAqGRIRfCxoAATYCJAMwBCAFhCIHIAwHG2EHyK4GbKcbcGQNtWJFDSdOvvHwv1jjBc9TXvV+JRmkoiXRPdbKV/NI8AzptH00NlEP6VHRpIfYI5oowUOGbSGPh/iTvX/3R/PNdDDhRQWVp+OZpoH30S7BEN4yZEOk/wF8YU8cM120pTc24Gg30YlEh0WFDYejDacDKqr6KJC/1wdsfqHHB/Aftg3aqj7PfxIBDgBQDEIRJovQNCHAVpMFae89MB7eO2fSGHhMQCSSAHkVTBgDAwgQJiWGiCEqooBY48x0ddRkhDjokCiKASyaotj1ia5PFBvo+kOJRR5t1XvnW6ICZxNj6jMVeS0WKhJeq56vF1+bAiryA2sWxxtjhizDgrpUMgQG+JPIgaWlY3AL0d+Tp/JPDzh/lgvKFf0EAlC7ug9URSL7f+1QEhFURPoUDZskAIoBVBNZBuoHgAIGKIlMQEkUwxAoTYAsSg9xWUUVNU1jC7giUcah8FO4M4476rBDDthordUJzCakIvlQjqeVRSBA4B9khQCACQCEehXDfw6hFse3SwaWF8R6FQOvVKAX3DwoxvRDt7SPd21HnTu0j558PC5HPFsrXaTJv8N62EpUTBaHTHuK2S3oLrxxgAT2X7dzI+WuvGen7YyT4qfqFHjcsPBOJYDIbdtTaRwqAEpdsRzxcXoQGqEzsqzsYXZmeoJII4FQefeiGNMv3dPuACCzV+EMKl3vtLQZjmjsuTXhAuo8388Runx/tf94Vu3PEkOJQWHwzBbg2+EZy0Ndv9wL3/vSNYR7hLu8052HScPCRoUyPFzwrguuMdafOCnk2vkbQP8sND0dOkyr/TjeH8qM+Fhabt1Lrpb926Nqv4l2amc8CwqCR9VC/8ACaq5b6H6oy1TUqP/Eh90edMsVHPe7JSccfZ4Wanfn9oq4Z1AYjJxZTVS1cLWo7Grp1bP/aF39j9Napxcrw6rUN/Hbwjm/Mj85lhvO5aeDOBRAnunhFyYACFC6f78v25Lld/wd2XgHcNNwm0GAx1XiVkZ6RaKs3sZdIIoCIPhiButWg/jfAIiM385pv5TM1rjiv/ZZCXd2xZUdcWQ7XPFXyb6KGrGLeq0xtjhMC0TgiEPVA2WsqykCYk1AJj0W+ONkTBWBD1XxrKYaWhtRTVUlqJbydJQoVXFoBByoZYy/cRIwNTaxV7TVN7W3ha3oVYCxg4WerQawtTOFrSAWBiYm5l4cUGurt+ZVUFQQ552rPdW5ZXMUtnaxXbsbsYwfdkFqOQB0W5W6FEZnwKC9M+zguyfwvtyIapzFe2s7HkZGY2XdxEGfwQC2ZMxlgwXQW6ESyoCjXljNV9NBTv0lp7JuB2wdgSEk0Ua0jm8s6FkCHojEurMkDMgMfpHVNZd5XCKzZy4GAAA=) format('woff2');
+    }
+  </style>
+  <defs>
+    <radialGradient id="coreGradient" cx="35%" cy="35%">
+      <stop offset="0%" stop-color="#3bc9db" />
+      <stop offset="100%" stop-color="#0ea5e9" />
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="underline" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3bc9db" />
+      <stop offset="100%" stop-color="#0ea5e9" />
+    </linearGradient>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c8e6f0" />
+      <stop offset="50%" stop-color="#4db8cc" />
+      <stop offset="100%" stop-color="#1a8fa8" />
+    </linearGradient>
+    <!-- 切割遮罩：上半+下半，中间留3px透明缝隙 -->
+    <clipPath id="sliceMask">
+      <rect x="-20" y="-50" width="400" height="48.5"/>
+      <rect x="-20" y="1.5" width="400" height="70"/>
+    </clipPath>
+  </defs>
+
+  <!-- Text -->
+  <g transform="translate(16, 48)" clip-path="url(#sliceMask)">
+    <text x="0" y="0" font-family="Orbitron, sans-serif" font-size="72" font-weight="700" letter-spacing="-1" fill="url(#textGradient)" dominant-baseline="middle">Coolgo</text>
+  </g>
+  <g transform="translate(16, 48)">
+    <text x="6" y="44" font-family="Orbitron, sans-serif" font-size="16" font-weight="400" letter-spacing="6" fill="#ffffff" opacity="0.75">NETWORK</text>
+    <rect x="0" y="58" width="338" height="2.5" fill="url(#underline)" opacity="0.6" rx="1.2"/>
+  </g>
+</svg>

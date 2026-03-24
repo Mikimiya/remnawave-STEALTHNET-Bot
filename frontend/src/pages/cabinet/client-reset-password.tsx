@@ -25,7 +25,7 @@ export function ClientResetPasswordPage() {
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
   const config = useCabinetConfig();
-  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? null };
+  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? "/favicon.svg" };
 
   useEffect(() => {
     if (!token) {

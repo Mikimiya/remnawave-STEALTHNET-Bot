@@ -16,6 +16,6 @@
   <g transform="translate(10, 10)">
     <circle cx="35" cy="50" r="14" fill="url(#coreGradient)" filter="url(#glow)"/>
     <circle cx="32" cy="47" r="5" fill="#ffffff" opacity="0.4"/>
-    <path d="M 65 20 A 35 35 0 0 1 65 80" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+    <path d="M 65 20 A 35 35 0 0 1 65 80" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round"/>
   </g>
 </svg>

@@ -213,7 +213,7 @@ const zh: typeof import("./ru").default = {
     resetNoReset: "不重置",
     planInfoBtn: "套餐说明",
     planInfoStandard: "STANDARD · 标准路线：接入 BGP 中继节点",
-    planInfoPremium: "PREMIUM · 高级路线：BGP 中继 + IEPL 专线节点",
+    planInfoPremium: "PREMIUM · 高级路线：BGP 中继 + IEPL 专线节点,含家宽节点",
     planInfoNoReset: "NO RESET 标记：固定流量包，不会重置",
     balancePaySuccess: "套餐「{{name}}」已激活！已从余额扣除 {{amount}} {{currency}}。",
     overrideWarning: "你当前有一个有效订阅。购买新套餐将覆盖当前的流量和有效期。",

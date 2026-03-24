@@ -29,7 +29,7 @@ export function ClientLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const config = useCabinetConfig();
-  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? null };
+  const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? "/favicon.svg" };
   const telegramBotUsername = config?.telegramBotUsername ?? null;
   const googleEnabled = !!config?.googleLoginEnabled;
   const googleClientId = config?.googleClientId ?? null;
