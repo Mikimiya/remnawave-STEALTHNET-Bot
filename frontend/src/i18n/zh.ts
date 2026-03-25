@@ -211,6 +211,7 @@ const zh: typeof import("./ru").default = {
     resetWeek: "每周重置",
     resetMonth: "每月重置",
     resetNoReset: "不重置",
+    subGroup: "规格：",
     planInfoBtn: "套餐说明",
     planInfoStandard: "STANDARD · 标准路线：接入 BGP 中继节点",
     planInfoPremium: "PREMIUM · 高级路线：BGP 中继 + IEPL 专线节点,含家宽节点",

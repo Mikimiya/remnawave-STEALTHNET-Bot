@@ -354,26 +354,26 @@ export function ClientSubscribePage() {
           >
             <Card className="border-slate-200/50 dark:border-white/10 bg-white/40 dark:bg-black/20 backdrop-blur-xl overflow-hidden group hover:bg-white/60 dark:hover:bg-black/30 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl">
               <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <CardHeader className="pb-3 relative z-10">
-                <CardTitle className="text-lg flex items-center gap-3 text-slate-900 dark:text-white">
-                  <div className="p-2 rounded-lg bg-slate-100/50 dark:bg-white/5 ring-1 ring-slate-200/50 dark:ring-white/10 group-hover:ring-primary/30 group-hover:text-primary transition-all duration-300">
-                    <Smartphone className="h-5 w-5" />
+              <CardHeader className="pb-2 relative z-10">
+                <CardTitle className="text-base flex items-center gap-2.5 text-slate-900 dark:text-white">
+                  <div className="p-1.5 rounded-lg bg-slate-100/50 dark:bg-white/5 ring-1 ring-slate-200/50 dark:ring-white/10 group-hover:ring-primary/30 group-hover:text-primary transition-all duration-300">
+                    <Smartphone className="h-4 w-4" />
                   </div>
                   {app.name}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6 relative z-10">
+              <CardContent className="space-y-5 relative z-10">
                 {app.blocks?.map((block, blockIndex) => (
-                  <div key={blockIndex} className="space-y-3">
-                    <div className="space-y-1.5">
-                      <h3 className="text-sm font-semibold text-slate-800 dark:text-foreground/90 flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
+                  <div key={blockIndex} className="space-y-2.5">
+                    <div className="space-y-1">
+                      <h3 className="text-[13px] font-semibold text-slate-800 dark:text-foreground/90 flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary shrink-0">
                           {blockIndex + 1}
                         </span>
                         {getText(block.title, locale)}
                       </h3>
                       {block.description && (
-                        <p className="text-sm text-slate-600 dark:text-muted-foreground pl-7 leading-relaxed">
+                        <p className="text-[12px] text-slate-600 dark:text-muted-foreground pl-7 leading-relaxed">
                           {getText(block.description, locale)}
                         </p>
                       )}
@@ -478,7 +478,7 @@ export function ClientSubscribePage() {
       className="relative group"
     >
       <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/30 to-primary/10 rounded-2xl blur opacity-50 group-hover:opacity-75 transition duration-500" />
-      <div className="relative rounded-2xl border border-slate-200/50 dark:border-white/10 bg-white/60 dark:bg-black/40 backdrop-blur-2xl p-5 sm:p-6 shadow-2xl overflow-hidden transition-all duration-300 hover:shadow-primary/5">
+      <div className="relative rounded-2xl border border-slate-200/50 dark:border-white/10 bg-white/60 dark:bg-black/40 backdrop-blur-2xl p-4 sm:p-6 shadow-2xl overflow-hidden transition-all duration-300 hover:shadow-primary/5">
         {/* Decorative background elements */}
         <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-primary/20 rounded-full blur-2xl" />
         <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl" />

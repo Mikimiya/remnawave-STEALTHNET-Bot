@@ -19,6 +19,7 @@ import {
   RotateCcw,
   Info,
   AlertTriangle,
+  Layers,
 } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
@@ -915,20 +916,20 @@ export function ClientTariffsPage() {
 
                   return (
                     <div className="space-y-3">
-                      {/* Sub-group pills */}
+                      {/* Sub-group selector */}
                       {hasSubGroups && (
-                        <div className="overflow-hidden">
-                          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                        <div className="-mx-4 px-4 overflow-x-auto no-scrollbar">
+                          <div className="inline-flex gap-2 pb-1">
                             {subGroups.map((sg, sgIdx) => (
                               <button
                                 key={sg.id}
                                 type="button"
                                 onClick={() => setSelectedSubGroupIndex((prev) => ({ ...prev, [currentCat.id]: sgIdx }))}
                                 className={cn(
-                                  "shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-200",
+                                  "shrink-0 px-4 py-2 rounded-xl text-[12px] font-bold border transition-all duration-200 whitespace-nowrap",
                                   selectedSgIdx === sgIdx
-                                    ? "bg-foreground text-background border-foreground shadow-sm"
-                                    : "bg-card/30 border-border/30 text-muted-foreground"
+                                    ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/25"
+                                    : "bg-card/40 border-border/50 text-muted-foreground"
                                 )}
                               >
                                 {sg.name}
@@ -964,43 +965,45 @@ export function ClientTariffsPage() {
                             <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-primary/70 pointer-events-none" />
                           )}
 
-                          <div className="relative flex flex-col p-5 gap-4">
+                          <div className="relative flex flex-col p-4 gap-3">
                             {/* Header row */}
-                            <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center justify-between gap-2">
                               <p className={cn(
-                                "text-[15px] font-bold",
+                                "text-[14px] font-bold truncate",
                                 isPopular ? "text-primary-foreground/75" : "text-muted-foreground"
                               )}>
                                 {tariffItem.name}
                               </p>
                               {isPopular && (
-                                <span className="shrink-0 flex items-center gap-1 bg-primary-foreground/20 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-primary-foreground">
-                                  <Flame className="h-3 w-3" />
+                                <span className="shrink-0 flex items-center gap-1 bg-primary-foreground/20 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-primary-foreground">
+                                  <Flame className="h-2.5 w-2.5" />
                                   {t("tariffs.popular")}
                                 </span>
                               )}
                             </div>
 
-                            {/* Price — HERO */}
-                            <div>
-                              <p className={cn(
-                                "font-black tabular-nums leading-none",
-                                isPopular ? "text-primary-foreground" : "text-foreground"
-                              )} style={{ fontSize: 52 }}>
-                                {formatMoney(tariffItem.price, tariffItem.currency)}
-                              </p>
-                              {pricePerGB && (
+                            {/* Price + specs row — horizontal layout for mobile */}
+                            <div className="flex items-end justify-between gap-3">
+                              <div className="min-w-0">
                                 <p className={cn(
-                                  "text-[13px] font-medium mt-1.5",
-                                  isPopular ? "text-primary-foreground/55" : "text-muted-foreground"
-                                )}>
-                                  {pricePerGB} / GB
+                                  "font-black tabular-nums leading-none",
+                                  isPopular ? "text-primary-foreground" : "text-foreground"
+                                )} style={{ fontSize: 40 }}>
+                                  {formatMoney(tariffItem.price, tariffItem.currency)}
                                 </p>
-                              )}
+                                {pricePerGB && (
+                                  <p className={cn(
+                                    "text-[11px] font-medium mt-1",
+                                    isPopular ? "text-primary-foreground/55" : "text-muted-foreground"
+                                  )}>
+                                    {pricePerGB} / GB
+                                  </p>
+                                )}
+                              </div>
                             </div>
 
-                            {/* Spec chips */}
-                            <div className="flex flex-wrap gap-2">
+                            {/* Spec chips — compact grid */}
+                            <div className="flex flex-wrap gap-1.5">
                               {[
                                 { icon: <Calendar className="h-3 w-3" />, label: `${tariffItem.durationDays} ${t("tariffs.daysShort")}` },
                                 { icon: <Wifi className="h-3 w-3" />, label: trafficLabel },
@@ -1012,10 +1015,10 @@ export function ClientTariffsPage() {
                                   : []),
                               ].map((chip, ci) => (
                                 <span key={ci} className={cn(
-                                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold",
+                                  "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
                                   isPopular
                                     ? "bg-primary-foreground/15 text-primary-foreground"
-                                    : "bg-background/60 border border-border/50 text-foreground"
+                                    : "bg-background/60 border border-border/40 text-foreground"
                                 )}>
                                   {chip.icon}{chip.label}
                                 </span>
@@ -1024,7 +1027,7 @@ export function ClientTariffsPage() {
 
                             {tariffItem.description?.trim() && (
                               <p className={cn(
-                                "text-[12px] leading-relaxed line-clamp-2",
+                                "text-[11px] leading-relaxed line-clamp-2",
                                 isPopular ? "text-primary-foreground/55" : "text-muted-foreground"
                               )}>
                                 {tariffItem.description}
@@ -1035,7 +1038,7 @@ export function ClientTariffsPage() {
                             {token ? (
                               <Button
                                 className={cn(
-                                  "w-full h-13 rounded-2xl font-bold text-base",
+                                  "w-full h-12 rounded-2xl font-bold text-[14px]",
                                   isPopular
                                     ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
                                     : "shadow-md"
@@ -1046,11 +1049,11 @@ export function ClientTariffsPage() {
                               </Button>
                             ) : (
                               <div className={cn(
-                                "w-full h-13 rounded-2xl flex items-center justify-center",
+                                "w-full h-12 rounded-2xl flex items-center justify-center",
                                 isPopular ? "bg-primary-foreground/10" : "bg-muted/40 border border-border/50"
                               )}>
                                 <span className={cn(
-                                  "text-[12px] font-bold uppercase tracking-wider",
+                                  "text-[11px] font-bold uppercase tracking-wider",
                                   isPopular ? "text-primary-foreground/60" : "text-muted-foreground"
                                 )}>
                                   {t("tariffs.inBot")}
@@ -1096,26 +1099,32 @@ export function ClientTariffsPage() {
 
                     {/* Sub-group tabs */}
                     {hasSubGroups && (
-                      <div className="flex gap-2 mb-6 flex-wrap">
-                        {subGroups.map((sg, sgIdx) => (
-                          <button
-                            key={sg.id}
-                            type="button"
-                            onClick={() => setSelectedSubGroupIndex((prev) => ({ ...prev, [cat.id]: sgIdx }))}
-                            className={cn(
-                              "px-4 py-2 rounded-full text-sm font-bold border transition-all duration-200",
-                              selectedSgIdx === sgIdx
-                                ? "bg-foreground text-background border-foreground shadow-md"
-                                : "bg-card/50 border-border/50 text-muted-foreground hover:bg-card/70 hover:text-foreground"
-                            )}
-                          >
-                            {sg.name}
-                          </button>
-                        ))}
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground shrink-0">
+                          <Layers className="h-4 w-4 text-primary" />
+                          <span>{t("tariffs.subGroup")}</span>
+                        </div>
+                        <div className="rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm p-1 flex gap-1 flex-wrap">
+                          {subGroups.map((sg, sgIdx) => (
+                            <button
+                              key={sg.id}
+                              type="button"
+                              onClick={() => setSelectedSubGroupIndex((prev) => ({ ...prev, [cat.id]: sgIdx }))}
+                              className={cn(
+                                "px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200",
+                                selectedSgIdx === sgIdx
+                                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                              )}
+                            >
+                              {sg.name}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
 
-                    <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 items-stretch">
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 items-stretch">
                       {displayTariffs.map((tariffItem, tidx) => {
                         const catLength = displayTariffs.length;
                         const isPopular = catLength >= 2 && tidx === 1;
@@ -1129,17 +1138,17 @@ export function ClientTariffsPage() {
                           <div
                             key={tariffItem.id}
                             className={cn(
-                              "relative rounded-3xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1",
+                              "relative rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1",
                               isPopular
-                                ? "shadow-2xl shadow-primary/30 ring-2 ring-primary/60 hover:-translate-y-2"
-                                : "border border-border/50 shadow-lg hover:shadow-xl bg-card/50 backdrop-blur-xl"
+                                ? "shadow-xl shadow-primary/20 ring-2 ring-primary/50 hover:-translate-y-2"
+                                : "border border-border/50 shadow-md hover:shadow-lg bg-card/50 backdrop-blur-xl"
                             )}
                           >
                             {isPopular && (
                               <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-primary/70 pointer-events-none" />
                             )}
 
-                            <div className="relative flex flex-col flex-1 p-6 gap-5">
+                            <div className="relative flex flex-col flex-1 p-5 gap-4">
                               {/* Header */}
                               <div className="flex items-start justify-between gap-2 min-h-[2rem]">
                                 <p className={cn(

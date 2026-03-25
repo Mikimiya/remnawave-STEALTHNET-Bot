@@ -767,7 +767,7 @@ function CabinetShell() {
           </div>
         </div>
       </header>
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 overflow-x-hidden transition-all duration-300">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 overflow-x-clip transition-all duration-300">
         <Outlet />
       </main>
     </div>

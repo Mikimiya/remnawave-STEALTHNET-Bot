@@ -20,7 +20,6 @@ import {
   Users,
   
   AlertCircle,
-  Zap
 } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { useCabinetConfig } from "@/contexts/cabinet-config";
@@ -297,155 +296,167 @@ export function ClientDashboardPage() {
           </section>
         ) : (
           <section className="min-w-0">
-            <div className="rounded-[1.85rem] border border-border/50 bg-card/45 p-4 shadow-sm backdrop-blur-xl">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                      <Zap className="h-3 w-3 shrink-0" />
-                      {t("dashboard.subscriptionStatus")}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                      {t("dashboard.active")}
-                    </span>
+            <div className="rounded-[1.85rem] border border-border/50 bg-card/45 p-4 shadow-sm backdrop-blur-xl relative overflow-hidden">
+              {/* Decorative glow */}
+              <div className="absolute -top-12 -right-12 h-28 w-28 rounded-full bg-primary/15 blur-[50px] pointer-events-none" />
+
+              <div className="relative z-10">
+                {/* Header: icon + name + active badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Package className="h-5 w-5" />
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-[17px] font-bold tracking-tight text-foreground leading-snug truncate"
+                      title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                    >
+                      {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                    </p>
+                    {isTrial ? (
+                      <div className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{t("dashboard.trialLimitedNodesShort")}</span>
+                      </div>
+                    ) : tariffCategoryName ? (
+                      <p className="text-[12px] text-muted-foreground truncate">{tariffCategoryName}</p>
+                    ) : null}
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+                    {t("dashboard.active")}
+                  </span>
+                </div>
 
-                  <p
-                    className="mt-3 text-xl font-bold tracking-tight text-foreground leading-tight break-words"
-                    title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
-                  >
-                    {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
-                  </p>
-
-                  {isTrial ? (
-                    <div className="mt-2 inline-flex max-w-full items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                      <AlertCircle className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{t("dashboard.trialLimitedNodesShort")}</span>
+                {/* Info grid: 2x2 compact layout */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {daysLeft != null && (
+                    <div className="flex items-center gap-2 rounded-xl bg-background/40 px-3 py-2">
+                      <Timer className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="text-[12px] font-semibold text-foreground truncate">
+                        {t("dashboard.daysLeft_many", { count: daysLeft })}
+                      </span>
                     </div>
-                  ) : tariffCategoryName ? (
-                    <p className="mt-1 text-[13px] text-muted-foreground break-words">{tariffCategoryName}</p>
-                  ) : null}
-                </div>
-
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <Package className="h-5 w-5" />
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {daysLeft != null && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-background/50 px-3 py-1.5 text-[12px] font-medium text-foreground">
-                    <Timer className="h-3.5 w-3.5 text-primary" />
-                    {t("dashboard.daysLeft_many", { count: daysLeft })}
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-background/50 px-3 py-1.5 text-[12px] font-medium text-foreground">
-                  <Monitor className="h-3.5 w-3.5 text-primary" />
-                  {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "∞"}
-                </span>
-                {subParsed.expireAt && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-background/50 px-3 py-1.5 text-[12px] font-medium text-foreground">
-                    <Calendar className="h-3.5 w-3.5 text-primary" />
-                    {formatDate(subParsed.expireAt, lang)}
-                  </span>
-                )}
-                {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-background/50 px-3 py-1.5 text-[12px] font-medium text-foreground">
-                    <RotateCcw className="h-3.5 w-3.5 text-primary" />
-                    {t(RESET_STRATEGY_I18N[trafficResetStrategy])}
-                  </span>
-                )}
-              </div>
-
-              <div className="mt-4 rounded-[1.35rem] bg-background/35 px-3.5 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      {t("dashboard.traffic")}
-                    </p>
-                    <p className="mt-1 text-[14px] font-semibold text-foreground break-words">
-                      {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
-                        ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
-                        : t("dashboard.unlimited")}
-                    </p>
-                  </div>
-
-                  {trafficPercent != null && (
-                    <span className="shrink-0 text-sm font-semibold text-primary">
-                      {trafficPercent}%
+                  )}
+                  <div className="flex items-center gap-2 rounded-xl bg-background/40 px-3 py-2">
+                    <Monitor className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="text-[12px] font-semibold text-foreground">
+                      {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "∞"} {t("dashboard.devices")}
                     </span>
+                  </div>
+                  {subParsed.expireAt && (
+                    <div className="flex items-center gap-2 rounded-xl bg-background/40 px-3 py-2">
+                      <Calendar className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="text-[12px] font-semibold text-foreground truncate">
+                        {formatDate(subParsed.expireAt, lang)}
+                      </span>
+                    </div>
+                  )}
+                  {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
+                    <div className="flex items-center gap-2 rounded-xl bg-background/40 px-3 py-2">
+                      <RotateCcw className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="text-[12px] font-semibold text-foreground truncate">
+                        {t(RESET_STRATEGY_I18N[trafficResetStrategy])}
+                      </span>
+                    </div>
                   )}
                 </div>
 
-                {trafficPercent != null && (
-                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted/30">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${trafficPercent}%` }}
-                      transition={{ duration: 0.8, ease: "easeOut" }}
-                      className="h-full rounded-full bg-primary"
-                    />
+                {/* Traffic section */}
+                <div className="mt-3 rounded-[1.2rem] bg-background/35 px-3.5 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <Wifi className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground leading-none">
+                          {t("dashboard.traffic")}
+                        </p>
+                        <p className="mt-0.5 text-[13px] font-bold text-foreground truncate">
+                          {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
+                            ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
+                            : t("dashboard.unlimited")}
+                        </p>
+                      </div>
+                    </div>
+
+                    {trafficPercent != null && (
+                      <span className="shrink-0 text-lg font-bold text-primary tabular-nums">
+                        {trafficPercent}%
+                      </span>
+                    )}
                   </div>
-                )}
+
+                  {trafficPercent != null && (
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${trafficPercent}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </section>
         )}
 
         {/* 2. Как подключиться — ссылка и кнопка */}
-        <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl p-5 shadow-sm overflow-hidden transition-all duration-300">
-          <h2 className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-4">
+        <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl p-4 shadow-sm overflow-hidden transition-all duration-300">
+          <h2 className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-3">
              <div className="p-1.5 bg-primary/20 rounded-lg">
-              <Wifi className="h-4 w-4 shrink-0 text-primary" />
+              <Wifi className="h-3.5 w-3.5 shrink-0 text-primary" />
             </div>
             {t("dashboard.connection")}
           </h2>
           {vpnUrl ? (
-            <div className="space-y-4">
-              <p className="text-[14px] text-muted-foreground leading-relaxed">{t("dashboard.connectDesc")}</p>
+            <div className="space-y-3">
+              <p className="text-[13px] text-muted-foreground leading-relaxed">{t("dashboard.connectDesc")}</p>
               <div className="flex gap-2 min-w-0">
-                <code className="flex-1 min-w-0 truncate rounded-xl bg-background/50 border border-border/50 px-3 py-2.5 text-xs font-mono flex items-center text-foreground/80" title={vpnUrl}>
+                <code className="flex-1 min-w-0 truncate rounded-xl bg-background/50 border border-border/50 px-3 py-2 text-[11px] font-mono flex items-center text-foreground/80" title={vpnUrl}>
                   {vpnUrl}
                 </code>
                 <Button
                   size="icon"
                   variant="outline"
-                  className="shrink-0 h-auto w-11 rounded-xl bg-background/50 hover:bg-background/80 transition-transform hover:scale-105"
+                  className="shrink-0 h-auto w-10 rounded-xl bg-background/50 hover:bg-background/80 transition-transform hover:scale-105"
                   onClick={() => {
                     navigator.clipboard.writeText(vpnUrl);
                     window.Telegram?.WebApp?.showPopup?.({ title: t("common.copied"), message: t("subscribe.linkCopied") });
                   }}
                 >
-                  <Copy className="h-4 w-4" />
+                  <Copy className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <Link to="/cabinet/subscribe" className="inline-flex w-full h-11 items-center justify-center gap-2.5 rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
-                <Link2 className="h-5 w-5 shrink-0" />
+              <Link to="/cabinet/subscribe" className="inline-flex w-full h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
+                <Link2 className="h-4 w-4 shrink-0" />
                 <span className="inline-flex items-center leading-none">{t("dashboard.connectVPN")}</span>
               </Link>
             </div>
           ) : showTrial ? (
-            <div className="space-y-4 text-center">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10 text-green-600 mb-2">
-                 <Gift className="h-6 w-6" />
+            <div className="space-y-3 text-center">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10 text-green-600 mb-1">
+                 <Gift className="h-5 w-5" />
               </div>
-              <p className="text-[14px] text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 {t("dashboard.trialDesc", { days: formatDays(trialDays, lang) })}
               </p>
-              <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white shadow-sm h-12 rounded-xl hover:scale-[1.02] transition-transform duration-300" onClick={activateTrial} disabled={trialLoading}>
-                {trialLoading ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" /> : <Gift className="h-5 w-5 shrink-0" />}
-                <span className="font-medium text-base">{t("dashboard.activateTrial")}</span>
+              <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white shadow-sm h-11 rounded-xl hover:scale-[1.02] transition-transform duration-300" onClick={activateTrial} disabled={trialLoading}>
+                {trialLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Gift className="h-4 w-4 shrink-0" />}
+                <span className="font-medium text-[14px]">{t("dashboard.activateTrial")}</span>
               </Button>
               {trialError && <p className="text-sm text-destructive break-words text-center">{trialError}</p>}
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="p-4 bg-primary/10 rounded-2xl border border-primary/20 text-[14px] text-primary flex gap-3 items-start">
-                <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div className="space-y-3">
+              <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 text-[13px] text-primary flex gap-2.5 items-start">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <p className="leading-relaxed">{t("dashboard.noLinkDesc")}</p>
               </div>
-              <Link to="/cabinet/tariffs" className="inline-flex w-full h-11 items-center justify-center rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
+              <Link to="/cabinet/tariffs" className="inline-flex w-full h-10 items-center justify-center rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
                 <span className="inline-flex items-center leading-none">{t("dashboard.choosePlan")}</span>
               </Link>
             </div>
@@ -453,13 +464,13 @@ export function ClientDashboardPage() {
         </section>
 
         {/* 3. Баланс */}
-        <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl p-6 shadow-sm overflow-hidden flex items-center justify-between transition-all duration-300">
-          <div>
-            <h2 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-1">{t("dashboard.myBalance")}</h2>
-            <p className="text-3xl font-bold tracking-tight text-foreground">{formatMoney(client.balance, client.preferredCurrency)}</p>
+        <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl px-4 py-4 shadow-sm overflow-hidden flex items-center justify-between gap-3 transition-all duration-300">
+          <div className="min-w-0">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-0.5">{t("dashboard.myBalance")}</h2>
+            <p className="text-2xl font-bold tracking-tight text-foreground truncate">{formatMoney(client.balance, client.preferredCurrency)}</p>
           </div>
-          <Link to="/cabinet/profile#topup" className="inline-flex h-11 items-center justify-center gap-2.5 rounded-xl bg-primary px-4 text-[14px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
-            <PlusCircle className="h-5 w-5 shrink-0" />
+          <Link to="/cabinet/profile#topup" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
+            <PlusCircle className="h-4 w-4 shrink-0" />
             <span className="inline-flex items-center leading-none">{t("dashboard.topUp")}</span>
           </Link>
         </section>

@@ -211,6 +211,7 @@ const ru = {
     resetWeek: "Сброс еженедельно",
     resetMonth: "Сброс ежемесячно",
     resetNoReset: "Без сброса",
+    subGroup: "Тариф",
     planInfoBtn: "О тарифах",
     planInfoStandard: "STANDARD · Стандартный маршрут: BGP-транзитные узлы",
     planInfoPremium: "PREMIUM · Премиум маршрут: BGP-транзит + IEPL выделенная линия",

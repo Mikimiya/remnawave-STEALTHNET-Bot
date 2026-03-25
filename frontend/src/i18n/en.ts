@@ -211,6 +211,7 @@ const en: typeof import("./ru").default = {
     resetWeek: "Weekly reset",
     resetMonth: "Monthly reset",
     resetNoReset: "No reset",
+    subGroup: "Plan",
     planInfoBtn: "Plan Info",
     planInfoStandard: "STANDARD · Standard routes: BGP relay nodes",
     planInfoPremium: "PREMIUM · Premium routes: BGP relay + IEPL dedicated line nodes",
