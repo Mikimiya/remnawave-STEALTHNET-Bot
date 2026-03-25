@@ -13,6 +13,7 @@ import {
   remnaGetUserByEmail,
   extractRemnaUuid,
   remnaUsernameFromClient,
+  remnaResetUserTraffic,
 } from "../remna/remna.client.js";
 
 export type ActivationResult = { ok: true } | { ok: false; error: string; status: number };
@@ -108,6 +109,10 @@ export async function activateTariffForClient(
     if (updateRes.error) {
       return { ok: false, error: updateRes.error, status: updateRes.status >= 400 ? updateRes.status : 500 };
     }
+    // 续费时重置已使用流量，使新的流量上限完整可用
+    await remnaResetUserTraffic(client.remnawaveUuid).catch((err) => {
+      console.error("[TariffActivation] Failed to reset traffic for", client.remnawaveUuid, err);
+    });
     // Не вызываем add-users: по api-1.yaml эндпоинт добавляет ВСЕХ пользователей в сквад.
   } else {
     let existingUuid: string | null = null;
@@ -125,6 +130,9 @@ export async function activateTariffForClient(
     }
 
     const expireAt = calculateExpireAt(currentExpireAt, tariff.durationDays);
+
+    // 记录是否为已存在用户（续费场景需要重置流量，新建用户不需要）
+    const isExistingUser = !!existingUuid;
 
     if (!existingUuid) {
       const displayUsername = remnaUsernameFromClient({
@@ -150,6 +158,12 @@ export async function activateTariffForClient(
     const currentSquads = existingUuid ? extractCurrentSquads((await remnaGetUser(existingUuid)).data) : [];
     const activeInternalSquads = resolveSquads(tariff.internalSquadUuids, currentSquads);
     await remnaUpdateUser({ uuid: existingUuid, expireAt, trafficLimitBytes, trafficLimitStrategy, hwidDeviceLimit, activeInternalSquads });
+    // 已存在用户续费时重置已使用流量
+    if (isExistingUser) {
+      await remnaResetUserTraffic(existingUuid).catch((err) => {
+        console.error("[TariffActivation] Failed to reset traffic for", existingUuid, err);
+      });
+    }
     // Не вызываем add-users: по api-1.yaml эндпоинт добавляет ВСЕХ пользователей в сквад.
     await prisma.client.update({ where: { id: client.id }, data: { remnawaveUuid: existingUuid } });
   }

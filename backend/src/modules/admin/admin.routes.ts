@@ -2788,21 +2788,37 @@ adminRouter.get("/sales-report", async (req, res) => {
   const agg = await prisma.payment.aggregate({ where, _sum: { amount: true }, _count: true });
 
   return res.json({
-    items: payments.map((p) => ({
-      id: p.id,
-      orderId: p.orderId,
-      amount: p.amount,
-      currency: p.currency,
-      provider: p.provider ?? "unknown",
-      status: p.status,
-      tariffName: p.tariff?.name ?? null,
-      clientEmail: p.client?.email ?? null,
-      clientTelegramId: p.client?.telegramId ?? null,
-      clientTelegramUsername: p.client?.telegramUsername ?? null,
-      paidAt: p.paidAt?.toISOString() ?? null,
-      createdAt: p.createdAt.toISOString(),
-      metadata: p.metadata,
-    })),
+    items: payments.map((p) => {
+      // Parse promoCode from metadata JSON
+      let promoCodeStr: string | null = null;
+      let originalAmount: number | null = null;
+      if (p.metadata) {
+        try {
+          const meta = JSON.parse(p.metadata);
+          if (meta.promoCode) promoCodeStr = String(meta.promoCode);
+          else if (meta.promoCodeId) promoCodeStr = String(meta.promoCodeId);
+          if (meta.originalAmount != null) originalAmount = Number(meta.originalAmount);
+          else if (meta.originalPrice != null) originalAmount = Number(meta.originalPrice);
+        } catch { /* ignore */ }
+      }
+      return {
+        id: p.id,
+        orderId: p.orderId,
+        externalId: p.externalId ?? null,
+        amount: p.amount,
+        originalAmount,
+        currency: p.currency,
+        provider: p.provider ?? "unknown",
+        status: p.status,
+        tariffName: p.tariff?.name ?? null,
+        clientEmail: p.client?.email ?? null,
+        clientTelegramId: p.client?.telegramId ?? null,
+        clientTelegramUsername: p.client?.telegramUsername ?? null,
+        paidAt: p.paidAt?.toISOString() ?? null,
+        createdAt: p.createdAt.toISOString(),
+        promoCode: promoCodeStr,
+      };
+    }),
     total,
     page,
     limit,

@@ -32,10 +32,10 @@
       }
     </script>
     <script>
-      // 仅在 Telegram 内嵌环境中加载 Telegram Web App SDK（telegram.org 在国内不可访问）
+      // 仅在 Telegram 内嵌环境中加载 Telegram Web App SDK
       if (window.TelegramWebviewProxy || navigator.userAgent.includes('Telegram') || location.hash.includes('tgWebAppData')) {
         var s = document.createElement('script');
-        s.src = 'https://telegram.org/js/telegram-web-app.js';
+        s.src = '/telegram-web-app.js';
         document.head.appendChild(s);
       }
     </script>

@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Download, ChevronLeft, ChevronRight, DollarSign, ShoppingCart, Filter } from "lucide-react";
+import { Loader2, Download, ChevronLeft, ChevronRight, DollarSign, ShoppingCart, Filter, Copy, Check, Tag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 function formatDate(s: string | null) {
@@ -23,7 +23,9 @@ function formatMoney(n: number) {
 interface SaleItem {
   id: string;
   orderId: string;
+  externalId: string | null;
   amount: number;
+  originalAmount: number | null;
   currency: string;
   provider: string;
   status: string;
@@ -33,7 +35,7 @@ interface SaleItem {
   clientTelegramUsername: string | null;
   paidAt: string | null;
   createdAt: string;
-  metadata: string | null;
+  promoCode: string | null;
 }
 
 interface SalesData {
@@ -52,6 +54,31 @@ const PROVIDERS = [
   { value: "yoomoney_form", labelKey: "providerYoomoney" },
   { value: "yookassa", labelKey: "providerYookassa" },
 ];
+
+/** Small inline ID display with copy-to-clipboard */
+function CopyableId({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="group inline-flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors max-w-[220px]"
+      title={`${label}: ${value} (click to copy)`}
+    >
+      <span className="truncate">{value}</span>
+      {copied ? (
+        <Check className="h-3 w-3 shrink-0 text-green-500" />
+      ) : (
+        <Copy className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+      )}
+    </button>
+  );
+}
 
 export function SalesReportPage() {
   const { state } = useAuth();
@@ -95,17 +122,20 @@ export function SalesReportPage() {
 
   function exportCSV() {
     if (!data?.items.length) return;
-    const header = "Date;Order;Client;Telegram;Plan;Amount;Currency;Provider";
+    const header = "Date;Order;ExternalId;Client;Telegram;Plan;Amount;OriginalAmount;Currency;Provider;PromoCode";
     const rows = data.items.map((r) =>
       [
         formatDate(r.paidAt),
         r.orderId,
+        r.externalId ?? "",
         r.clientEmail ?? "",
         r.clientTelegramUsername ?? r.clientTelegramId ?? "",
         r.tariffName ?? "",
         r.amount.toFixed(2),
+        r.originalAmount != null ? r.originalAmount.toFixed(2) : "",
         r.currency,
         r.provider,
+        r.promoCode ?? "",
       ].join(";")
     );
     const csv = "\uFEFF" + header + "\n" + rows.join("\n");
@@ -225,6 +255,7 @@ export function SalesReportPage() {
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colAmount")}</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colMethod")}</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colOrder")}</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t("admin.salesReport.colPromo")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -242,7 +273,12 @@ export function SalesReportPage() {
                       </td>
                       <td className="px-4 py-3">{r.tariffName ?? <span className="text-muted-foreground">—</span>}</td>
                       <td className="px-4 py-3 text-right font-medium whitespace-nowrap">
-                        {formatMoney(r.amount)} {r.currency}
+                        <div className="flex flex-col items-end">
+                          <span>{formatMoney(r.amount)} {r.currency}</span>
+                          {r.originalAmount != null && r.originalAmount !== r.amount && (
+                            <span className="text-xs text-muted-foreground line-through">{formatMoney(r.originalAmount)} {r.currency}</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -252,9 +288,22 @@ export function SalesReportPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs text-muted-foreground font-mono truncate max-w-[120px] block" title={r.orderId}>
-                          {r.orderId.slice(0, 8)}...
-                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          <CopyableId label={t("admin.salesReport.labelOrderId")} value={r.orderId} />
+                          {r.externalId && (
+                            <CopyableId label={t("admin.salesReport.labelExternalId")} value={r.externalId} />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {r.promoCode ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-400 px-2 py-0.5 text-xs font-medium">
+                            <Tag className="h-3 w-3" />
+                            {r.promoCode}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
