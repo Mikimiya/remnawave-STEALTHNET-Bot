@@ -211,6 +211,14 @@ export function ClientDashboardPage() {
   const hasActiveSubscription =
     subscription && typeof subscription === "object" && (subParsed.status === "ACTIVE" || subParsed.status === undefined);
   const vpnUrl = subParsed.subscriptionUrl || null;
+  const [subUrlCopied, setSubUrlCopied] = useState(false);
+  const copySubUrl = () => {
+    if (vpnUrl) {
+      navigator.clipboard.writeText(vpnUrl);
+      setSubUrlCopied(true);
+      setTimeout(() => setSubUrlCopied(false), 2000);
+    }
+  };
   const [referralCopied, setReferralCopied] = useState<"site" | "bot" | null>(null);
   const siteOrigin = config?.publicAppUrl?.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
   const referralLinkSite =
@@ -295,20 +303,20 @@ export function ClientDashboardPage() {
             <NoSubscriptionState />
           </section>
         ) : (
-          <section className="min-w-0">
-            <div className="rounded-[1.85rem] border border-border/50 bg-card/45 p-4 shadow-sm backdrop-blur-xl relative overflow-hidden">
+          <section className="min-w-0 space-y-3">
+            <div className="rounded-[1.85rem] border border-border/50 bg-card/45 p-5 shadow-sm backdrop-blur-xl relative overflow-hidden">
               {/* Decorative glow */}
               <div className="absolute -top-12 -right-12 h-28 w-28 rounded-full bg-primary/15 blur-[50px] pointer-events-none" />
 
               <div className="relative z-10">
                 {/* Header: icon + name + active badge */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <Package className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p
-                      className="text-[17px] font-bold tracking-tight text-foreground leading-snug truncate"
+                      className="text-[18px] font-bold tracking-tight text-foreground leading-snug truncate"
                       title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
                     >
                       {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
@@ -319,33 +327,33 @@ export function ClientDashboardPage() {
                         <span className="truncate">{t("dashboard.trialLimitedNodesShort")}</span>
                       </div>
                     ) : tariffCategoryName ? (
-                      <p className="text-[12px] text-muted-foreground truncate">{tariffCategoryName}</p>
+                      <p className="text-[12px] text-muted-foreground truncate mt-0.5">{tariffCategoryName}</p>
                     ) : null}
                   </div>
-                  <span className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
                     {t("dashboard.active")}
                   </span>
                 </div>
 
                 {/* Info grid: 2x2 compact layout */}
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-4 grid grid-cols-2 gap-2.5">
                   {daysLeft != null && (
-                    <div className="flex items-center gap-2 rounded-xl bg-background/40 px-3 py-2">
+                    <div className="flex items-center gap-2.5 rounded-xl bg-background/40 px-3 py-2.5">
                       <Timer className="h-3.5 w-3.5 shrink-0 text-primary" />
                       <span className="text-[12px] font-semibold text-foreground truncate">
                         {t("dashboard.daysLeft_many", { count: daysLeft })}
                       </span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 rounded-xl bg-background/40 px-3 py-2">
+                  <div className="flex items-center gap-2.5 rounded-xl bg-background/40 px-3 py-2.5">
                     <Monitor className="h-3.5 w-3.5 shrink-0 text-primary" />
                     <span className="text-[12px] font-semibold text-foreground">
                       {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "∞"} {t("dashboard.devices")}
                     </span>
                   </div>
                   {subParsed.expireAt && (
-                    <div className="flex items-center gap-2 rounded-xl bg-background/40 px-3 py-2">
+                    <div className="flex items-center gap-2.5 rounded-xl bg-background/40 px-3 py-2.5">
                       <Calendar className="h-3.5 w-3.5 shrink-0 text-primary" />
                       <span className="text-[12px] font-semibold text-foreground truncate">
                         {formatDate(subParsed.expireAt, lang)}
@@ -353,7 +361,7 @@ export function ClientDashboardPage() {
                     </div>
                   )}
                   {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
-                    <div className="flex items-center gap-2 rounded-xl bg-background/40 px-3 py-2">
+                    <div className="flex items-center gap-2.5 rounded-xl bg-background/40 px-3 py-2.5">
                       <RotateCcw className="h-3.5 w-3.5 shrink-0 text-primary" />
                       <span className="text-[12px] font-semibold text-foreground truncate">
                         {t(RESET_STRATEGY_I18N[trafficResetStrategy])}
@@ -363,17 +371,17 @@ export function ClientDashboardPage() {
                 </div>
 
                 {/* Traffic section */}
-                <div className="mt-3 rounded-[1.2rem] bg-background/35 px-3.5 py-2.5">
+                <div className="mt-4 rounded-[1.2rem] bg-background/35 px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex items-center gap-2">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Wifi className="h-3.5 w-3.5 text-primary" />
+                    <div className="min-w-0 flex items-center gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <Wifi className="h-4 w-4 text-primary" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground leading-none">
                           {t("dashboard.traffic")}
                         </p>
-                        <p className="mt-0.5 text-[13px] font-bold text-foreground truncate">
+                        <p className="mt-1 text-[14px] font-bold text-foreground truncate">
                           {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
                             ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
                             : t("dashboard.unlimited")}
@@ -382,14 +390,14 @@ export function ClientDashboardPage() {
                     </div>
 
                     {trafficPercent != null && (
-                      <span className="shrink-0 text-lg font-bold text-primary tabular-nums">
+                      <span className="shrink-0 text-xl font-bold text-primary tabular-nums">
                         {trafficPercent}%
                       </span>
                     )}
                   </div>
 
                   {trafficPercent != null && (
-                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
+                    <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-muted/30">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${trafficPercent}%` }}
@@ -401,10 +409,43 @@ export function ClientDashboardPage() {
                 </div>
               </div>
             </div>
+
+            {/* Subscription URL — separate card */}
+            {vpnUrl && (
+              <div className="rounded-[1.85rem] border border-border/50 bg-card/45 p-5 shadow-sm backdrop-blur-xl">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <Link2 className="h-4 w-4 shrink-0 text-primary" />
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground leading-none">
+                    {t("dashboard.subscriptionAddress")}
+                  </p>
+                </div>
+                <code className="block w-full truncate rounded-xl bg-background/50 border border-border/50 px-3.5 py-3 text-[12px] font-mono text-foreground/80" title={vpnUrl}>
+                  {vpnUrl}
+                </code>
+                <div className="flex items-center gap-2.5 mt-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-11 rounded-xl bg-background/50 hover:bg-background/80 transition-transform hover:scale-[1.02] gap-2 text-[13px] font-medium"
+                    onClick={() => {
+                      copySubUrl();
+                      window.Telegram?.WebApp?.showPopup?.({ title: t("dashboard.copied"), message: t("subscribe.linkCopied") });
+                    }}
+                  >
+                    {subUrlCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                    <span>{subUrlCopied ? t("dashboard.copied") : t("dashboard.copySubAddress")}</span>
+                  </Button>
+                  <Link to="/cabinet/subscribe" className="inline-flex flex-1 h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
+                    <Link2 className="h-4 w-4 shrink-0" />
+                    <span>{t("dashboard.connectVPN")}</span>
+                  </Link>
+                </div>
+              </div>
+            )}
           </section>
         )}
 
-        {/* 2. Как подключиться — ссылка и кнопка */}
+        {/* 2. Как подключиться — ссылка и кнопка (только если нет подписки) */}
+        {!vpnUrl && (
         <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl p-4 shadow-sm overflow-hidden transition-all duration-300">
           <h2 className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-3">
              <div className="p-1.5 bg-primary/20 rounded-lg">
@@ -412,31 +453,7 @@ export function ClientDashboardPage() {
             </div>
             {t("dashboard.connection")}
           </h2>
-          {vpnUrl ? (
-            <div className="space-y-3">
-              <p className="text-[13px] text-muted-foreground leading-relaxed">{t("dashboard.connectDesc")}</p>
-              <div className="flex gap-2 min-w-0">
-                <code className="flex-1 min-w-0 truncate rounded-xl bg-background/50 border border-border/50 px-3 py-2 text-[11px] font-mono flex items-center text-foreground/80" title={vpnUrl}>
-                  {vpnUrl}
-                </code>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="shrink-0 h-auto w-10 rounded-xl bg-background/50 hover:bg-background/80 transition-transform hover:scale-105"
-                  onClick={() => {
-                    navigator.clipboard.writeText(vpnUrl);
-                    window.Telegram?.WebApp?.showPopup?.({ title: t("common.copied"), message: t("subscribe.linkCopied") });
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <Link to="/cabinet/subscribe" className="inline-flex w-full h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
-                <Link2 className="h-4 w-4 shrink-0" />
-                <span className="inline-flex items-center leading-none">{t("dashboard.connectVPN")}</span>
-              </Link>
-            </div>
-          ) : showTrial ? (
+          {showTrial ? (
             <div className="space-y-3 text-center">
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10 text-green-600 mb-1">
                  <Gift className="h-5 w-5" />
@@ -462,6 +479,7 @@ export function ClientDashboardPage() {
             </div>
           )}
         </section>
+        )}
 
         {/* 3. Баланс */}
         <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl px-4 py-4 shadow-sm overflow-hidden flex items-center justify-between gap-3 transition-all duration-300">
@@ -578,48 +596,44 @@ export function ClientDashboardPage() {
                   </div>
 
                   {/* Main metrics row: 4 items in a row */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
                     {/* Plan — hero metric */}
                     {((tariffDisplayName ?? subParsed.productName) || client?.trialUsed) && (
-                      <div className="relative rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border border-primary/20 p-5 overflow-hidden">
+                      <div className="relative rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border border-primary/20 p-5 overflow-hidden flex flex-col">
                         <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-primary/20 blur-[40px] pointer-events-none" />
-                        <div className="relative flex flex-col justify-between h-full">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Package className="h-4 w-4 text-primary" />
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-primary/80">{t("dashboard.plan")}</p>
-                          </div>
-                          <div>
-                            <p className="text-xl font-bold truncate text-foreground" title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
-                              {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
-                            </p>
-                            {isTrial ? (
-                              <div className="mt-2 inline-flex max-w-full items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                                <AlertCircle className="h-3 w-3 shrink-0" />
-                                <span className="truncate">{t("dashboard.trialLimitedNodesShort")}</span>
-                              </div>
-                            ) : tariffCategoryName ? (
-                              <p className="text-[11px] text-muted-foreground mt-1 font-medium truncate">
-                                {tariffCategoryName}
-                              </p>
-                            ) : null}
-                            {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
-                              <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                                <RotateCcw className="h-3 w-3 shrink-0" />
-                                <span className="truncate">{t(RESET_STRATEGY_I18N[trafficResetStrategy])}</span>
-                              </div>
-                            )}
-                          </div>
+                        <div className="relative flex items-center gap-2 mb-auto">
+                          <Package className="h-4 w-4 text-primary" />
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-primary/80 truncate">
+                            {tariffCategoryName || t("dashboard.plan")}
+                          </p>
+                        </div>
+                        <div className="relative mt-3">
+                          <p className="text-xl font-bold truncate text-foreground" title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
+                            {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                          </p>
+                          {isTrial && (
+                            <div className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                              <AlertCircle className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{t("dashboard.trialLimitedNodesShort")}</span>
+                            </div>
+                          )}
+                          {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
+                            <div className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                              <RotateCcw className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{t(RESET_STRATEGY_I18N[trafficResetStrategy])}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
                     {/* Days left */}
                     {daysLeft != null && (
-                      <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col justify-between">
-                        <div className="flex items-center gap-2 mb-2">
+                      <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col">
+                        <div className="flex items-center gap-2 mb-auto">
                           <Calendar className="h-4 w-4 text-primary" />
                           <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.validUntil")}</p>
                         </div>
-                        <div>
+                        <div className="mt-3">
                           <p className="text-lg font-bold text-foreground">
                             {t("dashboard.daysLeft_many", { count: daysLeft })}
                           </p>
@@ -633,41 +647,68 @@ export function ClientDashboardPage() {
                     )}
 
                     {/* Traffic */}
-                    <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col justify-center">
-                      <div className="flex items-center gap-2 mb-2">
+                    <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col">
+                      <div className="flex items-center gap-2 mb-auto">
                         <Wifi className="h-4 w-4 text-primary" />
                         <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.traffic")}</p>
                       </div>
-                      <p className="text-lg font-bold text-foreground">
-                        {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
-                          ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
-                          : t("dashboard.unlimited")}
-                      </p>
-                      {trafficPercent != null && (
-                        <div className="mt-2.5 h-2 w-full rounded-full bg-muted/30 overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${trafficPercent}%` }}
-                            transition={{ duration: 0.8, ease: "easeOut" }}
-                            className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70"
-                          />
-                        </div>
-                      )}
+                      <div className="mt-3">
+                        <p className="text-lg font-bold text-foreground">
+                          {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
+                            ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
+                            : t("dashboard.unlimited")}
+                        </p>
+                        {trafficPercent != null && (
+                          <div className="mt-2 h-2 w-full rounded-full bg-muted/30 overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${trafficPercent}%` }}
+                              transition={{ duration: 0.8, ease: "easeOut" }}
+                              className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Devices */}
-                    <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col justify-between">
-                      <div className="flex items-center gap-2 mb-2">
+                    <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col">
+                      <div className="flex items-center gap-2 mb-auto">
                         <Monitor className="h-4 w-4 text-primary" />
                         <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.devices")}</p>
                       </div>
-                      <p className="text-lg font-bold text-foreground">
+                      <p className="text-lg font-bold text-foreground mt-3">
                         {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0
                           ? subParsed.hwidDeviceLimit
                           : "∞"}
                       </p>
                     </div>
                   </div>
+
+                  {/* Subscription URL */}
+                  {vpnUrl && (
+                    <div className="rounded-2xl bg-background/40 border border-border/50 p-4 transition-colors hover:bg-background/60 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <Link2 className="h-4 w-4 text-primary" />
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.subscriptionAddress")}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 min-w-0 truncate rounded-xl bg-background/50 border border-border/50 px-3 py-2.5 text-[13px] font-mono text-foreground/80" title={vpnUrl}>
+                          {vpnUrl}
+                        </code>
+                      </div>
+                      <div className="flex items-center gap-3 mt-3">
+                        <Button variant="outline" onClick={copySubUrl} className="flex-1 h-10 rounded-xl hover:scale-[1.02] transition-transform border border-border/50 bg-background/50 gap-2 text-[13px] font-medium">
+                          {subUrlCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-foreground/70" />}
+                          <span>{subUrlCopied ? t("dashboard.copied") : t("dashboard.copySubAddress")}</span>
+                        </Button>
+                        <Link to="/cabinet/subscribe" className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-transform hover:scale-[1.02] hover:bg-primary/90">
+                          <Link2 className="h-4 w-4 shrink-0" />
+                          <span>{t("dashboard.connectVPN")}</span>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

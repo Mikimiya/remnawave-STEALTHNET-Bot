@@ -11,10 +11,10 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "STEALTHNET Admin",
-        short_name: "StealthNET",
+        name: "Coolgo",
+        short_name: "Coolgo",
         theme_color: "#0f172a",
-        icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+        icons: [{ src: "/favicon-192x192.png", sizes: "192x192", type: "image/png" }],
       },
       workbox: {
         // Не перехватывать запросы к /api/ — они должны идти на бэкенд
