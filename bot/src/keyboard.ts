@@ -1,7 +1,9 @@
 /**
  * Inline-клавиатуры с цветными кнопками (Telegram Bot API: style — primary, success, danger).
  * Эмодзи в тексте кнопок (Unicode).
+ * i18n: все видимые строки резолвятся через L(lang, key).
  */
+import { L } from "./locales/index.js";
 
 type ButtonStyle = "primary" | "success" | "danger";
 
@@ -47,24 +49,46 @@ const MENU_IDS: Record<string, string> = {
   extra_options: "menu:extra_options",
 };
 
-const DEFAULT_BUTTONS: BotButtonConfig[] = [
-  { id: "tariffs", visible: true, label: "📦 Тарифы", order: 0, style: "success" },
-  { id: "proxy", visible: true, label: "🌐 Прокси", order: 0.5, style: "primary" },
-  { id: "my_proxy", visible: true, label: "📋 Мои прокси", order: 0.6, style: "primary" },
-  { id: "singbox", visible: true, label: "🔑 Доступы", order: 0.55, style: "primary" },
-  { id: "my_singbox", visible: true, label: "📋 Мои доступы", order: 0.65, style: "primary" },
-  { id: "profile", visible: true, label: "👤 Профиль", order: 1, style: "" },
-  { id: "devices", visible: true, label: "📱 Устройства", order: 1.5, style: "primary" },
-  { id: "topup", visible: true, label: "💳 Пополнить баланс", order: 2, style: "success" },
-  { id: "referral", visible: true, label: "🔗 Реферальная программа", order: 3, style: "primary" },
-  { id: "trial", visible: true, label: "🎁 Попробовать бесплатно", order: 4, style: "success" },
-  { id: "vpn", visible: true, label: "🌐 Подключиться к VPN", order: 5, style: "danger", onePerRow: true },
-  { id: "cabinet", visible: true, label: "🌐 Web Кабинет", order: 6, style: "primary" },
-  { id: "tickets", visible: true, label: "🎫 Тикеты", order: 6.5, style: "primary" },
-  { id: "support", visible: true, label: "🆘 Поддержка", order: 7, style: "primary" },
-  { id: "promocode", visible: true, label: "🎟️ Промокод", order: 8, style: "primary" },
-  { id: "extra_options", visible: true, label: "➕ Доп. опции", order: 9, style: "primary" },
-];
+/** Default button ID → locale key mapping */
+const BTN_LOCALE_MAP: Record<string, keyof import("./locales/ru.js").LocaleStrings> = {
+  tariffs: "btnTariffs",
+  proxy: "btnProxy",
+  my_proxy: "btnMyProxy",
+  singbox: "btnSingbox",
+  my_singbox: "btnMySingbox",
+  profile: "btnProfile",
+  devices: "btnDevices",
+  topup: "btnTopup",
+  referral: "btnReferral",
+  trial: "btnTrial",
+  vpn: "btnVpn",
+  cabinet: "btnCabinet",
+  tickets: "btnTickets",
+  support: "btnSupport",
+  promocode: "btnPromocode",
+  extra_options: "btnExtraOptions",
+};
+
+function getDefaultButtons(lang: string): BotButtonConfig[] {
+  return [
+    { id: "tariffs", visible: true, label: L(lang, "btnTariffs"), order: 0, style: "success" },
+    { id: "proxy", visible: true, label: L(lang, "btnProxy"), order: 0.5, style: "primary" },
+    { id: "my_proxy", visible: true, label: L(lang, "btnMyProxy"), order: 0.6, style: "primary" },
+    { id: "singbox", visible: true, label: L(lang, "btnSingbox"), order: 0.55, style: "primary" },
+    { id: "my_singbox", visible: true, label: L(lang, "btnMySingbox"), order: 0.65, style: "primary" },
+    { id: "profile", visible: true, label: L(lang, "btnProfile"), order: 1, style: "" },
+    { id: "devices", visible: true, label: L(lang, "btnDevices"), order: 1.5, style: "primary" },
+    { id: "topup", visible: true, label: L(lang, "btnTopup"), order: 2, style: "success" },
+    { id: "referral", visible: true, label: L(lang, "btnReferral"), order: 3, style: "primary" },
+    { id: "trial", visible: true, label: L(lang, "btnTrial"), order: 4, style: "success" },
+    { id: "vpn", visible: true, label: L(lang, "btnVpn"), order: 5, style: "danger", onePerRow: true },
+    { id: "cabinet", visible: true, label: L(lang, "btnCabinet"), order: 6, style: "primary" },
+    { id: "tickets", visible: true, label: L(lang, "btnTickets"), order: 6.5, style: "primary" },
+    { id: "support", visible: true, label: L(lang, "btnSupport"), order: 7, style: "primary" },
+    { id: "promocode", visible: true, label: L(lang, "btnPromocode"), order: 8, style: "primary" },
+    { id: "extra_options", visible: true, label: L(lang, "btnExtraOptions"), order: 9, style: "primary" },
+  ];
+}
 
 function toStyle(s: string | undefined): ButtonStyle | undefined | null {
   if (s === "primary" || s === "success" || s === "danger") return s;
@@ -108,12 +132,14 @@ export function mainMenu(opts: {
   buttonsPerRow?: 1 | 2;
   /** URL страницы подписки Remna (если задан — кнопка VPN ведёт туда) */
   remnaSubscriptionUrl?: string | null;
+  lang?: string;
 }): InlineMarkup {
+  const lang = opts.lang || "zh";
   const configButtons = opts.botButtons ?? [];
   const fromConfig = configButtons.length > 0;
-  let list = fromConfig ? [...configButtons] : [...DEFAULT_BUTTONS];
+  let list = fromConfig ? [...configButtons] : [...getDefaultButtons(lang)];
   if (fromConfig && !list.some((b) => b.id === "devices")) {
-    list.push({ id: "devices", visible: true, label: "📱 Устройства", order: 1.5, style: "primary" });
+    list.push({ id: "devices", visible: true, label: L(lang, "btnDevices"), order: 1.5, style: "primary" });
   }
   list = list
     .filter((b) => b.visible)
@@ -180,23 +206,25 @@ export function mainMenu(opts: {
   return { inline_keyboard: rows };
 }
 
-const DEFAULT_BACK_LABEL = "◀️ В меню";
+const defaultBackLabel = (lang: string) => L(lang, "backToMenu");
 
 /** Меню «Поддержка»: 4 кнопки-ссылки (только с заданным URL) + «В меню». */
 export function supportSubMenu(
   links: { support?: string | null; agreement?: string | null; offer?: string | null; instructions?: string | null },
   backLabel?: string | null,
   backStyle?: string,
-  emojiIds?: InnerEmojiIds
+  emojiIds?: InnerEmojiIds,
+  lang?: string
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(backStyle), "danger");
   const rows: (InlineButton | UrlButton)[][] = [];
   const items: [string, string | null | undefined][] = [
-    ["👤 Тех поддержка", links.support],
-    ["📜 Соглашения", links.agreement],
-    ["📄 Оферта", links.offer],
-    ["📋 Инструкции", links.instructions],
+    [L(lg, "supportTech"), links.support],
+    [L(lg, "supportAgreement"), links.agreement],
+    [L(lg, "supportOffer"), links.offer],
+    [L(lg, "supportInstructions"), links.instructions],
   ];
   for (const [label, url] of items) {
     const u = (url ?? "").trim();
@@ -206,8 +234,9 @@ export function supportSubMenu(
   return { inline_keyboard: rows };
 }
 
-export function backToMenu(backLabel?: string | null, backStyle?: string, emojiIds?: InnerEmojiIds): InlineMarkup {
-  const text = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+export function backToMenu(backLabel?: string | null, backStyle?: string, emojiIds?: InnerEmojiIds, lang?: string): InlineMarkup {
+  const lg = lang || "zh";
+  const text = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   return { inline_keyboard: [[btn(text, "menu:main", resolveStyle(toStyle(backStyle), "danger"), emojiIds?.back)]] };
 }
 
@@ -216,11 +245,13 @@ export function payUrlMarkup(
   paymentUrl: string,
   backLabel?: string | null,
   backStyle?: string,
-  emojiIds?: InnerEmojiIds
+  emojiIds?: InnerEmojiIds,
+  lang?: string
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = undefined;
-  const payBtn: UrlButton = { text: "💳 Оплатить", url: paymentUrl };
+  const payBtn: UrlButton = { text: L(lg, "payBtn"), url: paymentUrl };
   if (emojiIds?.card) payBtn.icon_custom_emoji_id = emojiIds.card;
   return {
     inline_keyboard: [
@@ -230,11 +261,12 @@ export function payUrlMarkup(
   };
 }
 
-export function openSubscribePageMarkup(appUrl: string, backLabel?: string | null, backStyle?: string, emojiIds?: InnerEmojiIds, remnaSubscriptionUrl?: string | null): InlineMarkup {
+export function openSubscribePageMarkup(appUrl: string, backLabel?: string | null, backStyle?: string, emojiIds?: InnerEmojiIds, remnaSubscriptionUrl?: string | null, lang?: string): InlineMarkup {
+  const lg = lang || "zh";
   const base = appUrl.replace(/\/$/, "");
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   if (remnaSubscriptionUrl) {
-    const connectBtn: UrlButton = { text: "📲 Открыть страницу подключения", url: remnaSubscriptionUrl };
+    const connectBtn: UrlButton = { text: L(lg, "btnOpenConnectPage"), url: remnaSubscriptionUrl };
     if (emojiIds?.connect) connectBtn.icon_custom_emoji_id = emojiIds.connect;
     return {
       inline_keyboard: [
@@ -243,7 +275,7 @@ export function openSubscribePageMarkup(appUrl: string, backLabel?: string | nul
       ],
     };
   }
-  const connectBtn: WebAppButton = { text: "📲 Открыть страницу подключения", web_app: { url: `${base}/cabinet/subscribe` } };
+  const connectBtn: WebAppButton = { text: L(lg, "btnOpenConnectPage"), web_app: { url: `${base}/cabinet/subscribe` } };
   if (emojiIds?.connect) connectBtn.icon_custom_emoji_id = emojiIds.connect;
   return {
     inline_keyboard: [
@@ -253,10 +285,11 @@ export function openSubscribePageMarkup(appUrl: string, backLabel?: string | nul
   };
 }
 
-export function topUpPresets(currency: string, backLabel?: string | null, innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds): InlineMarkup {
+export function topUpPresets(currency: string, backLabel?: string | null, innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds, lang?: string): InlineMarkup {
+  const lg = lang || "zh";
   const c = currency.toUpperCase();
   const sym = c === "RUB" ? "₽" : c === "USD" ? "$" : c === "CNY" ? "¥" : c;
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const topup = resolveStyle(toStyle(innerStyles?.topup), "primary");
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const cardId = emojiIds?.card;
@@ -282,10 +315,12 @@ export function tariffCategoryButtons(
   backLabel?: string | null,
   innerStyles?: InnerButtonStyles,
   emojiIds?: InnerEmojiIds,
-  _prefixEmoji?: string
+  _prefixEmoji?: string,
+  lang?: string
 ): InlineMarkup {
+  const lg = lang || "zh";
   const tariffPay = resolveStyle(toStyle(innerStyles?.tariffPay), "success");
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const tariffId = emojiIds?.tariff;
   const rows: InlineButton[][] = categories.map((cat) => {
@@ -303,11 +338,13 @@ export function tariffsOfCategoryButtons(
   innerStyles?: InnerButtonStyles,
   backData: string = "menu:tariffs",
   emojiIds?: InnerEmojiIds,
-  _prefixEmoji?: string
+  _prefixEmoji?: string,
+  lang?: string
 ): InlineMarkup {
+  const lg = lang || "zh";
   const rows: InlineButton[][] = [];
   const tariffPay = resolveStyle(toStyle(innerStyles?.tariffPay), "success");
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const prefix = (category.emoji && category.emoji.trim()) ? `${category.emoji} ` : "";
   const tariffId = emojiIds?.tariff;
@@ -330,17 +367,19 @@ export function tariffPayButtons(
   backLabel?: string | null,
   innerStyles?: InnerButtonStyles,
   emojiIds?: InnerEmojiIds,
-  prefixEmoji?: string
+  prefixEmoji?: string,
+  lang?: string
 ): InlineMarkup {
+  const lg = lang || "zh";
   if (categories.length === 0) {
-    const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+    const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
     const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
     return { inline_keyboard: [[btn(back, "menu:main", backSty, emojiIds?.back)]] };
   }
   if (categories.length === 1) {
-    return tariffsOfCategoryButtons(categories[0]!, backLabel, innerStyles, "menu:main", emojiIds, prefixEmoji);
+    return tariffsOfCategoryButtons(categories[0]!, backLabel, innerStyles, "menu:main", emojiIds, prefixEmoji, lg);
   }
-  return tariffCategoryButtons(categories, backLabel, innerStyles, emojiIds, prefixEmoji);
+  return tariffCategoryButtons(categories, backLabel, innerStyles, emojiIds, prefixEmoji, lg);
 }
 
 /** Кнопки выбора способа оплаты (СПБ, Карты и т.д. из админки) для тарифа + баланс + ЮMoney */
@@ -355,8 +394,10 @@ export function tariffPaymentMethodButtons(
   yookassaEnabled?: boolean,
   cryptopayEnabled?: boolean,
   tariffCurrency?: string,
+  lang?: string,
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = undefined;
   const cardId = emojiIds?.card;
   const rows: InlineButton[][] = [];
@@ -366,14 +407,14 @@ export function tariffPaymentMethodButtons(
   }
   // ЮMoney — только для рублёвых тарифов
   if (yoomoneyEnabled && (!tariffCurrency || tariffCurrency.toUpperCase() === "RUB")) {
-    rows.push([btn("💳 ЮMoney — оплата картой", `pay_tariff_yoomoney:${tariffId}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payYoomoney"), `pay_tariff_yoomoney:${tariffId}`, undefined, cardId)]);
   }
   // ЮKassa — только RUB
   if (yookassaEnabled && (!tariffCurrency || tariffCurrency.toUpperCase() === "RUB")) {
-    rows.push([btn("💳 ЮKassa — карта / СБП", `pay_tariff_yookassa:${tariffId}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payYookassa"), `pay_tariff_yookassa:${tariffId}`, undefined, cardId)]);
   }
   if (cryptopayEnabled) {
-    rows.push([btn("💳 Crypto Bot — криптовалюта", `pay_tariff_cryptopay:${tariffId}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payCryptoBot"), `pay_tariff_cryptopay:${tariffId}`, undefined, cardId)]);
   }
   for (const m of methods) {
     rows.push([btn(m.label, `pay_tariff:${tariffId}:${m.id}`, undefined, cardId)]);
@@ -387,10 +428,12 @@ export function proxyCategoryButtons(
   categories: { id: string; name: string; tariffs: { id: string; name: string; price: number; currency: string }[] }[],
   backLabel?: string | null,
   innerStyles?: InnerButtonStyles,
-  emojiIds?: InnerEmojiIds
+  emojiIds?: InnerEmojiIds,
+  lang?: string
 ): InlineMarkup {
+  const lg = lang || "zh";
   const tariffPay = resolveStyle(toStyle(innerStyles?.tariffPay), "success");
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const tariffId = emojiIds?.tariff;
   const rows: InlineButton[][] = categories.map((cat) => {
@@ -407,11 +450,13 @@ export function proxyTariffsOfCategoryButtons(
   backLabel?: string | null,
   innerStyles?: InnerButtonStyles,
   backData = "menu:proxy",
-  emojiIds?: InnerEmojiIds
+  emojiIds?: InnerEmojiIds,
+  lang?: string
 ): InlineMarkup {
+  const lg = lang || "zh";
   const rows: InlineButton[][] = [];
   const tariffPay = resolveStyle(toStyle(innerStyles?.tariffPay), "success");
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const tariffId = emojiIds?.tariff;
   for (const t of category.tariffs) {
@@ -426,15 +471,17 @@ export function proxyTariffPayButtons(
   categories: { id: string; name: string; tariffs: { id: string; name: string; price: number; currency: string }[] }[],
   backLabel?: string | null,
   innerStyles?: InnerButtonStyles,
-  emojiIds?: InnerEmojiIds
+  emojiIds?: InnerEmojiIds,
+  lang?: string
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   if (categories.length === 0) return { inline_keyboard: [[btn(back, "menu:main", backSty, emojiIds?.back)]] };
   if (categories.length === 1 && categories[0]!.tariffs.length <= 5) {
-    return proxyTariffsOfCategoryButtons(categories[0]!, backLabel, innerStyles, "menu:main", emojiIds);
+    return proxyTariffsOfCategoryButtons(categories[0]!, backLabel, innerStyles, "menu:main", emojiIds, lg);
   }
-  return proxyCategoryButtons(categories, backLabel, innerStyles, emojiIds);
+  return proxyCategoryButtons(categories, backLabel, innerStyles, emojiIds, lg);
 }
 
 /** Кнопки способа оплаты для прокси-тарифа */
@@ -449,19 +496,21 @@ export function proxyPaymentMethodButtons(
   yookassaEnabled?: boolean,
   cryptopayEnabled?: boolean,
   currency?: string,
+  lang?: string,
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = undefined;
   const cardId = emojiIds?.card;
   const rows: InlineButton[][] = [];
   if (balanceLabel) rows.push([btn(balanceLabel, `pay_proxy_balance:${proxyTariffId}`, undefined, cardId)]);
   if (yoomoneyEnabled && (!currency || currency.toUpperCase() === "RUB")) {
-    rows.push([btn("💳 ЮMoney — карта", `pay_proxy_yoomoney:${proxyTariffId}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payYoomoneyShort"), `pay_proxy_yoomoney:${proxyTariffId}`, undefined, cardId)]);
   }
   if (yookassaEnabled && (!currency || currency.toUpperCase() === "RUB")) {
-    rows.push([btn("💳 ЮKassa — карта / СБП", `pay_proxy_yookassa:${proxyTariffId}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payYookassa"), `pay_proxy_yookassa:${proxyTariffId}`, undefined, cardId)]);
   }
-  if (cryptopayEnabled) rows.push([btn("💳 Crypto Bot — криптовалюта", `pay_proxy_cryptopay:${proxyTariffId}`, undefined, cardId)]);
+  if (cryptopayEnabled) rows.push([btn(L(lg, "payCryptoBot"), `pay_proxy_cryptopay:${proxyTariffId}`, undefined, cardId)]);
   for (const m of methods) {
     rows.push([btn(m.label, `pay_proxy:${proxyTariffId}:${m.id}`, undefined, cardId)]);
   }
@@ -474,10 +523,12 @@ export function singboxCategoryButtons(
   categories: { id: string; name: string; tariffs: { id: string; name: string; price: number; currency: string }[] }[],
   backLabel?: string | null,
   innerStyles?: InnerButtonStyles,
-  emojiIds?: InnerEmojiIds
+  emojiIds?: InnerEmojiIds,
+  lang?: string
 ): InlineMarkup {
+  const lg = lang || "zh";
   const tariffPay = resolveStyle(toStyle(innerStyles?.tariffPay), "success");
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const tariffId = emojiIds?.tariff;
   const rows: InlineButton[][] = categories.map((cat) => {
@@ -494,11 +545,13 @@ export function singboxTariffsOfCategoryButtons(
   backLabel?: string | null,
   innerStyles?: InnerButtonStyles,
   backData = "menu:singbox",
-  emojiIds?: InnerEmojiIds
+  emojiIds?: InnerEmojiIds,
+  lang?: string
 ): InlineMarkup {
+  const lg = lang || "zh";
   const rows: InlineButton[][] = [];
   const tariffPay = resolveStyle(toStyle(innerStyles?.tariffPay), "success");
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const tariffId = emojiIds?.tariff;
   for (const t of category.tariffs) {
@@ -513,15 +566,17 @@ export function singboxTariffPayButtons(
   categories: { id: string; name: string; tariffs: { id: string; name: string; price: number; currency: string }[] }[],
   backLabel?: string | null,
   innerStyles?: InnerButtonStyles,
-  emojiIds?: InnerEmojiIds
+  emojiIds?: InnerEmojiIds,
+  lang?: string
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   if (categories.length === 0) return { inline_keyboard: [[btn(back, "menu:main", backSty, emojiIds?.back)]] };
   if (categories.length === 1 && categories[0]!.tariffs.length <= 5) {
-    return singboxTariffsOfCategoryButtons(categories[0]!, backLabel, innerStyles, "menu:main", emojiIds);
+    return singboxTariffsOfCategoryButtons(categories[0]!, backLabel, innerStyles, "menu:main", emojiIds, lg);
   }
-  return singboxCategoryButtons(categories, backLabel, innerStyles, emojiIds);
+  return singboxCategoryButtons(categories, backLabel, innerStyles, emojiIds, lg);
 }
 
 /** Кнопки способа оплаты для тарифа Sing-box */
@@ -536,19 +591,21 @@ export function singboxPaymentMethodButtons(
   yookassaEnabled?: boolean,
   cryptopayEnabled?: boolean,
   currency?: string,
+  lang?: string,
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = undefined;
   const cardId = emojiIds?.card;
   const rows: InlineButton[][] = [];
   if (balanceLabel) rows.push([btn(balanceLabel, `pay_singbox_balance:${singboxTariffId}`, undefined, cardId)]);
   if (yoomoneyEnabled && (!currency || currency.toUpperCase() === "RUB")) {
-    rows.push([btn("💳 ЮMoney — карта", `pay_singbox_yoomoney:${singboxTariffId}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payYoomoneyShort"), `pay_singbox_yoomoney:${singboxTariffId}`, undefined, cardId)]);
   }
   if (yookassaEnabled && (!currency || currency.toUpperCase() === "RUB")) {
-    rows.push([btn("💳 ЮKassa — карта / СБП", `pay_singbox_yookassa:${singboxTariffId}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payYookassa"), `pay_singbox_yookassa:${singboxTariffId}`, undefined, cardId)]);
   }
-  if (cryptopayEnabled) rows.push([btn("💳 Crypto Bot — криптовалюта", `pay_singbox_cryptopay:${singboxTariffId}`, undefined, cardId)]);
+  if (cryptopayEnabled) rows.push([btn(L(lg, "payCryptoBot"), `pay_singbox_cryptopay:${singboxTariffId}`, undefined, cardId)]);
   for (const m of methods) {
     rows.push([btn(m.label, `pay_singbox:${singboxTariffId}:${m.id}`, undefined, cardId)]);
   }
@@ -566,19 +623,21 @@ export function topupPaymentMethodButtons(
   yoomoneyEnabled?: boolean,
   yookassaEnabled?: boolean,
   cryptopayEnabled?: boolean,
+  lang?: string,
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(backStyle), "danger");
   const cardId = emojiIds?.card;
   const rows: InlineButton[][] = [];
   if (yoomoneyEnabled) {
-    rows.push([btn("💳 ЮMoney — оплата картой", `topup_yoomoney:${amount}`, "primary", cardId)]);
+    rows.push([btn(L(lg, "payYoomoney"), `topup_yoomoney:${amount}`, "primary", cardId)]);
   }
   if (yookassaEnabled) {
-    rows.push([btn("💳 ЮKassa — карта / СБП", `topup_yookassa:${amount}`, "primary", cardId)]);
+    rows.push([btn(L(lg, "payYookassa"), `topup_yookassa:${amount}`, "primary", cardId)]);
   }
   if (cryptopayEnabled) {
-    rows.push([btn("💳 Crypto Bot — криптовалюта", `topup_cryptopay:${amount}`, "primary", cardId)]);
+    rows.push([btn(L(lg, "payCryptoBot"), `topup_cryptopay:${amount}`, "primary", cardId)]);
   }
   for (const m of methods) {
     rows.push([btn(m.label, `topup:${amount}:${m.id}`, "primary", cardId)]);
@@ -597,13 +656,15 @@ export function extraOptionsButtons(
   options: SellOptionItem[],
   backLabel?: string | null,
   innerStyles?: InnerButtonStyles,
-  emojiIds?: InnerEmojiIds
+  emojiIds?: InnerEmojiIds,
+  lang?: string
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const cardId = emojiIds?.card;
   const rows: InlineButton[][] = options.map((o) => {
-    const extra = o.kind === "servers" && (o.trafficGb ?? 0) > 0 ? ` + ${o.trafficGb} ГБ` : "";
+    const extra = o.kind === "servers" && (o.trafficGb ?? 0) > 0 ? ` + ${o.trafficGb} ${L(lg, "extraOptionTraffic")}` : "";
     const label = `${o.name || o.kind}${extra} — ${o.price} ${o.currency}`.slice(0, 64);
     return [btn(label, `pay_option:${o.kind}:${o.id}`, "success", cardId)];
   });
@@ -622,66 +683,72 @@ export function optionPaymentMethodButtons(
   yoomoneyEnabled?: boolean,
   yookassaEnabled?: boolean,
   cryptopayEnabled?: boolean,
+  lang?: string,
 ): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const backSty = undefined;
   const cardId = emojiIds?.card;
   const rows: InlineButton[][] = [];
   if (balance >= option.price) {
-    rows.push([btn(`💰 Оплатить балансом (${option.price} ₽)`, `pay_option_balance:${option.kind}:${option.id}`, undefined, cardId)]);
+    rows.push([btn(`${L(lg, "payOptionBalance")} (${option.price} ₽)`, `pay_option_balance:${option.kind}:${option.id}`, undefined, cardId)]);
   }
   if (yoomoneyEnabled) {
-    rows.push([btn("💳 ЮMoney — карта", `pay_option_yoomoney:${option.kind}:${option.id}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payYoomoneyShort"), `pay_option_yoomoney:${option.kind}:${option.id}`, undefined, cardId)]);
   }
   if (yookassaEnabled !== false) {
-    rows.push([btn("💳 ЮKassa — карта / СБП", `pay_option_yookassa:${option.kind}:${option.id}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payYookassa"), `pay_option_yookassa:${option.kind}:${option.id}`, undefined, cardId)]);
   }
   if (cryptopayEnabled) {
-    rows.push([btn("💳 Crypto Bot — криптовалюта", `pay_option_cryptopay:${option.kind}:${option.id}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payCryptoBot"), `pay_option_cryptopay:${option.kind}:${option.id}`, undefined, cardId)]);
   }
   for (const m of plategaMethods) {
     rows.push([btn(m.label, `pay_option_platega:${option.kind}:${option.id}:${m.id}`, undefined, cardId)]);
   }
   if (rows.length === 0) {
-    rows.push([btn("💳 Оплата (ЮKassa)", `pay_option_yookassa:${option.kind}:${option.id}`, undefined, cardId)]);
+    rows.push([btn(L(lg, "payOptionYookassa"), `pay_option_yookassa:${option.kind}:${option.id}`, undefined, cardId)]);
   }
   rows.push([btn(back, "menu:extra_options", backSty, emojiIds?.back)]);
   return { inline_keyboard: rows };
 }
 
-export function profileButtons(backLabel?: string | null, innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds): InlineMarkup {
-  const back = (backLabel && backLabel.trim()) || DEFAULT_BACK_LABEL;
+export function profileButtons(backLabel?: string | null, innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds, lang?: string): InlineMarkup {
+  const lg = lang || "zh";
+  const back = (backLabel && backLabel.trim()) || defaultBackLabel(lg);
   const profile = resolveStyle(toStyle(innerStyles?.profile), "primary");
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const profileId = emojiIds?.profile;
   return {
     inline_keyboard: [
-      [btn("🌐 Язык", "profile:lang", profile, profileId), btn("💱 Валюта", "profile:currency", profile, profileId)],
+      [btn(L(lg, "btnLang"), "profile:lang", profile, profileId), btn(L(lg, "btnCurrency"), "profile:currency", profile, profileId)],
       [btn(back, "menu:main", backSty, emojiIds?.back)],
     ],
   };
 }
 
-export function langButtons(langs: string[], innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds): InlineMarkup {
+export function langButtons(langs: string[], innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds, lang?: string): InlineMarkup {
+  const lg = lang || "zh";
   const langStyle = resolveStyle(toStyle(innerStyles?.lang), "primary");
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const row: InlineButton[] = langs.slice(0, 3).map((l) => btn(l.toUpperCase(), `set_lang:${l}`, langStyle));
-  return { inline_keyboard: [row, [btn("◀️ Назад", "menu:profile", backSty, emojiIds?.back)]] };
+  return { inline_keyboard: [row, [btn(L(lg, "back"), "menu:profile", backSty, emojiIds?.back)]] };
 }
 
-export function currencyButtons(currencies: string[], innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds): InlineMarkup {
+export function currencyButtons(currencies: string[], innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds, lang?: string): InlineMarkup {
+  const lg = lang || "zh";
   const currencyStyle = resolveStyle(toStyle(innerStyles?.currency), "primary");
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   const row: InlineButton[] = currencies.slice(0, 3).map((c) => btn(c.toUpperCase(), `set_currency:${c}`, currencyStyle));
-  return { inline_keyboard: [row, [btn("◀️ Назад", "menu:profile", backSty, emojiIds?.back)]] };
+  return { inline_keyboard: [row, [btn(L(lg, "back"), "menu:profile", backSty, emojiIds?.back)]] };
 }
 
-export function trialConfirmButton(innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds): InlineMarkup {
+export function trialConfirmButton(innerStyles?: InnerButtonStyles, emojiIds?: InnerEmojiIds, lang?: string): InlineMarkup {
+  const lg = lang || "zh";
   const trialConfirm = resolveStyle(toStyle(innerStyles?.trialConfirm), "success");
   const backSty = resolveStyle(toStyle(innerStyles?.back), "danger");
   return {
     inline_keyboard: [
-      [btn("🎁 Активировать триал", "trial:confirm", trialConfirm, emojiIds?.trial), btn("Отмена", "menu:main", backSty, emojiIds?.back)],
+      [btn(L(lg, "btnTrialActivate"), "trial:confirm", trialConfirm, emojiIds?.trial), btn(L(lg, "cancel"), "menu:main", backSty, emojiIds?.back)],
     ],
   };
 }

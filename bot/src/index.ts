@@ -7,6 +7,7 @@
 import "dotenv/config";
 import { Bot, InputFile } from "grammy";
 import * as api from "./api.js";
+import { L, formatDaysI18n, getDefaultMenuTexts } from "./locales/index.js";
 import {
   mainMenu,
   backToMenu,
@@ -132,13 +133,13 @@ async function checkUserSubscription(userId: number, channelInput: string): Prom
 }
 
 /** Генерирует клавиатуру «Подписаться + Проверить подписку» */
-function subscribeKeyboard(channelInput: string): InlineMarkup {
+function subscribeKeyboard(channelInput: string, lang?: string): InlineMarkup {
   const target = parseForceChannelTarget(channelInput);
   const rows: InlineMarkup["inline_keyboard"] = [];
   if (target.joinUrl) {
-    rows.push([{ text: "📢 Подписаться на канал", url: target.joinUrl }]);
+    rows.push([{ text: L(lang ?? "zh", "forceSubscribeBtn"), url: target.joinUrl }]);
   }
-  rows.push([{ text: "✅ Я подписался", callback_data: "check_subscribe" }]);
+  rows.push([{ text: L(lang ?? "zh", "forceSubscribeCheck"), callback_data: "check_subscribe" }]);
   return { inline_keyboard: rows };
 }
 
@@ -160,15 +161,15 @@ async function enforceSubscription(
   if (!userId) return false;
   const result = await checkUserSubscription(userId, channelId);
   if (result.state === "subscribed") return false;
-  const msg = config.forceSubscribeMessage?.trim() || "Для использования бота подпишитесь на наш канал:";
+  const msg = config.forceSubscribeMessage?.trim() || L(getLang(userId), "forceSubscribeDefault");
   if (result.state === "cannot_verify") {
     await ctx.reply(
-      `⚠️ ${msg}\n\nПроверка подписки сейчас недоступна. Сообщите администратору: бот должен быть администратором канала, а в настройках должен быть указан корректный ID или @username.`,
-      { reply_markup: subscribeKeyboard(channelId) }
+      `⚠️ ${msg}\n\n${L(getLang(userId), "forceSubscribeCheckUnavailable")}`,
+      { reply_markup: subscribeKeyboard(channelId, getLang(userId)) }
     );
     return true;
   }
-  await ctx.reply(`⚠️ ${msg}`, { reply_markup: subscribeKeyboard(channelId) });
+  await ctx.reply(`⚠️ ${msg}`, { reply_markup: subscribeKeyboard(channelId, getLang(userId)) });
   return true;
 }
 
@@ -186,6 +187,8 @@ type TariffCategory = { id: string; name: string; emoji?: string; emojiKey?: str
 
 // Токены по telegram_id (в памяти; для продакшена лучше Redis/БД)
 const tokenStore = new Map<number, string>();
+// Кэш языка пользователя
+const langStore = new Map<number, string>();
 
 function getToken(userId: number): string | undefined {
   return tokenStore.get(userId);
@@ -193,6 +196,14 @@ function getToken(userId: number): string | undefined {
 
 function setToken(userId: number, token: string): void {
   tokenStore.set(userId, token);
+}
+
+function getLang(userId: number): string {
+  return langStore.get(userId) || "zh";
+}
+
+function setLang(userId: number, lang: string): void {
+  langStore.set(userId, lang);
 }
 
 // Пользователи, ожидающие ввода промокода
@@ -252,28 +263,13 @@ function progressBar(pct: number, barLen: number): string {
   return "█".repeat(filled) + "░".repeat(barLen - filled);
 }
 
-const DEFAULT_MENU_TEXTS: Record<string, string> = {
-  welcomeTitlePrefix: "🛡 ",
-  welcomeGreeting: "👋 Добро пожаловать в ",
-  balancePrefix: "💰 Баланс: ",
-  tariffPrefix: "💎 Ваш тариф : ",
-  subscriptionPrefix: "{{CHART}} Статус подписки — ",
-  statusInactive: "{{STATUS_INACTIVE}} Истекла",
-  statusActive: "{{STATUS_ACTIVE}} Активна",
-  statusExpired: "{{STATUS_EXPIRED}} Истекла",
-  statusLimited: "{{STATUS_LIMITED}} Ограничена",
-  statusDisabled: "{{STATUS_DISABLED}} Отключена",
-  expirePrefix: "📅 до ",
-  daysLeftPrefix: "⏰ осталось ",
-  devicesLabel: "📱 Устройств: ",
-  devicesAvailable: " доступно",
-  trafficPrefix: "📈 Трафик — ",
-  linkLabel: "🔗 Ссылка подключения:",
-  chooseAction: "Выберите действие:",
-};
+/** DEFAULT_MENU_TEXTS: now resolved per-language via getDefaultMenuTexts(lang) from locales */
+function getDefaultMenuTextsForLang(lang: string): Record<string, string> {
+  return getDefaultMenuTexts(lang);
+}
 
-const DEFAULT_TARIFFS_TEXT = "Тарифы\n\n{{CATEGORY}}\n{{TARIFFS}}\n\nВыберите тариф для оплаты:";
-const DEFAULT_PAYMENT_TEXT = "Оплата: {{NAME}} — {{PRICE}}\n\n{{ACTION}}";
+function getDefaultTariffsText(lang: string): string { return L(lang, "defaultTariffsText"); }
+function getDefaultPaymentText(lang: string): string { return L(lang, "defaultPaymentText"); }
 
 type BotTariffLineFields = {
   name?: boolean;
@@ -302,10 +298,11 @@ function formatDaysRu(days: number): string {
   return "дней";
 }
 
-function formatTariffLine(tariff: TariffItem, fields: Required<BotTariffLineFields>): string {
+function formatTariffLine(tariff: TariffItem, fields: Required<BotTariffLineFields>, lang?: string): string {
+  const lg = lang || "zh";
   const parts: string[] = [];
   if (fields.name) parts.push(tariff.name);
-  if (fields.durationDays) parts.push(`${tariff.durationDays} ${formatDaysRu(tariff.durationDays)}`);
+  if (fields.durationDays) parts.push(`${tariff.durationDays} ${formatDaysI18n(tariff.durationDays, lg)}`);
   if (fields.price) {
     const pricePart = fields.currency ? `${tariff.price} ${tariff.currency}` : `${tariff.price}`;
     parts.push(pricePart);
@@ -314,11 +311,11 @@ function formatTariffLine(tariff: TariffItem, fields: Required<BotTariffLineFiel
   }
   if (fields.trafficLimit) {
     const limit = tariff.trafficLimitBytes;
-    parts.push(limit == null ? "трафик без лимита" : `трафик ${bytesToGb(limit)} GB`);
+    parts.push(limit == null ? L(lg, "trafficUnlimited") : `${L(lg, "trafficLabel")} ${bytesToGb(limit)} GB`);
   }
   if (fields.deviceLimit) {
     const limit = tariff.deviceLimit;
-    parts.push(limit == null ? "устройства без лимита" : `устройства ${limit}`);
+    parts.push(limit == null ? L(lg, "devicesUnlimited") : `${L(lg, "devicesLabelTariff")} ${limit}`);
   }
   if (!parts.length) return `• ${tariff.name}`;
   return `• ${parts.join(" — ")}`;
@@ -344,15 +341,16 @@ function renderPaymentText(
 
 function buildPaymentMessage(
   config: Awaited<ReturnType<typeof api.getPublicConfig>> | null | undefined,
-  vars: { name: string; price: string; amount: string; currency: string; action: string }
+  vars: { name: string; price: string; amount: string; currency: string; action: string },
+  lang?: string
 ): { text: string; entities: CustomEmojiEntity[] } {
-  const template = (config?.botPaymentText ?? "").trim() || DEFAULT_PAYMENT_TEXT;
+  const template = (config?.botPaymentText ?? "").trim() || getDefaultPaymentText(lang || "zh");
   const base = renderPaymentText(template, vars);
   return applyCustomEmojiPlaceholders(base, config?.botEmojis);
 }
 
-function t(texts: Record<string, string> | null | undefined, key: string): string {
-  return (texts?.[key] ?? DEFAULT_MENU_TEXTS[key]) || "";
+function t(texts: Record<string, string> | null | undefined, key: string, lang?: string): string {
+  return (texts?.[key] ?? getDefaultMenuTextsForLang(lang || "zh")[key]) || "";
 }
 
 /**
@@ -366,7 +364,7 @@ function getLocaleTexts(
   const locales = config?.botMenuTextsLocales;
   if (locales) {
     const normalized = lang.toLowerCase();
-    const locale = locales[normalized] ?? locales[normalized.split("-")[0]] ?? locales["en"] ?? locales["ru"] ?? null;
+    const locale = locales[normalized] ?? locales[normalized.split("-")[0]] ?? locales["en"] ?? locales["zh"] ?? null;
     if (locale) return locale;
   }
   return config?.botMenuTexts ?? config?.resolvedBotMenuTexts ?? null;
@@ -374,16 +372,16 @@ function getLocaleTexts(
 
 /**
  * Maps a Telegram language_code (e.g. "zh-hans", "en-US") to a supported
- * activeLanguages entry. Falls back to "ru" if none matches.
+ * activeLanguages entry. Falls back to "zh" if none matches.
  */
 function resolveLangCode(tgLang: string | undefined, activeLanguages?: string[] | null): string {
-  if (!tgLang) return "ru";
-  const supported = activeLanguages?.length ? activeLanguages : ["ru", "en", "zh"];
+  if (!tgLang) return "zh";
+  const supported = activeLanguages?.length ? activeLanguages : ["zh", "en", "ru"];
   const normalized = tgLang.toLowerCase().split("-")[0];
   // Map Telegram codes to our codes
   const aliases: Record<string, string> = { "zh": "zh", "hans": "zh", "hant": "zh" };
   const code = aliases[normalized] ?? normalized;
-  return supported.includes(code) ? code : supported[0] ?? "ru";
+  return supported.includes(code) ? code : supported[0] ?? "zh";
 }
 
 /**
@@ -537,11 +535,11 @@ function buildMainMenuText(opts: {
   menuLineVisibility?: Record<string, boolean> | null;
   menuTextCustomEmojiIds?: Record<string, string> | null;
   botEmojis?: Record<string, { unicode?: string; tgEmojiId?: string }> | null;
-  /** Client's preferred language (e.g. "ru", "en", "zh"). Defaults to "ru". */
+  /** Client's preferred language (e.g. "ru", "en", "zh"). Defaults to "zh". */
   lang?: string;
 }): { text: string; entities: CustomEmojiEntity[] } {
-  const { serviceName, balance, currency, subscription, tariffDisplayName, menuTexts, menuLineVisibility, menuTextCustomEmojiIds, botEmojis, lang = "ru" } = opts;
-  const name = serviceName.trim() || "Кабинет";
+  const { serviceName, balance, currency, subscription, tariffDisplayName, menuTexts, menuLineVisibility, menuTextCustomEmojiIds, botEmojis, lang = "zh" } = opts;
+  const name = serviceName.trim() || L(lang, "cabinet");
   const balanceStr = formatMoney(balance, currency);
   const lines: string[] = [];
   const lineStartKeys: (string | null)[] = [];
@@ -555,19 +553,19 @@ function buildMainMenuText(opts: {
     lineEntitiesByIndex.push(entities);
   };
 
-  pushLine("welcomeGreeting", t(menuTexts, "welcomeGreeting"));
-  pushLine("welcomeTitlePrefix", t(menuTexts, "welcomeTitlePrefix") + name);
-  pushLine("balancePrefix", t(menuTexts, "balancePrefix") + balanceStr);
+  pushLine("welcomeGreeting", t(menuTexts, "welcomeGreeting", lang));
+  pushLine("welcomeTitlePrefix", t(menuTexts, "welcomeTitlePrefix", lang) + name);
+  pushLine("balancePrefix", t(menuTexts, "balancePrefix", lang) + balanceStr);
 
   const user = getSubUser(subscription);
   const url = getSubscriptionUrl(subscription);
-  const tariffName = (tariffDisplayName && tariffDisplayName.trim()) || "Тариф не выбран";
-  pushLine("tariffPrefix", t(menuTexts, "tariffPrefix") + tariffName);
+  const tariffName = (tariffDisplayName && tariffDisplayName.trim()) || L(lang, "tariffNotSelected");
+  pushLine("tariffPrefix", t(menuTexts, "tariffPrefix", lang) + tariffName);
 
   if (!user && !url) {
-    pushLine("subscriptionPrefix", t(menuTexts, "subscriptionPrefix") + t(menuTexts, "statusInactive"));
-    pushLine("trafficPrefix", t(menuTexts, "trafficPrefix") + " 0.00 GB");
-    pushLine("chooseAction", t(menuTexts, "chooseAction"));
+    pushLine("subscriptionPrefix", t(menuTexts, "subscriptionPrefix", lang) + t(menuTexts, "statusInactive", lang));
+    pushLine("trafficPrefix", t(menuTexts, "trafficPrefix", lang) + " 0.00 GB");
+    pushLine("chooseAction", t(menuTexts, "chooseAction", lang));
   } else {
     const expireAt = user?.expireAt ?? user?.expirationDate ?? user?.expire_at;
     let expireDate: Date | null = null;
@@ -577,10 +575,10 @@ function buildMainMenuText(opts: {
     }
     const status = (user?.status ?? user?.userStatus ?? "ACTIVE") as string;
     const statusLabel =
-      status === "ACTIVE" ? t(menuTexts, "statusActive")
-      : status === "EXPIRED" ? t(menuTexts, "statusExpired")
-      : status === "LIMITED" ? t(menuTexts, "statusLimited")
-      : status === "DISABLED" ? t(menuTexts, "statusDisabled")
+      status === "ACTIVE" ? t(menuTexts, "statusActive", lang)
+      : status === "EXPIRED" ? t(menuTexts, "statusExpired", lang)
+      : status === "LIMITED" ? t(menuTexts, "statusLimited", lang)
+      : status === "DISABLED" ? t(menuTexts, "statusDisabled", lang)
       : `🟡 ${status}`;
     const expireStr = expireDate
       ? expireDate.toLocaleString(lang === "zh" ? "zh-CN" : lang === "en" ? "en-GB" : "ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -590,16 +588,16 @@ function buildMainMenuText(opts: {
         ? Math.max(0, Math.ceil((expireDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
         : null;
 
-    pushLine("subscriptionPrefix", t(menuTexts, "subscriptionPrefix") + statusLabel);
-    pushLine("expirePrefix", t(menuTexts, "expirePrefix") + expireStr);
+    pushLine("subscriptionPrefix", t(menuTexts, "subscriptionPrefix", lang) + statusLabel);
+    pushLine("expirePrefix", t(menuTexts, "expirePrefix", lang) + expireStr);
     if (daysLeft != null) {
-      pushLine("daysLeftPrefix", t(menuTexts, "daysLeftPrefix") + formatDaysForLang(daysLeft, lang));
+      pushLine("daysLeftPrefix", t(menuTexts, "daysLeftPrefix", lang) + formatDaysForLang(daysLeft, lang));
     }
     const deviceLimit = user?.hwidDeviceLimit ?? user?.deviceLimit ?? user?.device_limit;
     const devicesUsed = user?.devicesUsed ?? user?.devices_used;
     if (deviceLimit != null && typeof deviceLimit === "number") {
       const available = devicesUsed != null ? Math.max(0, deviceLimit - Number(devicesUsed)) : deviceLimit;
-      pushLine("devicesLabel", t(menuTexts, "devicesLabel") + available + t(menuTexts, "devicesAvailable"));
+      pushLine("devicesLabel", t(menuTexts, "devicesLabel", lang) + available + t(menuTexts, "devicesAvailable", lang));
     }
     const trafficUsedBytes =
       (user?.userTraffic as { usedTrafficBytes?: number } | undefined)?.usedTrafficBytes ??
@@ -614,21 +612,21 @@ function buildMainMenuText(opts: {
       const usedGb = bytesToGb(usedNum);
       const limitGb = bytesToGb(limitNum);
       const pctInt = Math.round(Math.min(100, pct * 100));
-      pushLine("trafficPrefix", t(menuTexts, "trafficPrefix") + `🟢 ${progressBar(pct, 14)} ${pctInt}% (${usedGb} / ${limitGb} GB)`);
+      pushLine("trafficPrefix", t(menuTexts, "trafficPrefix", lang) + `🟢 ${progressBar(pct, 14)} ${pctInt}% (${usedGb} / ${limitGb} GB)`);
     } else if (Number.isFinite(usedNum)) {
-      pushLine("trafficPrefix", t(menuTexts, "trafficPrefix") + ` ${bytesToGb(usedNum)} GB`);
+      pushLine("trafficPrefix", t(menuTexts, "trafficPrefix", lang) + ` ${bytesToGb(usedNum)} GB`);
     } else {
-      pushLine("trafficPrefix", t(menuTexts, "trafficPrefix") + " 0.00 GB");
+      pushLine("trafficPrefix", t(menuTexts, "trafficPrefix", lang) + " 0.00 GB");
     }
     if (url) {
       if (shouldShow("linkLabel")) {
-        const { text: label, entities } = applyCustomEmojiPlaceholders(t(menuTexts, "linkLabel"), botEmojis);
+        const { text: label, entities } = applyCustomEmojiPlaceholders(t(menuTexts, "linkLabel", lang), botEmojis);
         lines.push(label, url);
         lineStartKeys.push("linkLabel", null);
         lineEntitiesByIndex.push(entities, []);
       }
     }
-    pushLine("chooseAction", t(menuTexts, "chooseAction"));
+    pushLine("chooseAction", t(menuTexts, "chooseAction", lang));
   }
 
   const text = lines.join("\n");
@@ -742,7 +740,7 @@ bot.command("start", async (ctx) => {
 
   try {
     const config = await api.getPublicConfig();
-    const name = config?.serviceName?.trim() || "Кабинет";
+    const name = config?.serviceName?.trim() || L("zh", "cabinet");
 
     const auth = await api.registerByTelegram({
       telegramId,
@@ -757,17 +755,18 @@ bot.command("start", async (ctx) => {
 
     setToken(from.id, auth.token);
     const client = auth.client;
-    const clientLang = (client?.preferredLang ?? config?.activeLanguages?.[0] ?? "ru").toLowerCase();
+    const clientLang = (client?.preferredLang ?? config?.activeLanguages?.[0] ?? "zh").toLowerCase();
+    setLang(from.id, clientLang);
 
     // Если это промо-ссылка — активируем промокод
     if (promoCode) {
       try {
         const result = await api.activatePromo(auth.token, promoCode);
-        await ctx.reply(`✅ ${result.message}\n\nНажмите /start чтобы открыть меню.`);
+        await ctx.reply(`✅ ${result.message}\n\n${L(clientLang, "pressStartForMenu")}`);
         return;
       } catch (promoErr: unknown) {
-        const promoMsg = promoErr instanceof Error ? promoErr.message : "Ошибка активации промокода";
-        await ctx.reply(`❌ ${promoMsg}\n\nНажмите /start чтобы открыть меню.`);
+        const promoMsg = promoErr instanceof Error ? promoErr.message : L(clientLang, "promoActivationError");
+        await ctx.reply(`❌ ${promoMsg}\n\n${L(clientLang, "pressStartForMenu")}`);
         return;
       }
     }
@@ -814,10 +813,11 @@ bot.command("start", async (ctx) => {
       showExtraOptions: config?.sellOptionsEnabled === true && (config?.sellOptions?.length ?? 0) > 0,
       buttonsPerRow: config?.botButtonsPerRow ?? 1,
       remnaSubscriptionUrl: config?.useRemnaSubscriptionPage ? vpnUrl : null,
+      lang: clientLang,
     });
     const isBotAdmin = config?.botAdminTelegramIds?.includes(String(from.id)) ?? false;
     if (isBotAdmin) {
-      markup.inline_keyboard.push([{ text: "⚙️ Панель админа", callback_data: "admin:menu" }]);
+      markup.inline_keyboard.push([{ text: L(clientLang, "btnAdminPanel"), callback_data: "admin:menu" }]);
     }
 
     const media = logoToMediaSource(config?.logoBot);
@@ -832,7 +832,7 @@ bot.command("start", async (ctx) => {
       await ctx.reply(text, { entities: entities.length ? entities : undefined, reply_markup: markup });
     }
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Ошибка входа";
+    const msg = e instanceof Error ? e.message : L(getLang(from.id), "loginError");
     await ctx.reply(`❌ ${msg}`);
   }
 });
@@ -841,16 +841,17 @@ bot.command("start", async (ctx) => {
 bot.command("link", async (ctx) => {
   const from = ctx.from;
   if (!from) return;
+  const lg = getLang(from.id);
   const code = (ctx.match?.trim() || "").replace(/\s+/g, " ");
   if (!code) {
-    await ctx.reply("Отправьте код из кабинета на сайте.\nПример: /link 123456");
+    await ctx.reply(L(lg, "linkUsage"));
     return;
   }
   try {
     await api.linkTelegramFromBot(code, from.id, from.username ?? undefined);
-    await ctx.reply("✅ Telegram успешно привязан к вашему аккаунту. Теперь вы можете входить через бота.");
+    await ctx.reply(L(lg, "linkSuccess"));
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Ошибка привязки";
+    const msg = e instanceof Error ? e.message : L(lg, "linkError");
     await ctx.reply(`❌ ${msg}`);
   }
 });
@@ -865,8 +866,9 @@ bot.on("callback_query:data", async (ctx) => {
   // Админ-панель в боте (не требует токена пользователя)
   if (data.startsWith("admin:")) {
     const config = await api.getPublicConfig();
+    const lg = getLang(userId);
     if (!config?.botAdminTelegramIds?.includes(String(userId))) {
-      await ctx.answerCallbackQuery({ text: "Доступ запрещён", show_alert: true }).catch(() => {});
+      await ctx.answerCallbackQuery({ text: L(lg, "accessDenied"), show_alert: true }).catch(() => {});
       return;
     }
     if (data === "admin:menu") {
@@ -879,39 +881,39 @@ bot.on("callback_query:data", async (ctx) => {
       lastSquadsForRemove.delete(userId);
       const markup: InlineMarkup = {
         inline_keyboard: [
-          [{ text: "📊 Статистика", callback_data: "admin:stats" }],
-          [{ text: "🔔 Уведомления", callback_data: "admin:notifications" }],
-          [{ text: "👥 Клиенты", callback_data: "admin:clients:1" }],
-          [{ text: "🔍 Поиск пользователя", callback_data: "admin:search" }],
+          [{ text: L(lg, "adminStats"), callback_data: "admin:stats" }],
+          [{ text: L(lg, "adminNotifications"), callback_data: "admin:notifications" }],
+          [{ text: L(lg, "adminClients"), callback_data: "admin:clients:1" }],
+          [{ text: L(lg, "adminSearch"), callback_data: "admin:search" }],
           [
-            { text: "💳 Ожидают оплаты", callback_data: "admin:payments:pending:1" },
-            { text: "💰 Последние платежи", callback_data: "admin:payments:paid:1" },
+            { text: L(lg, "adminPaymentsPending"), callback_data: "admin:payments:pending:1" },
+            { text: L(lg, "adminPaymentsRecent"), callback_data: "admin:payments:paid:1" },
           ],
-          [{ text: "📢 Рассылка", callback_data: "admin:broadcast" }],
-          [{ text: "◀️ В меню", callback_data: "menu:main" }],
+          [{ text: L(lg, "adminBroadcast"), callback_data: "admin:broadcast" }],
+          [{ text: L(lg, "backToMenu"), callback_data: "menu:main" }],
         ],
       };
-      await editMessageContent(ctx, "⚙️ Панель админа\n\nВыберите раздел:", markup);
+      await editMessageContent(ctx, L(lg, "adminTitle"), markup);
       return;
     }
     if (data === "admin:notifications") {
       const settings = await api.getBotAdminNotificationSettings(userId);
       const s = settings;
-      const yesNo = (v: boolean) => (v ? "Вкл" : "Выкл");
+      const yesNo = (v: boolean) => (v ? L(lg, "adminOn") : L(lg, "adminOff"));
       const text =
-        "🔔 Настройки уведомлений\n\n" +
-        `Пополнение баланса: ${yesNo(s.notifyBalanceTopup)}\n` +
-        `Оплата тарифов: ${yesNo(s.notifyTariffPayment)}\n` +
-        `Новые клиенты: ${yesNo(s.notifyNewClient)}\n` +
-        `Новые тикеты: ${yesNo(s.notifyNewTicket)}\n\n` +
-        "Нажмите на пункт ниже, чтобы переключить.";
+        L(lg, "adminNotifTitle") + "\n\n" +
+        `${L(lg, "adminNotifBalance")}: ${yesNo(s.notifyBalanceTopup)}\n` +
+        `${L(lg, "adminNotifTariff")}: ${yesNo(s.notifyTariffPayment)}\n` +
+        `${L(lg, "adminNotifNewClient")}: ${yesNo(s.notifyNewClient)}\n` +
+        `${L(lg, "adminNotifNewTicket")}: ${yesNo(s.notifyNewTicket)}\n\n` +
+        L(lg, "adminNotifToggleHint");
       const markup: InlineMarkup = {
         inline_keyboard: [
-          [{ text: `💰 Пополнение баланса: ${yesNo(s.notifyBalanceTopup)}`, callback_data: "admin:notif:balance" }],
-          [{ text: `📦 Оплата тарифов: ${yesNo(s.notifyTariffPayment)}`, callback_data: "admin:notif:tariff" }],
-          [{ text: `👤 Новые клиенты: ${yesNo(s.notifyNewClient)}`, callback_data: "admin:notif:newclient" }],
-          [{ text: `🎫 Новые тикеты: ${yesNo(s.notifyNewTicket)}`, callback_data: "admin:notif:newticket" }],
-          [{ text: "◀️ В админку", callback_data: "admin:menu" }],
+          [{ text: `💰 ${L(lg, "adminNotifBalance")}: ${yesNo(s.notifyBalanceTopup)}`, callback_data: "admin:notif:balance" }],
+          [{ text: `📦 ${L(lg, "adminNotifTariff")}: ${yesNo(s.notifyTariffPayment)}`, callback_data: "admin:notif:tariff" }],
+          [{ text: `👤 ${L(lg, "adminNotifNewClient")}: ${yesNo(s.notifyNewClient)}`, callback_data: "admin:notif:newclient" }],
+          [{ text: `🎫 ${L(lg, "adminNotifNewTicket")}: ${yesNo(s.notifyNewTicket)}`, callback_data: "admin:notif:newticket" }],
+          [{ text: L(lg, "backToAdmin"), callback_data: "admin:menu" }],
         ],
       };
       await editMessageContent(ctx, text, markup);
@@ -932,21 +934,21 @@ bot.on("callback_query:data", async (ctx) => {
       }
       const updated = await api.patchBotAdminNotificationSettings(userId, payload);
       const s = updated;
-      const yesNo = (v: boolean) => (v ? "Вкл" : "Выкл");
+      const yesNo = (v: boolean) => (v ? L(lg, "adminOn") : L(lg, "adminOff"));
       const text =
-        "🔔 Настройки уведомлений\n\n" +
-        `Пополнение баланса: ${yesNo(s.notifyBalanceTopup)}\n` +
-        `Оплата тарифов: ${yesNo(s.notifyTariffPayment)}\n` +
-        `Новые клиенты: ${yesNo(s.notifyNewClient)}\n` +
-        `Новые тикеты: ${yesNo(s.notifyNewTicket)}\n\n` +
-        "Нажмите на пункт ниже, чтобы переключить.";
+        L(lg, "adminNotifTitle") + "\n\n" +
+        `${L(lg, "adminNotifBalance")}: ${yesNo(s.notifyBalanceTopup)}\n` +
+        `${L(lg, "adminNotifTariff")}: ${yesNo(s.notifyTariffPayment)}\n` +
+        `${L(lg, "adminNotifNewClient")}: ${yesNo(s.notifyNewClient)}\n` +
+        `${L(lg, "adminNotifNewTicket")}: ${yesNo(s.notifyNewTicket)}\n\n` +
+        L(lg, "adminNotifToggleHint");
       const markup: InlineMarkup = {
         inline_keyboard: [
-          [{ text: `💰 Пополнение баланса: ${yesNo(s.notifyBalanceTopup)}`, callback_data: "admin:notif:balance" }],
-          [{ text: `📦 Оплата тарифов: ${yesNo(s.notifyTariffPayment)}`, callback_data: "admin:notif:tariff" }],
-          [{ text: `👤 Новые клиенты: ${yesNo(s.notifyNewClient)}`, callback_data: "admin:notif:newclient" }],
-          [{ text: `🎫 Новые тикеты: ${yesNo(s.notifyNewTicket)}`, callback_data: "admin:notif:newticket" }],
-          [{ text: "◀️ В админку", callback_data: "admin:menu" }],
+          [{ text: `💰 ${L(lg, "adminNotifBalance")}: ${yesNo(s.notifyBalanceTopup)}`, callback_data: "admin:notif:balance" }],
+          [{ text: `📦 ${L(lg, "adminNotifTariff")}: ${yesNo(s.notifyTariffPayment)}`, callback_data: "admin:notif:tariff" }],
+          [{ text: `👤 ${L(lg, "adminNotifNewClient")}: ${yesNo(s.notifyNewClient)}`, callback_data: "admin:notif:newclient" }],
+          [{ text: `🎫 ${L(lg, "adminNotifNewTicket")}: ${yesNo(s.notifyNewTicket)}`, callback_data: "admin:notif:newticket" }],
+          [{ text: L(lg, "backToAdmin"), callback_data: "admin:menu" }],
         ],
       };
       await editMessageContent(ctx, text, markup);
@@ -956,8 +958,8 @@ bot.on("callback_query:data", async (ctx) => {
       awaitingAdminSearch.add(userId);
       await editMessageContent(
         ctx,
-        "🔍 Поиск пользователя\n\nВведите Telegram ID, @username или email:",
-        { inline_keyboard: [[{ text: "◀️ Отмена", callback_data: "admin:menu" }]] }
+        L(lg, "adminSearchTitle"),
+        { inline_keyboard: [[{ text: L(lg, "cancel"), callback_data: "admin:menu" }]] }
       );
       return;
     }
@@ -966,9 +968,9 @@ bot.on("callback_query:data", async (ctx) => {
       const u = stats.users;
       const s = stats.sales;
       const text =
-        `📊 Статистика\n\n👥 Пользователи: ${u.total}\nС Remna: ${u.withRemna}\nНовых за 7 дн.: ${u.newLast7Days}\nНовых за 30 дн.: ${u.newLast30Days}\n\n` +
-        `💰 Продажи (всего): ${s.totalAmount} ₽ (${s.totalCount})\nЗа 7 дн.: ${s.last7DaysAmount} ₽ (${s.last7DaysCount})\nЗа 30 дн.: ${s.last30DaysAmount} ₽ (${s.last30DaysCount})`;
-      const back: InlineMarkup = { inline_keyboard: [[{ text: "◀️ В админку", callback_data: "admin:menu" }]] };
+        `${L(lg, "adminStatsTitle")}\n\n${L(lg, "adminStatsUsers")}: ${u.total}\n${L(lg, "adminStatsWithRemna")}: ${u.withRemna}\n${L(lg, "adminStatsNew7")}: ${u.newLast7Days}\n${L(lg, "adminStatsNew30")}: ${u.newLast30Days}\n\n` +
+        `${L(lg, "adminStatsSalesTotal")}: ${s.totalAmount} ₽ (${s.totalCount})\n${L(lg, "adminStatsSales7")}: ${s.last7DaysAmount} ₽ (${s.last7DaysCount})\n${L(lg, "adminStatsSales30")}: ${s.last30DaysAmount} ₽ (${s.last30DaysCount})`;
+      const back: InlineMarkup = { inline_keyboard: [[{ text: L(lg, "backToAdmin"), callback_data: "admin:menu" }]] };
       await editMessageContent(ctx, text, back);
       return;
     }
@@ -979,12 +981,12 @@ bot.on("callback_query:data", async (ctx) => {
         // Показать первую страницу без поиска
         const { items, total, limit } = await api.getBotAdminClients(userId, 1);
         const totalPages = Math.max(1, Math.ceil(total / limit));
-        let msg = `👥 Клиенты (${total})\n\n`;
+        let msg = `${L(lg, "adminClientsTitle")} (${total})\n\n`;
         items.forEach((c, i) => {
           const label = c.email || c.telegramUsername || c.telegramId || c.id.slice(0, 8);
           msg += `${i + 1}. ${label} ${c.isBlocked ? "🚫" : ""}\n`;
         });
-        msg += `\nСтр. 1/${totalPages}`;
+        msg += `\n${L(lg, "adminPage")} 1/${totalPages}`;
         const rows: InlineMarkup["inline_keyboard"] = [];
         items.forEach((c) => {
           rows.push([
@@ -995,8 +997,8 @@ bot.on("callback_query:data", async (ctx) => {
           ]);
         });
         const nav: InlineMarkup["inline_keyboard"][0] = [];
-        nav.push({ text: "◀️ В админку", callback_data: "admin:menu" });
-        if (totalPages > 1) nav.push({ text: "Вперёд ▶", callback_data: "admin:clients:2" });
+        nav.push({ text: L(lg, "backToAdmin"), callback_data: "admin:menu" });
+        if (totalPages > 1) nav.push({ text: L(lg, "adminNext"), callback_data: "admin:clients:2" });
         rows.push(nav);
         await editMessageContent(ctx, msg, { inline_keyboard: rows });
         return;
@@ -1005,12 +1007,12 @@ bot.on("callback_query:data", async (ctx) => {
       const search = lastAdminSearch.get(userId);
       const { items, total, limit } = await api.getBotAdminClients(userId, page, search);
       const totalPages = Math.max(1, Math.ceil(total / limit));
-      let msg = search ? `👥 Поиск «${search}» (${total})\n\n` : `👥 Клиенты (${total})\n\n`;
+      let msg = search ? `${L(lg, "adminClientSearch")} «${search}» (${total})\n\n` : `${L(lg, "adminClientsTitle")} (${total})\n\n`;
       items.forEach((c, i) => {
         const label = c.email || c.telegramUsername || c.telegramId || c.id.slice(0, 8);
         msg += `${(page - 1) * limit + i + 1}. ${label} ${c.isBlocked ? "🚫" : ""}\n`;
       });
-      msg += `\nСтр. ${page}/${totalPages}`;
+      msg += `\n${L(lg, "adminPage")} ${page}/${totalPages}`;
       const rows: InlineMarkup["inline_keyboard"] = [];
       items.forEach((c) => {
         rows.push([
@@ -1021,10 +1023,10 @@ bot.on("callback_query:data", async (ctx) => {
         ]);
       });
       const nav: InlineMarkup["inline_keyboard"][0] = [];
-      if (page > 1) nav.push({ text: "◀ Назад", callback_data: `admin:clients:${page - 1}` });
-      nav.push({ text: "◀️ В админку", callback_data: "admin:menu" });
-      if (search) nav.push({ text: "✖ Сбросить поиск", callback_data: "admin:clients:clear" });
-      if (page < totalPages) nav.push({ text: "Вперёд ▶", callback_data: `admin:clients:${page + 1}` });
+      if (page > 1) nav.push({ text: L(lg, "adminPrev"), callback_data: `admin:clients:${page - 1}` });
+      nav.push({ text: L(lg, "backToAdmin"), callback_data: "admin:menu" });
+      if (search) nav.push({ text: L(lg, "adminResetSearch"), callback_data: "admin:clients:clear" });
+      if (page < totalPages) nav.push({ text: L(lg, "adminNext"), callback_data: `admin:clients:${page + 1}` });
       rows.push(nav);
       await editMessageContent(ctx, msg, { inline_keyboard: rows });
       return;
@@ -1033,34 +1035,34 @@ bot.on("callback_query:data", async (ctx) => {
       const clientId = data.slice("admin:client:".length);
       if (!clientId) return;
       const client = await api.getBotAdminClient(userId, clientId);
-      const created = client.createdAt ? new Date(client.createdAt).toLocaleString("ru-RU") : "—";
+      const created = client.createdAt ? new Date(client.createdAt).toLocaleString(lg === "zh" ? "zh-CN" : lg === "en" ? "en-US" : "ru-RU") : "—";
       let text = `👤 ${client.email || client.telegramUsername || client.telegramId || client.id}\n\n`;
-      text += `ID: ${client.id}\nБаланс: ${client.balance}\nРефералов: ${client._count?.referrals ?? 0}\nСоздан: ${created}\n`;
-      if (client.isBlocked) text += `\n🚫 Заблокирован${client.blockReason ? `: ${client.blockReason}` : ""}`;
+      text += `${L(lg, "adminClientId")}: ${client.id}\n${L(lg, "adminClientBalance")}: ${client.balance}\n${L(lg, "adminClientReferrals")}: ${client._count?.referrals ?? 0}\n${L(lg, "adminClientCreated")}: ${created}\n`;
+      if (client.isBlocked) text += `\n${L(lg, "adminClientBlocked")}${client.blockReason ? `: ${client.blockReason}` : ""}`;
       const kb: InlineMarkup["inline_keyboard"] = [];
       if (client.isBlocked) {
-        kb.push([{ text: "✅ Разблокировать", callback_data: `admin:unblock:${client.id}` }]);
+        kb.push([{ text: L(lg, "adminUnblock"), callback_data: `admin:unblock:${client.id}` }]);
       } else {
-        kb.push([{ text: "🚫 Заблокировать", callback_data: `admin:block:${client.id}` }]);
+        kb.push([{ text: L(lg, "adminBlock"), callback_data: `admin:block:${client.id}` }]);
       }
-      kb.push([{ text: "💵 Пополнить баланс", callback_data: `admin:balance:${client.id}` }]);
+      kb.push([{ text: L(lg, "adminTopupBalance"), callback_data: `admin:balance:${client.id}` }]);
       if (client.remnawaveUuid) {
         kb.push(
           [
-            { text: "🔄 Отозвать подписку", callback_data: `admin:remna:revoke:${client.id}` },
-            { text: "⏸ Отключить Remna", callback_data: `admin:remna:disable:${client.id}` },
+            { text: L(lg, "adminRevokeSubscription"), callback_data: `admin:remna:revoke:${client.id}` },
+            { text: L(lg, "adminDisableRemna"), callback_data: `admin:remna:disable:${client.id}` },
           ],
           [
-            { text: "▶ Включить Remna", callback_data: `admin:remna:enable:${client.id}` },
-            { text: "📊 Сбросить трафик", callback_data: `admin:remna:reset:${client.id}` },
+            { text: L(lg, "adminEnableRemna"), callback_data: `admin:remna:enable:${client.id}` },
+            { text: L(lg, "adminResetTraffic"), callback_data: `admin:remna:reset:${client.id}` },
           ],
           [
-            { text: "➕ Добавить сквад", callback_data: `admin:squad:add:${client.id}` },
-            { text: "➖ Убрать сквад", callback_data: `admin:squad:remove:${client.id}` },
+            { text: L(lg, "adminAddSquad"), callback_data: `admin:squad:add:${client.id}` },
+            { text: L(lg, "adminRemoveSquad"), callback_data: `admin:squad:remove:${client.id}` },
           ]
         );
       }
-      kb.push([{ text: "◀️ К списку", callback_data: "admin:clients:1" }]);
+      kb.push([{ text: L(lg, "backToList"), callback_data: "admin:clients:1" }]);
       await editMessageContent(ctx, text, { inline_keyboard: kb });
       return;
     }
@@ -1070,8 +1072,8 @@ bot.on("callback_query:data", async (ctx) => {
       awaitingAdminBalance.set(userId, clientId);
       await editMessageContent(
         ctx,
-        "💵 Пополнение баланса\n\nВведите сумму (число):",
-        { inline_keyboard: [[{ text: "◀️ Отмена", callback_data: "admin:menu" }]] }
+        L(lg, "adminTopupBalanceTitle"),
+        { inline_keyboard: [[{ text: L(lg, "cancel"), callback_data: "admin:menu" }]] }
       );
       return;
     }
@@ -1080,12 +1082,12 @@ bot.on("callback_query:data", async (ctx) => {
       if (!clientId) return;
       try {
         await api.postBotAdminClientRemnaRevoke(userId, clientId);
-        await editMessageContent(ctx, `✅ Подписка Remna отозвана для клиента.`, {
-          inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, L(lg, "adminSubscriptionRevoked"), {
+          inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
         });
       } catch (e: unknown) {
-        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-          inline_keyboard: [[{ text: "◀️ Назад", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+          inline_keyboard: [[{ text: L(lg, "back"), callback_data: `admin:client:${clientId}` }]],
         });
       }
       return;
@@ -1095,12 +1097,12 @@ bot.on("callback_query:data", async (ctx) => {
       if (!clientId) return;
       try {
         await api.postBotAdminClientRemnaDisable(userId, clientId);
-        await editMessageContent(ctx, "✅ Пользователь отключён в Remna.", {
-          inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, L(lg, "adminRemnaDisabled"), {
+          inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
         });
       } catch (e: unknown) {
-        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-          inline_keyboard: [[{ text: "◀️ Назад", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+          inline_keyboard: [[{ text: L(lg, "back"), callback_data: `admin:client:${clientId}` }]],
         });
       }
       return;
@@ -1110,12 +1112,12 @@ bot.on("callback_query:data", async (ctx) => {
       if (!clientId) return;
       try {
         await api.postBotAdminClientRemnaEnable(userId, clientId);
-        await editMessageContent(ctx, "✅ Пользователь включён в Remna.", {
-          inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, L(lg, "adminRemnaEnabled"), {
+          inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
         });
       } catch (e: unknown) {
-        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-          inline_keyboard: [[{ text: "◀️ Назад", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+          inline_keyboard: [[{ text: L(lg, "back"), callback_data: `admin:client:${clientId}` }]],
         });
       }
       return;
@@ -1125,12 +1127,12 @@ bot.on("callback_query:data", async (ctx) => {
       if (!clientId) return;
       try {
         await api.postBotAdminClientRemnaResetTraffic(userId, clientId);
-        await editMessageContent(ctx, "✅ Трафик сброшен.", {
-          inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, L(lg, "adminTrafficReset"), {
+          inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
         });
       } catch (e: unknown) {
-        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-          inline_keyboard: [[{ text: "◀️ Назад", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+          inline_keyboard: [[{ text: L(lg, "back"), callback_data: `admin:client:${clientId}` }]],
         });
       }
       return;
@@ -1145,8 +1147,8 @@ bot.on("callback_query:data", async (ctx) => {
         const index = parseInt(indexStr, 10);
         const stored = lastSquadsForAdd.get(userId);
         if (!stored || index < 0 || index >= stored.items.length) {
-          await editMessageContent(ctx, "Сессия истекла или сквад не найден. Вернитесь к клиенту.", {
-            inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+          await editMessageContent(ctx, L(lg, "adminSquadSessionExpired"), {
+            inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
           });
           return;
         }
@@ -1154,12 +1156,12 @@ bot.on("callback_query:data", async (ctx) => {
         try {
           await api.postBotAdminClientRemnaSquadAdd(userId, clientId, squadUuid);
           lastSquadsForAdd.delete(userId);
-          await editMessageContent(ctx, `✅ Сквад «${stored.items[index]!.name}» добавлен.`, {
-            inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+          await editMessageContent(ctx, L(lg, "adminSquadAdded").replace("{{name}}", stored.items[index]!.name), {
+            inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
           });
         } catch (e: unknown) {
-          await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-            inline_keyboard: [[{ text: "◀️ Назад", callback_data: `admin:squad:add:${clientId}` }]],
+          await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+            inline_keyboard: [[{ text: L(lg, "back"), callback_data: `admin:squad:add:${clientId}` }]],
           });
         }
         return;
@@ -1167,8 +1169,8 @@ bot.on("callback_query:data", async (ctx) => {
       try {
         const { items } = await api.getBotAdminRemnaSquadsInternal(userId);
         if (!items.length) {
-          await editMessageContent(ctx, "Нет доступных сквадов в Remna.", {
-            inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+          await editMessageContent(ctx, L(lg, "adminNoSquads"), {
+            inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
           });
           return;
         }
@@ -1176,11 +1178,11 @@ bot.on("callback_query:data", async (ctx) => {
         const rows: InlineMarkup["inline_keyboard"] = items.slice(0, 15).map((s, i) => [
           { text: `➕ ${s.name || s.uuid.slice(0, 8)}`, callback_data: `admin:squad:add:${clientId}:${i}` },
         ]);
-        rows.push([{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]);
-        await editMessageContent(ctx, "Выберите сквад для добавления:", { inline_keyboard: rows });
+        rows.push([{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]);
+        await editMessageContent(ctx, L(lg, "adminChooseSquadAdd"), { inline_keyboard: rows });
       } catch (e: unknown) {
-        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-          inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+          inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
         });
       }
       return;
@@ -1195,8 +1197,8 @@ bot.on("callback_query:data", async (ctx) => {
         const index = parseInt(indexStr, 10);
         const stored = lastSquadsForRemove.get(userId);
         if (!stored || index < 0 || index >= stored.items.length) {
-          await editMessageContent(ctx, "Сессия истекла или сквад не найден. Вернитесь к клиенту.", {
-            inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+          await editMessageContent(ctx, L(lg, "adminSquadSessionExpired"), {
+            inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
           });
           return;
         }
@@ -1204,12 +1206,12 @@ bot.on("callback_query:data", async (ctx) => {
         try {
           await api.postBotAdminClientRemnaSquadRemove(userId, clientId, squadUuid);
           lastSquadsForRemove.delete(userId);
-          await editMessageContent(ctx, `✅ Сквад «${stored.items[index]!.name}» убран.`, {
-            inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+          await editMessageContent(ctx, L(lg, "adminSquadRemoved").replace("{{name}}", stored.items[index]!.name), {
+            inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
           });
         } catch (e: unknown) {
-          await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-            inline_keyboard: [[{ text: "◀️ Назад", callback_data: `admin:squad:remove:${clientId}` }]],
+          await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+            inline_keyboard: [[{ text: L(lg, "back"), callback_data: `admin:squad:remove:${clientId}` }]],
           });
         }
         return;
@@ -1220,8 +1222,8 @@ bot.on("callback_query:data", async (ctx) => {
         const uuidToName = new Map(allSquads.items.map((s) => [s.uuid, s.name || s.uuid.slice(0, 8)]));
         const current = remna.activeInternalSquads.map((uuid) => ({ uuid, name: uuidToName.get(uuid) ?? uuid.slice(0, 8) }));
         if (!current.length) {
-          await editMessageContent(ctx, "У пользователя нет сквадов.", {
-            inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+          await editMessageContent(ctx, L(lg, "adminNoUserSquads"), {
+            inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
           });
           return;
         }
@@ -1229,11 +1231,11 @@ bot.on("callback_query:data", async (ctx) => {
         const rows: InlineMarkup["inline_keyboard"] = current.slice(0, 15).map((s, i) => [
           { text: `➖ ${s.name}`, callback_data: `admin:squad:remove:${clientId}:${i}` },
         ]);
-        rows.push([{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]);
-        await editMessageContent(ctx, "Выберите сквад для удаления у пользователя:", { inline_keyboard: rows });
+        rows.push([{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]);
+        await editMessageContent(ctx, L(lg, "adminChooseSquadRemoveFromUser"), { inline_keyboard: rows });
       } catch (e: unknown) {
-        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-          inline_keyboard: [[{ text: "◀️ К клиенту", callback_data: `admin:client:${clientId}` }]],
+        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+          inline_keyboard: [[{ text: L(lg, "backToClient"), callback_data: `admin:client:${clientId}` }]],
         });
       }
       return;
@@ -1245,21 +1247,21 @@ bot.on("callback_query:data", async (ctx) => {
       const isPending = status === "pending";
       const { items, total, limit } = await api.getBotAdminPayments(userId, isPending ? "PENDING" : "PAID", page);
       const totalPages = Math.max(1, Math.ceil(total / limit));
-      const title = isPending ? `💳 Ожидают оплаты (${total})` : `💰 Последние платежи (${total})`;
+      const title = isPending ? `${L(lg, "adminPaymentsPendingTitle")} (${total})` : `${L(lg, "adminPaymentsRecentTitle")} (${total})`;
       let msg = `${title}\n\n`;
       const rows: InlineMarkup["inline_keyboard"] = [];
       items.forEach((p, i) => {
         const label = `${p.amount} ${p.currency} — ${p.clientTelegramUsername || p.clientEmail || p.clientTelegramId || "—"}`;
         msg += `${(page - 1) * limit + i + 1}. ${label}\n`;
         if (isPending) {
-          rows.push([{ text: `✅ ${p.amount} ${p.currency} — отметить оплаченным`, callback_data: `admin:pay:${p.id}` }]);
+          rows.push([{ text: `✅ ${p.amount} ${p.currency} — ${L(lg, "adminMarkAsPaid")}`, callback_data: `admin:pay:${p.id}` }]);
         }
       });
-      msg += `\nСтр. ${page}/${totalPages}`;
+      msg += `\n${L(lg, "adminPage")} ${page}/${totalPages}`;
       const nav: InlineMarkup["inline_keyboard"][0] = [];
-      if (page > 1) nav.push({ text: "◀ Назад", callback_data: `admin:payments:${status}:${page - 1}` });
-      nav.push({ text: "◀️ В админку", callback_data: "admin:menu" });
-      if (page < totalPages) nav.push({ text: "Вперёд ▶", callback_data: `admin:payments:${status}:${page + 1}` });
+      if (page > 1) nav.push({ text: L(lg, "adminPrev"), callback_data: `admin:payments:${status}:${page - 1}` });
+      nav.push({ text: L(lg, "backToAdmin"), callback_data: "admin:menu" });
+      if (page < totalPages) nav.push({ text: L(lg, "adminNext"), callback_data: `admin:payments:${status}:${page + 1}` });
       rows.push(nav);
       await editMessageContent(ctx, msg, { inline_keyboard: rows });
       return;
@@ -1269,12 +1271,12 @@ bot.on("callback_query:data", async (ctx) => {
       if (!paymentId) return;
       try {
         await api.patchBotAdminPaymentMarkPaid(userId, paymentId);
-        await editMessageContent(ctx, "✅ Платёж отмечен как оплаченный.", {
-          inline_keyboard: [[{ text: "◀️ К платежам", callback_data: "admin:payments:pending:1" }]],
+        await editMessageContent(ctx, L(lg, "adminPaymentConfirmed"), {
+          inline_keyboard: [[{ text: L(lg, "adminBackToPayments"), callback_data: "admin:payments:pending:1" }]],
         });
       } catch (e: unknown) {
-        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-          inline_keyboard: [[{ text: "◀️ Назад", callback_data: "admin:payments:pending:1" }]],
+        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+          inline_keyboard: [[{ text: L(lg, "back"), callback_data: "admin:payments:pending:1" }]],
         });
       }
       return;
@@ -1284,8 +1286,8 @@ bot.on("callback_query:data", async (ctx) => {
       awaitingBroadcastMessage.add(userId);
       await editMessageContent(
         ctx,
-        `📢 Рассылка\n\nСейчас: Telegram ${counts.withTelegram}, Email ${counts.withEmail}\n\nОтправьте текст сообщения или фото с подписью (caption):`,
-        { inline_keyboard: [[{ text: "◀️ Отмена", callback_data: "admin:menu" }]] }
+        `${L(lg, "adminBroadcastTitle")}\n\n${L(lg, "adminBroadcastNow")}: Telegram ${counts.withTelegram}, Email ${counts.withEmail}\n\n${L(lg, "adminBroadcastSendPrompt")}`,
+        { inline_keyboard: [[{ text: L(lg, "cancel"), callback_data: "admin:menu" }]] }
       );
       return;
     }
@@ -1293,28 +1295,28 @@ bot.on("callback_query:data", async (ctx) => {
       const channel = data.slice("admin:bc:".length) as "tg" | "email" | "both";
       const raw = lastBroadcastMessage.get(userId);
       if (raw == null) {
-        await editMessageContent(ctx, "Текст рассылки не найден. Начните заново.", {
-          inline_keyboard: [[{ text: "◀️ В админку", callback_data: "admin:menu" }]],
+        await editMessageContent(ctx, L(lg, "adminBroadcastTextNotFound"), {
+          inline_keyboard: [[{ text: L(lg, "backToAdmin"), callback_data: "admin:menu" }]],
         });
         return;
       }
       const msg: BroadcastPayload = typeof raw === "string" ? { text: raw } : raw;
       const ch: "telegram" | "email" | "both" = channel === "tg" ? "telegram" : channel === "email" ? "email" : "both";
-      const channelLabel = ch === "telegram" ? "Telegram" : ch === "email" ? "Email" : "Telegram и Email";
+      const channelLabel = ch === "telegram" ? "Telegram" : ch === "email" ? "Email" : "Telegram + Email";
       // Сразу показываем, что рассылка запущена, чтобы было понятно и не нажимали повторно
-      await editMessageContent(ctx, `📢 Рассылка по каналу «${channelLabel}» запущена, подождите…`, {
-        inline_keyboard: [[{ text: "◀️ В админку", callback_data: "admin:menu" }]],
+      await editMessageContent(ctx, L(lg, "adminBroadcastStarted").replace("{{channel}}", channelLabel), {
+        inline_keyboard: [[{ text: L(lg, "backToAdmin"), callback_data: "admin:menu" }]],
       });
       lastBroadcastMessage.delete(userId);
       try {
         const result = await api.postBotAdminBroadcast(userId, msg.text, ch, msg.photoFileId);
-        const text = `✅ Рассылка завершена.\n\nTelegram: отправлено ${result.sentTelegram}, ошибок ${result.failedTelegram}\nEmail: отправлено ${result.sentEmail}, ошибок ${result.failedEmail}${result.errors?.length ? "\n\nОшибки: " + result.errors.slice(0, 3).join("; ") : ""}`;
+        const text = `${L(lg, "adminBroadcastDone")}\n\n${L(lg, "adminBroadcastSentTg")} ${result.sentTelegram}, ${L(lg, "adminBroadcastFailedTg")} ${result.failedTelegram}\n${L(lg, "adminBroadcastSentEmail")} ${result.sentEmail}, ${L(lg, "adminBroadcastFailedTg")} ${result.failedEmail}${result.errors?.length ? "\n\n" + L(lg, "adminBroadcastErrors") + ": " + result.errors.slice(0, 3).join("; ") : ""}`;
         await editMessageContent(ctx, text, {
-          inline_keyboard: [[{ text: "◀️ В админку", callback_data: "admin:menu" }]],
+          inline_keyboard: [[{ text: L(lg, "backToAdmin"), callback_data: "admin:menu" }]],
         });
       } catch (e: unknown) {
-        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-          inline_keyboard: [[{ text: "◀️ В админку", callback_data: "admin:menu" }]],
+        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+          inline_keyboard: [[{ text: L(lg, "backToAdmin"), callback_data: "admin:menu" }]],
         });
       }
       return;
@@ -1324,11 +1326,11 @@ bot.on("callback_query:data", async (ctx) => {
       if (!clientId) return;
       await api.patchBotAdminClientBlock(userId, clientId, true);
       const client = await api.getBotAdminClient(userId, clientId);
-      const created = client.createdAt ? new Date(client.createdAt).toLocaleString("ru-RU") : "—";
-      let text = `👤 ${client.email || client.telegramUsername || client.telegramId || client.id}\n\nID: ${client.id}\nБаланс: ${client.balance}\nРефералов: ${client._count?.referrals ?? 0}\nСоздан: ${created}\n\n🚫 Заблокирован`;
+      const created = client.createdAt ? new Date(client.createdAt).toLocaleString(lg === "zh" ? "zh-CN" : lg === "en" ? "en-US" : "ru-RU") : "—";
+      let text = `👤 ${client.email || client.telegramUsername || client.telegramId || client.id}\n\n${L(lg, "adminClientId")}: ${client.id}\n${L(lg, "adminClientBalance")}: ${client.balance}\n${L(lg, "adminClientReferrals")}: ${client._count?.referrals ?? 0}\n${L(lg, "adminClientCreated")}: ${created}\n\n${L(lg, "adminClientBlocked")}`;
       const kb: InlineMarkup["inline_keyboard"] = [
-        [{ text: "✅ Разблокировать", callback_data: `admin:unblock:${client.id}` }],
-        [{ text: "◀️ К списку", callback_data: "admin:clients:1" }],
+        [{ text: L(lg, "adminUnblock"), callback_data: `admin:unblock:${client.id}` }],
+        [{ text: L(lg, "backToList"), callback_data: "admin:clients:1" }],
       ];
       await editMessageContent(ctx, text, { inline_keyboard: kb });
       return;
@@ -1338,11 +1340,11 @@ bot.on("callback_query:data", async (ctx) => {
       if (!clientId) return;
       await api.patchBotAdminClientBlock(userId, clientId, false);
       const client = await api.getBotAdminClient(userId, clientId);
-      const created = client.createdAt ? new Date(client.createdAt).toLocaleString("ru-RU") : "—";
-      let text = `👤 ${client.email || client.telegramUsername || client.telegramId || client.id}\n\nID: ${client.id}\nБаланс: ${client.balance}\nРефералов: ${client._count?.referrals ?? 0}\nСоздан: ${created}`;
+      const created = client.createdAt ? new Date(client.createdAt).toLocaleString(lg === "zh" ? "zh-CN" : lg === "en" ? "en-US" : "ru-RU") : "—";
+      let text = `👤 ${client.email || client.telegramUsername || client.telegramId || client.id}\n\n${L(lg, "adminClientId")}: ${client.id}\n${L(lg, "adminClientBalance")}: ${client.balance}\n${L(lg, "adminClientReferrals")}: ${client._count?.referrals ?? 0}\n${L(lg, "adminClientCreated")}: ${created}`;
       const kb: InlineMarkup["inline_keyboard"] = [
-        [{ text: "🚫 Заблокировать", callback_data: `admin:block:${client.id}` }],
-        [{ text: "◀️ К списку", callback_data: "admin:clients:1" }],
+        [{ text: L(lg, "adminBlock"), callback_data: `admin:block:${client.id}` }],
+        [{ text: L(lg, "backToList"), callback_data: "admin:clients:1" }],
       ];
       await editMessageContent(ctx, text, { inline_keyboard: kb });
       return;
@@ -1352,9 +1354,12 @@ bot.on("callback_query:data", async (ctx) => {
 
   const token = getToken(userId);
   if (!token) {
-    await ctx.reply("Сессия истекла. Отправьте /start");
+    await ctx.reply(L(getLang(userId), "sessionExpired") + " " + L(getLang(userId), "pressStartForMenu"));
     return;
   }
+
+  // Resolve user's cached language for this session
+  const lg = getLang(userId);
 
   try {
     const config = await api.getPublicConfig();
@@ -1366,24 +1371,24 @@ bot.on("callback_query:data", async (ctx) => {
         const result = await checkUserSubscription(userId, channelId);
         if (result.state === "cannot_verify") {
           await ctx.answerCallbackQuery({
-            text: "⚠️ Сейчас не удаётся проверить подписку. Сообщите администратору.",
+            text: "⚠️ " + L(lg, "forceSubscribeCannotVerifyAlert"),
             show_alert: true,
           }).catch(() => {});
           await editMessageContent(
             ctx,
-            `⚠️ Проверка подписки временно недоступна.\n\nПроверьте настройки: бот должен быть админом в канале, а ID/@username канала должен быть указан корректно.`,
-            subscribeKeyboard(channelId)
+            `⚠️ ${L(lg, "forceSubscribeTempUnavailable")}`,
+            subscribeKeyboard(channelId, getLang(userId))
           );
           return;
         }
         if (result.state !== "subscribed") {
-          await ctx.answerCallbackQuery({ text: "❌ Вы ещё не подписались на канал", show_alert: true }).catch(() => {});
+          await ctx.answerCallbackQuery({ text: "❌ " + L(lg, "forceSubscribeNotYet"), show_alert: true }).catch(() => {});
           return;
         }
       }
       // Подписан — показываем основное меню через /start
-      await ctx.answerCallbackQuery({ text: "✅ Подписка подтверждена!" }).catch(() => {});
-      await ctx.reply("Отлично! Отправьте /start чтобы открыть меню.");
+      await ctx.answerCallbackQuery({ text: "✅ " + L(lg, "forceSubscribeConfirmed") }).catch(() => {});
+      await ctx.reply(L(lg, "forceSubscribeOk"));
       return;
     }
 
@@ -1392,11 +1397,11 @@ bot.on("callback_query:data", async (ctx) => {
       const channelId = config.forceSubscribeChannelId.trim();
       const result = await checkUserSubscription(userId, channelId);
       if (result.state !== "subscribed") {
-        const msg = config.forceSubscribeMessage?.trim() || "Для использования бота подпишитесь на наш канал:";
+        const msg = config.forceSubscribeMessage?.trim() || L(lg, "forceSubscribeDefault");
         const details = result.state === "cannot_verify"
-          ? "\n\nПроверка подписки сейчас недоступна. Сообщите администратору."
+          ? "\n\n" + L(lg, "forceSubscribeCannotVerifyDetails")
           : "";
-        await editMessageContent(ctx, `⚠️ ${msg}${details}`, subscribeKeyboard(channelId));
+        await editMessageContent(ctx, `⚠️ ${msg}${details}`, subscribeKeyboard(channelId, getLang(userId)));
         return;
       }
     }
@@ -1435,8 +1440,9 @@ bot.on("callback_query:data", async (ctx) => {
       const showTrial = Boolean(config?.trialEnabled && !client?.trialUsed);
       const showProxy = proxyRes.items?.some((c: { tariffs: unknown[] }) => c.tariffs?.length > 0) ?? false;
       const showSingbox = singboxRes.items?.some((c: { tariffs: unknown[] }) => c.tariffs?.length > 0) ?? false;
-      const name = config?.serviceName?.trim() || "Кабинет";
-      const clientLang = (client?.preferredLang ?? "ru").toLowerCase();
+      const clientLang = (client?.preferredLang ?? "zh").toLowerCase();
+      setLang(userId, clientLang);
+      const name = config?.serviceName?.trim() || L(clientLang, "cabinet");
       const { text, entities } = buildMainMenuText({
         serviceName: name,
         balance: client?.balance ?? 0,
@@ -1463,10 +1469,10 @@ bot.on("callback_query:data", async (ctx) => {
         showExtraOptions: config?.sellOptionsEnabled === true && (config?.sellOptions?.length ?? 0) > 0,
         buttonsPerRow: config?.botButtonsPerRow ?? 1,
         remnaSubscriptionUrl: config?.useRemnaSubscriptionPage ? vpnUrl : null,
+        lang: lg,
       });
-      const userId = ctx.from?.id;
-      if (userId && config?.botAdminTelegramIds?.includes(String(userId))) {
-        backMarkup.inline_keyboard.push([{ text: "⚙️ Панель админа", callback_data: "admin:menu" }]);
+      if (config?.botAdminTelegramIds?.includes(String(userId))) {
+        backMarkup.inline_keyboard.push([{ text: L(clientLang, "btnAdminPanel"), callback_data: "admin:menu" }]);
       }
       await editMessageContent(ctx, text, backMarkup, entities);
       return;
@@ -1475,12 +1481,12 @@ bot.on("callback_query:data", async (ctx) => {
     if (data === "menu:support") {
       const hasAny = config?.supportLink || config?.agreementLink || config?.offerLink || config?.instructionsLink;
       if (!hasAny) {
-        await editMessageContent(ctx, "Раздел поддержки не настроен.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "supportNotConfigured"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       await editMessageContent(
         ctx,
-        "🆘 Поддержка\n\nВыберите раздел:",
+        L(lg, "supportTitle") + "\n\n" + L(lg, "supportChoose"),
         supportSubMenu(
           {
             support: config?.supportLink,
@@ -1490,7 +1496,8 @@ bot.on("callback_query:data", async (ctx) => {
           },
           config?.botBackLabel ?? null,
           innerStyles?.back,
-          innerEmojiIds
+          innerEmojiIds,
+          lg
         )
       );
       return;
@@ -1499,7 +1506,7 @@ bot.on("callback_query:data", async (ctx) => {
     if (data === "menu:tariffs") {
       const { items } = await api.getPublicTariffs();
       if (!items?.length) {
-        await editMessageContent(ctx, "Тарифы пока не настроены.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffsNotConfigured"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const tariffsEmojiKey = getMenuEmojiKey(config, "tariffs");
@@ -1511,7 +1518,7 @@ bot.on("callback_query:data", async (ctx) => {
         ? { ...innerEmojiIds, tariff: tariffsEmojiEntry.tgEmojiId }
         : innerEmojiIds;
       if (items.length > 1) {
-        const { text, entities } = titleWithOptionalEmoji(tariffsEmojiKey, "Тарифы\n\nВыберите категорию:", config?.botEmojis);
+        const { text, entities } = titleWithOptionalEmoji(tariffsEmojiKey, L(lg, "tariffsTitle") + "\n\n" + L(lg, "tariffsChooseCategory"), config?.botEmojis);
         await editMessageContent(ctx, text, tariffPayButtons(items, config?.botBackLabel ?? null, innerStyles, tariffsEmojiIds, tariffsEmojiUnicode), entities);
         return;
       }
@@ -1519,8 +1526,8 @@ bot.on("callback_query:data", async (ctx) => {
       const nameOnly = (cat.name || "").replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, "").trim() || cat.name || "";
       const head = (cat.emoji && cat.emoji.trim() ? cat.emoji + " " : "") + nameOnly;
       const tariffFields = { ...DEFAULT_TARIFF_LINE_FIELDS, ...(config?.botTariffsFields ?? {}) };
-      const template = (config?.botTariffsText ?? "").trim() || DEFAULT_TARIFFS_TEXT;
-      const tariffLines = cat.tariffs.map((t: TariffItem) => formatTariffLine(t, tariffFields)).join("\n");
+      const template = (config?.botTariffsText ?? "").trim() || getDefaultTariffsText(lg);
+      const tariffLines = cat.tariffs.map((t: TariffItem) => formatTariffLine(t, tariffFields, lg)).join("\n");
       const body = renderTariffsText(template, head, tariffLines);
       const { text, entities } = titleWithOptionalEmoji(tariffsEmojiKey, body, config?.botEmojis);
       await editMessageContent(ctx, text, tariffPayButtons(items, config?.botBackLabel ?? null, innerStyles, tariffsEmojiIds, tariffsEmojiUnicode), entities);
@@ -1532,7 +1539,7 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicTariffs();
       const category = items?.find((c: TariffCategory) => c.id === categoryId);
       if (!category?.tariffs?.length) {
-        await editMessageContent(ctx, "Категория не найдена.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "categoryNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const nameOnly = (category.name || "").replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, "").trim() || category.name || "";
@@ -1546,8 +1553,8 @@ bot.on("callback_query:data", async (ctx) => {
         ? { ...innerEmojiIds, tariff: tariffsEmojiEntry.tgEmojiId }
         : innerEmojiIds;
       const tariffFields = { ...DEFAULT_TARIFF_LINE_FIELDS, ...(config?.botTariffsFields ?? {}) };
-      const template = (config?.botTariffsText ?? "").trim() || DEFAULT_TARIFFS_TEXT;
-      const tariffLines = category.tariffs.map((t: TariffItem) => formatTariffLine(t, tariffFields)).join("\n");
+      const template = (config?.botTariffsText ?? "").trim() || getDefaultTariffsText(lg);
+      const tariffLines = category.tariffs.map((t: TariffItem) => formatTariffLine(t, tariffFields, lg)).join("\n");
       const body = renderTariffsText(template, head, tariffLines);
       const { text, entities } = titleWithOptionalEmoji(tariffsEmojiKey, body, config?.botEmojis);
       await editMessageContent(ctx, text, tariffsOfCategoryButtons(category, config?.botBackLabel ?? null, innerStyles, "menu:tariffs", tariffsEmojiIds, tariffsEmojiUnicode), entities);
@@ -1557,16 +1564,16 @@ bot.on("callback_query:data", async (ctx) => {
     if (data === "menu:proxy") {
       const { items } = await api.getPublicProxyTariffs();
       if (!items?.length || items.every((c: { tariffs: unknown[] }) => !c.tariffs?.length)) {
-        await editMessageContent(ctx, "Тарифы прокси пока не настроены.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "proxyNotConfigured"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const cats = items.filter((c: { tariffs: unknown[] }) => c.tariffs?.length > 0);
       if (cats.length === 1 && cats[0]!.tariffs.length <= 5) {
         const head = cats[0]!.name;
         const lines = cats[0]!.tariffs.map((t: { name: string; price: number; currency: string }) => `• ${t.name} — ${t.price} ${t.currency}`).join("\n");
-        await editMessageContent(ctx, `🌐 Прокси\n\n${head}\n${lines}\n\nВыберите тариф:`, proxyTariffPayButtons(cats, config?.botBackLabel ?? null, innerStyles, innerEmojiIds));
+        await editMessageContent(ctx, `${L(lg, "proxyTitle")}\n\n${head}\n${lines}\n\n${L(lg, "proxyChooseTariff")}`, proxyTariffPayButtons(cats, config?.botBackLabel ?? null, innerStyles, innerEmojiIds));
       } else {
-        await editMessageContent(ctx, "🌐 Прокси\n\nВыберите категорию:", proxyTariffPayButtons(cats, config?.botBackLabel ?? null, innerStyles, innerEmojiIds));
+        await editMessageContent(ctx, `${L(lg, "proxyTitle")}\n\n${L(lg, "proxyChooseCategory")}`, proxyTariffPayButtons(cats, config?.botBackLabel ?? null, innerStyles, innerEmojiIds));
       }
       return;
     }
@@ -1576,28 +1583,28 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicProxyTariffs();
       const category = items?.find((c: { id: string }) => c.id === categoryId);
       if (!category?.tariffs?.length) {
-        await editMessageContent(ctx, "Категория не найдена.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "categoryNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const head = category.name;
       const lines = category.tariffs.map((t: { name: string; price: number; currency: string }) => `• ${t.name} — ${t.price} ${t.currency}`).join("\n");
-      await editMessageContent(ctx, `🌐 ${head}\n\n${lines}\n\nВыберите тариф:`, proxyTariffsOfCategoryButtons(category, config?.botBackLabel ?? null, innerStyles, "menu:proxy", innerEmojiIds));
+      await editMessageContent(ctx, `🌐 ${head}\n\n${lines}\n\n${L(lg, "proxyChooseTariff")}`, proxyTariffsOfCategoryButtons(category, config?.botBackLabel ?? null, innerStyles, "menu:proxy", innerEmojiIds));
       return;
     }
 
     if (data === "menu:singbox") {
       const { items } = await api.getPublicSingboxTariffs();
       if (!items?.length || items.every((c: { tariffs: unknown[] }) => !c.tariffs?.length)) {
-        await editMessageContent(ctx, "Тарифы доступов пока не настроены.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "singboxNotConfigured"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const cats = items.filter((c: { tariffs: unknown[] }) => c.tariffs?.length > 0);
       if (cats.length === 1 && cats[0]!.tariffs.length <= 5) {
         const head = cats[0]!.name;
         const lines = cats[0]!.tariffs.map((t: { name: string; price: number; currency: string }) => `• ${t.name} — ${t.price} ${t.currency}`).join("\n");
-        await editMessageContent(ctx, `🔑 Доступы\n\n${head}\n${lines}\n\nВыберите тариф:`, singboxTariffPayButtons(cats, config?.botBackLabel ?? null, innerStyles, innerEmojiIds));
+        await editMessageContent(ctx, `${L(lg, "singboxTitle")}\n\n${head}\n${lines}\n\n${L(lg, "singboxChooseTariff")}`, singboxTariffPayButtons(cats, config?.botBackLabel ?? null, innerStyles, innerEmojiIds));
       } else {
-        await editMessageContent(ctx, "🔑 Доступы\n\nВыберите категорию:", singboxTariffPayButtons(cats, config?.botBackLabel ?? null, innerStyles, innerEmojiIds));
+        await editMessageContent(ctx, `${L(lg, "singboxTitle")}\n\n${L(lg, "singboxChooseCategory")}`, singboxTariffPayButtons(cats, config?.botBackLabel ?? null, innerStyles, innerEmojiIds));
       }
       return;
     }
@@ -1607,12 +1614,12 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicSingboxTariffs();
       const category = items?.find((c: { id: string }) => c.id === categoryId);
       if (!category?.tariffs?.length) {
-        await editMessageContent(ctx, "Категория не найдена.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "categoryNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const head = category.name;
       const lines = category.tariffs.map((t: { name: string; price: number; currency: string }) => `• ${t.name} — ${t.price} ${t.currency}`).join("\n");
-      await editMessageContent(ctx, `🔑 ${head}\n\n${lines}\n\nВыберите тариф:`, singboxTariffsOfCategoryButtons(category, config?.botBackLabel ?? null, innerStyles, "menu:singbox", innerEmojiIds));
+      await editMessageContent(ctx, `🔑 ${head}\n\n${lines}\n\n${L(lg, "singboxChooseTariff")}`, singboxTariffsOfCategoryButtons(category, config?.botBackLabel ?? null, innerStyles, "menu:singbox", innerEmojiIds));
       return;
     }
 
@@ -1620,32 +1627,34 @@ bot.on("callback_query:data", async (ctx) => {
       const slotsRes = await api.getSingboxSlots(token);
       const slots = slotsRes.slots ?? [];
       if (slots.length === 0) {
-        await editMessageContent(ctx, "У вас пока нет активных доступов. Купите тариф в разделе «Доступы».", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "mySingboxEmpty"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const lines = slots.map((s: { subscriptionLink: string; expiresAt: string; protocol: string }) => {
-        const exp = new Date(s.expiresAt).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
-        return `${s.protocol} — до ${exp}\n${s.subscriptionLink}`;
+        const localeStr = lg === "zh" ? "zh-CN" : lg === "en" ? "en-GB" : "ru-RU";
+        const exp = new Date(s.expiresAt).toLocaleDateString(localeStr, { day: "2-digit", month: "2-digit", year: "numeric" });
+        return `${s.protocol} — ${L(lg, "singboxExpirePrefix")}${exp}\n${s.subscriptionLink}`;
       }).join("\n\n");
-      const msg = `📋 Мои доступы (${slots.length})\n\nСкопируйте ссылку в приложение (v2rayN, Nekoray и др.):\n\n${lines}`;
-      await editMessageContent(ctx, msg.slice(0, 4096), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+      const msg = `${L(lg, "mySingboxTitle")} (${slots.length})\n\n${L(lg, "mySingboxCopyHint")}\n\n${lines}`;
+      await editMessageContent(ctx, msg.slice(0, 4096), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       return;
     }
 
     if (data === "menu:my_proxy") {
       const { slots } = await api.getProxySlots(token);
       if (!slots?.length) {
-        await editMessageContent(ctx, "📋 Мои прокси\n\nУ вас пока нет активных прокси. Купите тариф в разделе «Прокси».", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "myProxyEmpty"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
-      let text = "📋 Мои прокси\n\n";
+      let text = L(lg, "myProxyTitle") + "\n\n";
+      const localeStr = lg === "zh" ? "zh-CN" : lg === "en" ? "en-GB" : "ru-RU";
       for (const s of slots) {
         text += `• SOCKS5: \`socks5://${s.login}:${s.password}@${s.host}:${s.socksPort}\`\n`;
         text += `• HTTP: \`http://${s.login}:${s.password}@${s.host}:${s.httpPort}\`\n`;
-        text += `  До: ${new Date(s.expiresAt).toLocaleString("ru-RU")}\n\n`;
+        text += `${L(lg, "proxyExpirePrefix")}${new Date(s.expiresAt).toLocaleString(localeStr)}\n\n`;
       }
-      text += "Скопируйте строку в настройки прокси приложения.";
-      await editMessageContent(ctx, text.slice(0, 4096), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+      text += L(lg, "myProxyCopyHint");
+      await editMessageContent(ctx, text.slice(0, 4096), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       return;
     }
 
@@ -1653,10 +1662,10 @@ bot.on("callback_query:data", async (ctx) => {
       const proxyTariffId = data.slice("pay_proxy_balance:".length);
       try {
         const result = await api.payByBalance(token, { proxyTariffId });
-        await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка оплаты";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1666,7 +1675,7 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicProxyTariffs();
       const tariff = items?.flatMap((c: { tariffs: { id: string; name: string; price: number; currency: string }[] }) => c.tariffs).find((t: { id: string }) => t.id === proxyTariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
@@ -1676,12 +1685,12 @@ bot.on("callback_query:data", async (ctx) => {
           price: formatMoney(tariff.price, tariff.currency),
           amount: String(tariff.price),
           currency: tariff.currency,
-          action: "Нажмите для оплаты через ЮMoney:",
+          action: L(lg, "paymentClickYoomoney"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1691,11 +1700,11 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicProxyTariffs();
       const tariff = items?.flatMap((c: { tariffs: { id: string; name: string; price: number; currency: string }[] }) => c.tariffs).find((t: { id: string }) => t.id === proxyTariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       if (tariff.currency.toUpperCase() !== "RUB") {
-        await editMessageContent(ctx, "ЮKassa принимает только рубли (RUB).", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "yookassaRubOnly"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
@@ -1705,12 +1714,12 @@ bot.on("callback_query:data", async (ctx) => {
           price: formatMoney(tariff.price, tariff.currency),
           amount: String(tariff.price),
           currency: tariff.currency,
-          action: "Нажмите для оплаты через ЮKassa:",
+          action: L(lg, "paymentClickYookassa"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1720,16 +1729,16 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicProxyTariffs();
       const tariff = items?.flatMap((c: { tariffs: { id: string; name: string; price: number; currency: string }[] }) => c.tariffs).find((t: { id: string }) => t.id === proxyTariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
         const payment = await api.createCryptopayPayment(token, { amount: tariff.price, currency: tariff.currency, proxyTariffId });
-        const msg = buildPaymentMessage(config, { name: tariff.name, price: formatMoney(tariff.price, tariff.currency), amount: String(tariff.price), currency: tariff.currency, action: "Нажмите для оплаты через Crypto Bot:" });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        const msg = buildPaymentMessage(config, { name: tariff.name, price: formatMoney(tariff.price, tariff.currency), amount: String(tariff.price), currency: tariff.currency, action: L(lg, "paymentClickCryptoBot") });
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1742,19 +1751,19 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicProxyTariffs();
       const tariff = items?.flatMap((c: { tariffs: { id: string; name: string; price: number; currency: string }[] }) => c.tariffs).find((t: { id: string }) => t.id === proxyTariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const methods = config?.plategaMethods ?? [];
       const client = await api.getMe(token);
-      const balanceLabel = client && client.balance >= tariff.price ? `💰 Оплатить балансом (${formatMoney(client.balance, client.preferredCurrency ?? "RUB")})` : null;
+      const balanceLabel = client && client.balance >= tariff.price ? L(lg, "payBalanceBtnWithAmount").replace("{{amount}}", formatMoney(client.balance, client.preferredCurrency ?? "RUB")) : null;
       if (methodIdFromBtn != null && Number.isFinite(methodIdFromBtn)) {
         try {
           const payment = await api.createPlategaPayment(token, {
             amount: tariff.price,
             currency: tariff.currency,
             paymentMethod: methodIdFromBtn,
-            description: `Прокси: ${tariff.name}`,
+            description: `${L(lg, "descriptionProxy")}: ${tariff.name}`,
             proxyTariffId: tariff.id,
           });
           const msg = buildPaymentMessage(config, {
@@ -1762,12 +1771,12 @@ bot.on("callback_query:data", async (ctx) => {
             price: formatMoney(tariff.price, tariff.currency),
             amount: String(tariff.price),
             currency: tariff.currency,
-            action: "Нажмите для оплаты:",
+            action: L(lg, "paymentClickToPay"),
           });
-          await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+          await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : "Ошибка";
-          await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+          const msg = e instanceof Error ? e.message : L(lg, "error");
+          await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         }
         return;
       }
@@ -1782,13 +1791,14 @@ bot.on("callback_query:data", async (ctx) => {
         !!config?.yookassaEnabled,
         !!config?.cryptopayEnabled,
         tariff.currency,
+        lg,
       );
       const msg = buildPaymentMessage(config, {
         name: tariff.name,
         price: formatMoney(tariff.price, tariff.currency),
         amount: String(tariff.price),
         currency: tariff.currency,
-        action: "Выберите способ оплаты:",
+        action: L(lg, "choosePaymentMethod"),
       });
       await editMessageContent(ctx, msg.text, markup, msg.entities);
       return;
@@ -1798,10 +1808,10 @@ bot.on("callback_query:data", async (ctx) => {
       const singboxTariffId = data.slice("pay_singbox_balance:".length);
       try {
         const result = await api.payByBalance(token, { singboxTariffId });
-        await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка оплаты";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1811,7 +1821,7 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicSingboxTariffs();
       const tariff = items?.flatMap((c: { tariffs: { id: string; name: string; price: number; currency: string }[] }) => c.tariffs).find((t: { id: string }) => t.id === singboxTariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
@@ -1821,12 +1831,12 @@ bot.on("callback_query:data", async (ctx) => {
           price: formatMoney(tariff.price, tariff.currency),
           amount: String(tariff.price),
           currency: tariff.currency,
-          action: "Нажмите для оплаты через ЮMoney:",
+          action: L(lg, "paymentClickYoomoney"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1836,11 +1846,11 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicSingboxTariffs();
       const tariff = items?.flatMap((c: { tariffs: { id: string; name: string; price: number; currency: string }[] }) => c.tariffs).find((t: { id: string }) => t.id === singboxTariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       if (tariff.currency.toUpperCase() !== "RUB") {
-        await editMessageContent(ctx, "ЮKassa принимает только рубли (RUB).", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "yookassaRubOnly"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
@@ -1850,12 +1860,12 @@ bot.on("callback_query:data", async (ctx) => {
           price: formatMoney(tariff.price, tariff.currency),
           amount: String(tariff.price),
           currency: tariff.currency,
-          action: "Нажмите для оплаты через ЮKassa:",
+          action: L(lg, "paymentClickYookassa"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1865,16 +1875,16 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicSingboxTariffs();
       const tariff = items?.flatMap((c: { tariffs: { id: string; name: string; price: number; currency: string }[] }) => c.tariffs).find((t: { id: string }) => t.id === singboxTariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
         const payment = await api.createCryptopayPayment(token, { amount: tariff.price, currency: tariff.currency, singboxTariffId });
-        const msg = buildPaymentMessage(config, { name: tariff.name, price: formatMoney(tariff.price, tariff.currency), amount: String(tariff.price), currency: tariff.currency, action: "Нажмите для оплаты через Crypto Bot:" });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        const msg = buildPaymentMessage(config, { name: tariff.name, price: formatMoney(tariff.price, tariff.currency), amount: String(tariff.price), currency: tariff.currency, action: L(lg, "paymentClickCryptoBot") });
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1887,19 +1897,19 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicSingboxTariffs();
       const tariff = items?.flatMap((c: { tariffs: { id: string; name: string; price: number; currency: string }[] }) => c.tariffs).find((t: { id: string }) => t.id === singboxTariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const methods = config?.plategaMethods ?? [];
       const client = await api.getMe(token);
-      const balanceLabel = client && client.balance >= tariff.price ? `💰 Оплатить балансом (${formatMoney(client.balance, client.preferredCurrency ?? "RUB")})` : null;
+      const balanceLabel = client && client.balance >= tariff.price ? L(lg, "payBalanceBtnWithAmount").replace("{{amount}}", formatMoney(client.balance, client.preferredCurrency ?? "RUB")) : null;
       if (methodIdFromBtn != null && Number.isFinite(methodIdFromBtn)) {
         try {
           const payment = await api.createPlategaPayment(token, {
             amount: tariff.price,
             currency: tariff.currency,
             paymentMethod: methodIdFromBtn,
-            description: `Доступы: ${tariff.name}`,
+            description: `${L(lg, "descriptionSingbox")}: ${tariff.name}`,
             singboxTariffId: tariff.id,
           });
           const msg = buildPaymentMessage(config, {
@@ -1907,12 +1917,12 @@ bot.on("callback_query:data", async (ctx) => {
             price: formatMoney(tariff.price, tariff.currency),
             amount: String(tariff.price),
             currency: tariff.currency,
-            action: "Нажмите для оплаты:",
+            action: L(lg, "paymentClickToPay"),
           });
-          await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+          await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : "Ошибка";
-          await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+          const msg = e instanceof Error ? e.message : L(lg, "error");
+          await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         }
         return;
       }
@@ -1927,13 +1937,14 @@ bot.on("callback_query:data", async (ctx) => {
         !!config?.yookassaEnabled,
         !!config?.cryptopayEnabled,
         tariff.currency,
+        lg,
       );
       const msg = buildPaymentMessage(config, {
         name: tariff.name,
         price: formatMoney(tariff.price, tariff.currency),
         amount: String(tariff.price),
         currency: tariff.currency,
-        action: "Выберите способ оплаты:",
+        action: L(lg, "choosePaymentMethod"),
       });
       await editMessageContent(ctx, msg.text, markup, msg.entities);
       return;
@@ -1945,10 +1956,10 @@ bot.on("callback_query:data", async (ctx) => {
         const promoCode = activeDiscountCode.get(userId);
         const result = await api.payByBalance(token, { tariffId, promoCode });
         if (promoCode) activeDiscountCode.delete(userId);
-        await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка оплаты";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1958,7 +1969,7 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicTariffs();
       const tariff = items?.flatMap((c: TariffCategory) => c.tariffs).find((t: TariffItem) => t.id === tariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
@@ -1975,12 +1986,12 @@ bot.on("callback_query:data", async (ctx) => {
           price: formatMoney(tariff.price, tariff.currency),
           amount: String(tariff.price),
           currency: tariff.currency,
-          action: "Нажмите кнопку ниже для оплаты через ЮMoney:",
+          action: L(lg, "paymentClickButtonYoomoney"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа ЮMoney";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateErrorYoomoney");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -1990,11 +2001,11 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicTariffs();
       const tariff = items?.flatMap((c: TariffCategory) => c.tariffs).find((t: TariffItem) => t.id === tariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       if (tariff.currency.toUpperCase() !== "RUB") {
-        await editMessageContent(ctx, "ЮKassa принимает только рубли (RUB).", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "yookassaRubOnly"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
@@ -2011,12 +2022,12 @@ bot.on("callback_query:data", async (ctx) => {
           price: formatMoney(tariff.price, tariff.currency),
           amount: String(tariff.price),
           currency: tariff.currency,
-          action: "Нажмите кнопку ниже для оплаты через ЮKassa:",
+          action: L(lg, "paymentClickButtonYookassa"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа ЮKassa";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateErrorYookassa");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2026,18 +2037,18 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicTariffs();
       const tariff = items?.flatMap((c: TariffCategory) => c.tariffs).find((t: TariffItem) => t.id === tariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
         const promoCode = activeDiscountCode.get(userId);
         const payment = await api.createCryptopayPayment(token, { amount: tariff.price, currency: tariff.currency, tariffId: tariff.id, promoCode });
         if (promoCode) activeDiscountCode.delete(userId);
-        const msg = buildPaymentMessage(config, { name: tariff.name, price: formatMoney(tariff.price, tariff.currency), amount: String(tariff.price), currency: tariff.currency, action: "Нажмите кнопку ниже для оплаты через Crypto Bot:" });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        const msg = buildPaymentMessage(config, { name: tariff.name, price: formatMoney(tariff.price, tariff.currency), amount: String(tariff.price), currency: tariff.currency, action: L(lg, "paymentClickButtonCryptoBot") });
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2045,10 +2056,10 @@ bot.on("callback_query:data", async (ctx) => {
     if (data === "menu:extra_options") {
       const options = config?.sellOptions ?? [];
       if (!options.length) {
-        await editMessageContent(ctx, "Доп. опции пока не доступны. Оформите подписку в разделе «Тарифы».", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "extraOptionsUnavailable"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
-      const { text, entities } = titleWithEmoji("PACKAGE", "Доп. опции\n\nТрафик, устройства или серверы — докупка к подписке. Выберите опцию:", config?.botEmojis);
+      const { text, entities } = titleWithEmoji("PACKAGE", L(lg, "extraOptionsBody"), config?.botEmojis);
       await editMessageContent(ctx, text, extraOptionsButtons(options, config?.botBackLabel ?? null, innerStyles, innerEmojiIds), entities);
       return;
     }
@@ -2060,15 +2071,15 @@ bot.on("callback_query:data", async (ctx) => {
       const options = config?.sellOptions ?? [];
       const option = options.find((o) => o.kind === kind && o.id === productId);
       if (!option) {
-        await editMessageContent(ctx, "Опция не найдена.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "extraOptionNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
         const result = await api.payOptionByBalance(token, { kind: option.kind, productId: option.id });
-        await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка оплаты";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2080,27 +2091,27 @@ bot.on("callback_query:data", async (ctx) => {
       const options = config?.sellOptions ?? [];
       const option = options.find((o) => o.kind === kind && o.id === productId);
       if (!option) {
-        await editMessageContent(ctx, "Опция не найдена.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "extraOptionNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
         const payment = await api.createYookassaPayment(token, {
           extraOption: { kind: option.kind, productId: option.id },
         });
-        const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ГБ` : option.kind === "devices" ? `+${option.deviceCount} устр.` : "Сервер");
+        const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ${L(lg, "extraOptionTraffic")}` : option.kind === "devices" ? `+${option.deviceCount} ${L(lg, "extraOptionDevices")}` : L(lg, "extraOptionServer"));
         const msg = buildPaymentMessage(config, {
           name: optName,
           price: formatMoney(option.price, option.currency),
           amount: String(option.price),
           currency: option.currency,
-          action: "Нажмите кнопку ниже для оплаты через ЮKassa:",
+          action: L(lg, "paymentClickButtonYookassa"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
         const isAuthError = /401|unauthorized|истек|авториз|токен/i.test(msg);
-        const text = isAuthError ? "❌ Сессия истекла. Отправьте /start и попробуйте снова." : `❌ ${msg}`;
-        await editMessageContent(ctx, text, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const text = isAuthError ? L(lg, "sessionExpiredRestart") : `❌ ${msg}`;
+        await editMessageContent(ctx, text, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2112,19 +2123,19 @@ bot.on("callback_query:data", async (ctx) => {
       const options = config?.sellOptions ?? [];
       const option = options.find((o) => o.kind === kind && o.id === productId);
       if (!option) {
-        await editMessageContent(ctx, "Опция не найдена.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "extraOptionNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
         const payment = await api.createCryptopayPayment(token, { extraOption: { kind: option.kind, productId: option.id } });
-        const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ГБ` : option.kind === "devices" ? `+${option.deviceCount} устр.` : "Сервер");
-        const msg = buildPaymentMessage(config, { name: optName, price: formatMoney(option.price, option.currency), amount: String(option.price), currency: option.currency, action: "Нажмите кнопку ниже для оплаты через Crypto Bot:" });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ${L(lg, "extraOptionTraffic")}` : option.kind === "devices" ? `+${option.deviceCount} ${L(lg, "extraOptionDevices")}` : L(lg, "extraOptionServer"));
+        const msg = buildPaymentMessage(config, { name: optName, price: formatMoney(option.price, option.currency), amount: String(option.price), currency: option.currency, action: L(lg, "paymentClickButtonCryptoBot") });
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
         const isAuthError = /401|unauthorized|истек|авториз|токен/i.test(msg);
-        const text = isAuthError ? "❌ Сессия истекла. Отправьте /start и попробуйте снова." : `❌ ${msg}`;
-        await editMessageContent(ctx, text, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const text = isAuthError ? L(lg, "sessionExpiredRestart") : `❌ ${msg}`;
+        await editMessageContent(ctx, text, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2136,7 +2147,7 @@ bot.on("callback_query:data", async (ctx) => {
       const options = config?.sellOptions ?? [];
       const option = options.find((o) => o.kind === kind && o.id === productId);
       if (!option) {
-        await editMessageContent(ctx, "Опция не найдена.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "extraOptionNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
@@ -2145,18 +2156,18 @@ bot.on("callback_query:data", async (ctx) => {
           paymentType: "AC",
           extraOption: { kind: option.kind, productId: option.id },
         });
-        const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ГБ` : option.kind === "devices" ? `+${option.deviceCount} устр.` : "Сервер");
+        const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ${L(lg, "extraOptionTraffic")}` : option.kind === "devices" ? `+${option.deviceCount} ${L(lg, "extraOptionDevices")}` : L(lg, "extraOptionServer"));
         const msg = buildPaymentMessage(config, {
           name: optName,
           price: formatMoney(option.price, option.currency),
           amount: String(option.price),
           currency: option.currency,
-          action: "Нажмите кнопку ниже для оплаты через ЮMoney:",
+          action: L(lg, "paymentClickButtonYoomoney"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа ЮMoney";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateErrorYoomoney");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2169,11 +2180,11 @@ bot.on("callback_query:data", async (ctx) => {
       const options = config?.sellOptions ?? [];
       const option = options.find((o) => o.kind === kind && o.id === productId);
       if (!option) {
-        await editMessageContent(ctx, "Опция не найдена.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "extraOptionNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       if (!Number.isFinite(methodId)) {
-        await editMessageContent(ctx, "Неверный способ оплаты.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "invalidPaymentMethod"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       try {
@@ -2184,18 +2195,18 @@ bot.on("callback_query:data", async (ctx) => {
           description: option.name || `${option.kind} ${option.id}`,
           extraOption: { kind: option.kind, productId: option.id },
         });
-        const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ГБ` : option.kind === "devices" ? `+${option.deviceCount} устр.` : "Сервер");
+        const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ${L(lg, "extraOptionTraffic")}` : option.kind === "devices" ? `+${option.deviceCount} ${L(lg, "extraOptionDevices")}` : L(lg, "extraOptionServer"));
         const msg = buildPaymentMessage(config, {
           name: optName,
           price: formatMoney(option.price, option.currency),
           amount: String(option.price),
           currency: option.currency,
-          action: "Нажмите кнопку ниже для оплаты:",
+          action: L(lg, "paymentClickButtonBelow"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateError");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2207,21 +2218,21 @@ bot.on("callback_query:data", async (ctx) => {
       const options = config?.sellOptions ?? [];
       const option = options.find((o) => o.kind === kind && o.id === productId);
       if (!option) {
-        await editMessageContent(ctx, "Опция не найдена. Обновите меню (/start) и попробуйте снова.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "extraOptionNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       if (option.currency.toUpperCase() !== "RUB") {
-        await editMessageContent(ctx, "Оплата в боте доступна только в рублях (RUB).", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "optionRubOnly"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const client = await api.getMe(token);
-      const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ГБ` : option.kind === "devices" ? `+${option.deviceCount} устр.` : "Сервер");
+      const optName = option.name || (option.kind === "traffic" ? `+${option.trafficGb} ${L(lg, "extraOptionTraffic")}` : option.kind === "devices" ? `+${option.deviceCount} ${L(lg, "extraOptionDevices")}` : L(lg, "extraOptionServer"));
       const choiceText = buildPaymentMessage(config, {
         name: optName,
         price: formatMoney(option.price, option.currency),
         amount: String(option.price),
         currency: option.currency,
-        action: "Выберите способ оплаты:",
+        action: L(lg, "choosePaymentMethod"),
       });
       const markup = optionPaymentMethodButtons(
         option,
@@ -2232,7 +2243,8 @@ bot.on("callback_query:data", async (ctx) => {
         config?.plategaMethods ?? [],
         !!config?.yoomoneyEnabled,
         !!config?.yookassaEnabled,
-        !!config?.cryptopayEnabled
+        !!config?.cryptopayEnabled,
+        lg,
       );
       await editMessageContent(ctx, choiceText.text, markup, choiceText.entities);
       return;
@@ -2246,19 +2258,19 @@ bot.on("callback_query:data", async (ctx) => {
       const { items } = await api.getPublicTariffs();
       const tariff = items?.flatMap((c: TariffCategory) => c.tariffs).find((t: TariffItem) => t.id === tariffId);
       if (!tariff) {
-        await editMessageContent(ctx, "Тариф не найден.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "tariffNotFound"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const methods = config?.plategaMethods ?? [];
       const client = await api.getMe(token);
-      const balanceLabel = client && client.balance >= tariff.price ? `💰 Оплатить балансом (${formatMoney(client.balance, client.preferredCurrency ?? "RUB")})` : null;
+      const balanceLabel = client && client.balance >= tariff.price ? L(lg, "payBalanceBtnWithAmount").replace("{{amount}}", formatMoney(client.balance, client.preferredCurrency ?? "RUB")) : null;
 
       if (methodIdFromBtn != null && Number.isFinite(methodIdFromBtn)) {
         const payment = await api.createPlategaPayment(token, {
           amount: tariff.price,
           currency: tariff.currency,
           paymentMethod: methodIdFromBtn,
-          description: `Тариф: ${tariff.name}`,
+          description: `${L(lg, "descriptionTariff")}: ${tariff.name}`,
           tariffId: tariff.id,
         });
         const msg = buildPaymentMessage(config, {
@@ -2266,9 +2278,9 @@ bot.on("callback_query:data", async (ctx) => {
           price: formatMoney(tariff.price, tariff.currency),
           amount: String(tariff.price),
           currency: tariff.currency,
-          action: "Нажмите кнопку ниже для оплаты:",
+          action: L(lg, "paymentClickButtonBelow"),
         });
-        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), msg.entities);
+        await editMessageContent(ctx, msg.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), msg.entities);
         return;
       }
       // Показываем способы оплаты (всегда, чтобы была кнопка баланса)
@@ -2277,19 +2289,19 @@ bot.on("callback_query:data", async (ctx) => {
         price: formatMoney(tariff.price, tariff.currency),
         amount: String(tariff.price),
         currency: tariff.currency,
-        action: "Выберите способ оплаты:",
+        action: L(lg, "choosePaymentMethod"),
       });
-      await editMessageContent(ctx, pay2.text, tariffPaymentMethodButtons(tariffId, methods, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, balanceLabel, !!config?.yoomoneyEnabled, !!config?.yookassaEnabled, !!config?.cryptopayEnabled, tariff.currency), pay2.entities);
+      await editMessageContent(ctx, pay2.text, tariffPaymentMethodButtons(tariffId, methods, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, balanceLabel, !!config?.yoomoneyEnabled, !!config?.yookassaEnabled, !!config?.cryptopayEnabled, tariff.currency, lg), pay2.entities);
       return;
     }
 
     if (data === "menu:profile") {
       const client = await api.getMe(token);
-      const langs = config?.activeLanguages?.length ? config.activeLanguages : ["ru", "en"];
+      const langs = config?.activeLanguages?.length ? config.activeLanguages : ["zh", "en"];
       const currencies = config?.activeCurrencies?.length ? config.activeCurrencies : ["usd", "rub"];
       const { text, entities } = titleWithEmoji(
         "PROFILE",
-        `Профиль\n\nБаланс: ${formatMoney(client?.balance ?? 0, client?.preferredCurrency ?? "usd")}\nЯзык: ${client?.preferredLang ?? "ru"}\nВалюта: ${client?.preferredCurrency ?? "usd"}\n\nИзменить:`,
+        `${L(lg, "profileTitle")}\n\n${L(lg, "profileBalance")}: ${formatMoney(client?.balance ?? 0, client?.preferredCurrency ?? "usd")}\n${L(lg, "profileLang")}: ${client?.preferredLang ?? "zh"}\n${L(lg, "profileCurrency")}: ${client?.preferredCurrency ?? "usd"}\n\n${L(lg, "profileChange")}`,
         config?.botEmojis
       );
       await editMessageContent(ctx, text, profileButtons(config?.botBackLabel ?? null, innerStyles, innerEmojiIds), entities);
@@ -2303,24 +2315,24 @@ bot.on("callback_query:data", async (ctx) => {
         if (devices.length === 0) {
           await editMessageContent(
             ctx,
-            "📱 Устройства\n\nПривязанных устройств пока нет. Подключитесь к VPN с приложения — устройство появится здесь. Удалять можно старые устройства, чтобы освободить слот для нового.",
-            { inline_keyboard: [[{ text: config?.botBackLabel ?? "◀️ В меню", callback_data: "menu:main" }]] }
+            L(lg, "devicesTitle") + "\n\n" + L(lg, "devicesEmpty"),
+            { inline_keyboard: [[{ text: config?.botBackLabel ?? L(lg, "backToMenu"), callback_data: "menu:main" }]] }
           );
           return;
         }
-        const lines = ["📱 Устройства\n\nУдалите устройство, чтобы привязать другое (освободится слот):\n"];
+        const lines = [L(lg, "devicesTitle") + "\n\n" + L(lg, "devicesDeleteHint") + "\n"];
         const rows: InlineMarkup["inline_keyboard"] = [];
         devices.slice(0, 15).forEach((d, i) => {
           const label = [d.platform, d.deviceModel].filter(Boolean).join(" · ") || d.hwid.slice(0, 12) + "…";
           lines.push(`${i + 1}. ${label}`);
-          rows.push([{ text: `🗑 Удалить: ${label.slice(0, 25)}`, callback_data: `devices:delete:${i}` }]);
+          rows.push([{ text: `${L(lg, "btnDeleteDevice")}: ${label.slice(0, 25)}`, callback_data: `devices:delete:${i}` }]);
         });
-        rows.push([{ text: config?.botBackLabel ?? "◀️ В меню", callback_data: "menu:main" }]);
+        rows.push([{ text: config?.botBackLabel ?? L(lg, "backToMenu"), callback_data: "menu:main" }]);
         await editMessageContent(ctx, lines.join("\n"), { inline_keyboard: rows });
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка";
-        await editMessageContent(ctx, `📱 Устройства\n\n❌ ${msg}`, {
-          inline_keyboard: [[{ text: config?.botBackLabel ?? "◀️ В меню", callback_data: "menu:main" }]],
+        const msg = e instanceof Error ? e.message : L(lg, "error");
+        await editMessageContent(ctx, L(lg, "devicesTitle") + "\n\n❌ " + msg, {
+          inline_keyboard: [[{ text: config?.botBackLabel ?? L(lg, "backToMenu"), callback_data: "menu:main" }]],
         });
       }
       return;
@@ -2331,8 +2343,8 @@ bot.on("callback_query:data", async (ctx) => {
       const index = parseInt(indexStr, 10);
       const stored = lastDevicesList.get(userId);
       if (!stored || index < 0 || index >= stored.devices.length) {
-        await editMessageContent(ctx, "Сессия истекла. Откройте «Устройства» снова.", {
-          inline_keyboard: [[{ text: config?.botBackLabel ?? "◀️ В меню", callback_data: "menu:main" }]],
+        await editMessageContent(ctx, L(lg, "devicesSessionExpired"), {
+          inline_keyboard: [[{ text: config?.botBackLabel ?? L(lg, "backToMenu"), callback_data: "menu:main" }]],
         });
         return;
       }
@@ -2344,51 +2356,52 @@ bot.on("callback_query:data", async (ctx) => {
         if (nextDevices.length === 0) {
           await editMessageContent(
             ctx,
-            "✅ Устройство удалено. Подключите приложение с нового устройства — оно будет привязано.",
-            { inline_keyboard: [[{ text: config?.botBackLabel ?? "◀️ В меню", callback_data: "menu:main" }]] }
+            L(lg, "devicesDeletedConnectNew"),
+            { inline_keyboard: [[{ text: config?.botBackLabel ?? L(lg, "backToMenu"), callback_data: "menu:main" }]] }
           );
         } else {
-          const lines = ["✅ Устройство удалено.\n\nОставшиеся устройства:\n"];
+          const lines = [L(lg, "devicesDeleted") + "\n\n" + L(lg, "devicesRemaining") + "\n"];
           const rows: InlineMarkup["inline_keyboard"] = [];
           nextDevices.slice(0, 15).forEach((d, i) => {
             const label = [d.platform, d.deviceModel].filter(Boolean).join(" · ") || d.hwid.slice(0, 12) + "…";
             lines.push(`${i + 1}. ${label}`);
-            rows.push([{ text: `🗑 Удалить: ${label.slice(0, 25)}`, callback_data: `devices:delete:${i}` }]);
+            rows.push([{ text: `${L(lg, "btnDeleteDevice")}: ${label.slice(0, 25)}`, callback_data: `devices:delete:${i}` }]);
           });
-          rows.push([{ text: config?.botBackLabel ?? "◀️ В меню", callback_data: "menu:main" }]);
+          rows.push([{ text: config?.botBackLabel ?? L(lg, "backToMenu"), callback_data: "menu:main" }]);
           await editMessageContent(ctx, lines.join("\n"), { inline_keyboard: rows });
         }
       } catch (e: unknown) {
-        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : "Ошибка"}`, {
-          inline_keyboard: [[{ text: config?.botBackLabel ?? "◀️ В меню", callback_data: "menu:devices" }]],
+        await editMessageContent(ctx, `❌ ${e instanceof Error ? e.message : L(lg, "error")}`, {
+          inline_keyboard: [[{ text: config?.botBackLabel ?? L(lg, "backToMenu"), callback_data: "menu:devices" }]],
         });
       }
       return;
     }
 
     if (data === "profile:lang") {
-      const langs = config?.activeLanguages?.length ? config.activeLanguages : ["ru", "en"];
-      await editMessageContent(ctx, "Выберите язык:", langButtons(langs, innerStyles, innerEmojiIds));
+      const langs = config?.activeLanguages?.length ? config.activeLanguages : ["zh", "en"];
+      await editMessageContent(ctx, L(lg, "chooseLang"), langButtons(langs, innerStyles, innerEmojiIds));
       return;
     }
 
     if (data.startsWith("set_lang:")) {
       const lang = data.slice("set_lang:".length);
       await api.updateProfile(token, { preferredLang: lang });
-      await editMessageContent(ctx, `Язык изменён на ${lang.toUpperCase()}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+      setLang(userId, lang);
+      await editMessageContent(ctx, `${L(lang, "langChanged")} ${lang.toUpperCase()}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       return;
     }
 
     if (data === "profile:currency") {
       const currencies = config?.activeCurrencies?.length ? config.activeCurrencies : ["usd", "rub"];
-      await editMessageContent(ctx, "Выберите валюту:", currencyButtons(currencies, innerStyles, innerEmojiIds));
+      await editMessageContent(ctx, L(lg, "chooseCurrency"), currencyButtons(currencies, innerStyles, innerEmojiIds));
       return;
     }
 
     if (data.startsWith("set_currency:")) {
       const currency = data.slice("set_currency:".length);
       await api.updateProfile(token, { preferredCurrency: currency });
-      await editMessageContent(ctx, `Валюта изменена на ${currency.toUpperCase()}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+      await editMessageContent(ctx, `${L(lg, "currencyChanged")} ${currency.toUpperCase()}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       return;
     }
 
@@ -2398,11 +2411,11 @@ bot.on("callback_query:data", async (ctx) => {
       const yooEnabled = !!config?.yoomoneyEnabled;
       const yookassaEnabledTopup = !!config?.yookassaEnabled;
       if (!methods.length && !yooEnabled && !yookassaEnabledTopup) {
-        await editMessageContent(ctx, "Пополнение временно недоступно.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "topupUnavailable"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
-      const topupTitle = titleWithEmoji("CARD", "Пополнить баланс\n\nВыберите сумму или введите свою (числом):", config?.botEmojis);
-      await editMessageContent(ctx, topupTitle.text, topUpPresets(client.preferredCurrency, config?.botBackLabel ?? null, innerStyles, innerEmojiIds), topupTitle.entities);
+      const topupTitle = titleWithEmoji("CARD", L(lg, "topupTitle") + "\n\n" + L(lg, "topupChooseAmount"), config?.botEmojis);
+      await editMessageContent(ctx, topupTitle.text, topUpPresets(client.preferredCurrency, config?.botBackLabel ?? null, innerStyles, innerEmojiIds, lg), topupTitle.entities);
       return;
     }
 
@@ -2410,7 +2423,7 @@ bot.on("callback_query:data", async (ctx) => {
       const amountStr = data.slice("topup_yoomoney:".length);
       const amount = Number(amountStr);
       if (!Number.isFinite(amount) || amount <= 0) {
-        await editMessageContent(ctx, "Неверная сумма.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "topupInvalidAmount"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const client = await api.getMe(token);
@@ -2419,11 +2432,11 @@ bot.on("callback_query:data", async (ctx) => {
           amount,
           paymentType: "AC",
         });
-        const yooTopup = titleWithEmoji("CARD", `Пополнение на ${formatMoney(amount, client.preferredCurrency)}\n\nНажмите кнопку ниже для оплаты через ЮMoney:`, config?.botEmojis);
-        await editMessageContent(ctx, yooTopup.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), yooTopup.entities);
+        const yooTopup = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(amount, client.preferredCurrency)}\n\n${L(lg, "paymentClickButtonYoomoney")}:`, config?.botEmojis);
+        await editMessageContent(ctx, yooTopup.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), yooTopup.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа ЮMoney";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateErrorYoomoney");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2432,17 +2445,17 @@ bot.on("callback_query:data", async (ctx) => {
       const amountStr = data.slice("topup_yookassa:".length);
       const amount = Number(amountStr);
       if (!Number.isFinite(amount) || amount <= 0) {
-        await editMessageContent(ctx, "Неверная сумма.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "topupInvalidAmount"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const client = await api.getMe(token);
       try {
         const payment = await api.createYookassaPayment(token, { amount, currency: "RUB" });
-        const yooTopup = titleWithEmoji("CARD", `Пополнение на ${formatMoney(amount, "RUB")}\n\nНажмите кнопку ниже для оплаты через ЮKassa:`, config?.botEmojis);
-        await editMessageContent(ctx, yooTopup.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), yooTopup.entities);
+        const yooTopup = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(amount, "RUB")}\n\n${L(lg, "paymentClickButtonYookassa")}:`, config?.botEmojis);
+        await editMessageContent(ctx, yooTopup.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), yooTopup.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа ЮKassa";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateErrorYookassa");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2451,17 +2464,17 @@ bot.on("callback_query:data", async (ctx) => {
       const amountStr = data.slice("topup_cryptopay:".length);
       const amount = Number(amountStr);
       if (!Number.isFinite(amount) || amount <= 0) {
-        await editMessageContent(ctx, "Неверная сумма.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "topupInvalidAmount"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const client = await api.getMe(token);
       try {
         const payment = await api.createCryptopayPayment(token, { amount, currency: client.preferredCurrency ?? "RUB" });
-        const cpTopup = titleWithEmoji("CARD", `Пополнение на ${formatMoney(amount, client.preferredCurrency ?? "RUB")}\n\nНажмите кнопку ниже для оплаты через Crypto Bot:`, config?.botEmojis);
-        await editMessageContent(ctx, cpTopup.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), cpTopup.entities);
+        const cpTopup = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(amount, client.preferredCurrency ?? "RUB")}\n\n${L(lg, "paymentClickButtonCryptoBot")}:`, config?.botEmojis);
+        await editMessageContent(ctx, cpTopup.text, payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), cpTopup.entities);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Ошибка создания платежа Crypto Bot";
-        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        const msg = e instanceof Error ? e.message : L(lg, "paymentCreateErrorCryptoBot");
+        await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       }
       return;
     }
@@ -2473,7 +2486,7 @@ bot.on("callback_query:data", async (ctx) => {
       const amount = Number(amountStr);
       const methodIdFromBtn = parts.length >= 2 ? Number(parts[1]) : null;
       if (!Number.isFinite(amount) || amount <= 0) {
-        await editMessageContent(ctx, "Неверная сумма.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "topupInvalidAmount"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const client = await api.getMe(token);
@@ -2483,29 +2496,29 @@ bot.on("callback_query:data", async (ctx) => {
           amount,
           currency: client.preferredCurrency,
           paymentMethod: methodIdFromBtn,
-          description: "Пополнение баланса",
+          description: L(lg, "descriptionTopup"),
         });
-        const topupPay1 = titleWithEmoji("CARD", `Пополнение на ${formatMoney(amount, client.preferredCurrency)}\n\nНажмите кнопку ниже для оплаты:`, config?.botEmojis);
-        await editMessageContent(ctx, topupPay1.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), topupPay1.entities);
+        const topupPay1 = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(amount, client.preferredCurrency)}\n\n${L(lg, "paymentClickButtonBelow")}:`, config?.botEmojis);
+        await editMessageContent(ctx, topupPay1.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), topupPay1.entities);
         return;
       }
       const yooEnabled = !!config?.yoomoneyEnabled;
       const yookassaEnabled = !!config?.yookassaEnabled;
       const cryptopayEnabled = !!config?.cryptopayEnabled;
       if (methods.length > 1 || (methods.length >= 1 && (yooEnabled || yookassaEnabled || cryptopayEnabled)) || (methods.length === 0 && ((yooEnabled && yookassaEnabled) || (yooEnabled && cryptopayEnabled) || (yookassaEnabled && cryptopayEnabled)))) {
-        const topupPay2 = titleWithEmoji("CARD", `Пополнение на ${formatMoney(amount, client.preferredCurrency)}\n\nВыберите способ оплаты:`, config?.botEmojis);
-        await editMessageContent(ctx, topupPay2.text, topupPaymentMethodButtons(amountStr, methods, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, yooEnabled, yookassaEnabled, cryptopayEnabled), topupPay2.entities);
+        const topupPay2 = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(amount, client.preferredCurrency)}\n\n${L(lg, "topupChoosePayMethod")}:`, config?.botEmojis);
+        await editMessageContent(ctx, topupPay2.text, topupPaymentMethodButtons(amountStr, methods, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, yooEnabled, yookassaEnabled, cryptopayEnabled, lg), topupPay2.entities);
         return;
       }
       // Если ЮMoney единственный способ (нет platega, нет ЮKassa) — сразу создаём платёж ЮMoney
       if (methods.length === 0 && yooEnabled && !yookassaEnabled) {
         try {
           const payment = await api.createYoomoneyPayment(token, { amount, paymentType: "AC" });
-          const yooTopup = titleWithEmoji("CARD", `Пополнение на ${formatMoney(amount, client.preferredCurrency)}\n\nНажмите кнопку ниже для оплаты через ЮMoney:`, config?.botEmojis);
-          await editMessageContent(ctx, yooTopup.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), yooTopup.entities);
+          const yooTopup = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(amount, client.preferredCurrency)}\n\n${L(lg, "paymentClickButtonYoomoney")}:`, config?.botEmojis);
+          await editMessageContent(ctx, yooTopup.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), yooTopup.entities);
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : "Ошибка создания платежа ЮMoney";
-          await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+          const msg = e instanceof Error ? e.message : L(lg, "paymentCreateErrorYoomoney");
+          await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         }
         return;
       }
@@ -2513,11 +2526,11 @@ bot.on("callback_query:data", async (ctx) => {
       if (methods.length === 0 && yookassaEnabled) {
         try {
           const payment = await api.createYookassaPayment(token, { amount, currency: "RUB" });
-          const yooTopup = titleWithEmoji("CARD", `Пополнение на ${formatMoney(amount, "RUB")}\n\nНажмите кнопку ниже для оплаты через ЮKassa:`, config?.botEmojis);
-          await editMessageContent(ctx, yooTopup.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), yooTopup.entities);
+          const yooTopup = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(amount, "RUB")}\n\n${L(lg, "paymentClickButtonYookassa")}:`, config?.botEmojis);
+          await editMessageContent(ctx, yooTopup.text, payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), yooTopup.entities);
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : "Ошибка создания платежа ЮKassa";
-          await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+          const msg = e instanceof Error ? e.message : L(lg, "paymentCreateErrorYookassa");
+          await editMessageContent(ctx, `❌ ${msg}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         }
         return;
       }
@@ -2526,17 +2539,17 @@ bot.on("callback_query:data", async (ctx) => {
         amount,
         currency: client.preferredCurrency,
         paymentMethod: methodId,
-        description: "Пополнение баланса",
+        description: L(lg, "descriptionTopup"),
       });
-      const topupPay3 = titleWithEmoji("CARD", `Пополнение на ${formatMoney(amount, client.preferredCurrency)}\n\nНажмите кнопку ниже для оплаты:`, config?.botEmojis);
-      await editMessageContent(ctx, topupPay3.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), topupPay3.entities);
+      const topupPay3 = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(amount, client.preferredCurrency)}\n\n${L(lg, "paymentClickButtonBelow")}:`, config?.botEmojis);
+      await editMessageContent(ctx, topupPay3.text, payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), topupPay3.entities);
       return;
     }
 
     if (data === "menu:referral") {
       const client = await api.getMe(token);
       if (!client.referralCode) {
-        await editMessageContent(ctx, "Реферальная ссылка недоступна.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "referralUnavailable"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const linkSite = appUrl ? `${appUrl}/cabinet/register?ref=${encodeURIComponent(client.referralCode)}` : null;
@@ -2544,17 +2557,17 @@ bot.on("callback_query:data", async (ctx) => {
       const p1 = (client.referralPercent != null && client.referralPercent > 0) ? client.referralPercent : (config?.defaultReferralPercent ?? 0);
       const p2 = config?.referralPercentLevel2 ?? 0;
       const p3 = config?.referralPercentLevel3 ?? 0;
-      let rest = "Реферальная программа\n\nПоделитесь ссылкой с друзьями и получайте процент от их пополнений!\n\n";
-      rest += "Как это работает:\n";
-      rest += `• 1 уровень — ${p1}% от пополнений тех, кто перешёл по вашей ссылке.\n`;
-      rest += `• 2 уровень — ${p2}% от пополнений рефералов ваших рефералов.\n`;
-      rest += `• 3 уровень — ${p3}% от пополнений рефералов второго уровня.\n`;
-      rest += "\nНачисления зачисляются на ваш баланс и могут быть использованы для оплаты тарифов.";
-      rest += "\n\nВаши ссылки:";
-      if (linkSite) rest += "\n\nСайт:\n" + linkSite;
-      rest += "\n\nБот:\n" + linkBot;
+      let rest = L(lg, "referralTitle") + "\n\n" + L(lg, "referralShareText") + "\n\n";
+      rest += L(lg, "referralHowItWorks") + "\n";
+      rest += `• ${L(lg, "referralLevel1").replace("{{pct}}", String(p1))}\n`;
+      rest += `• ${L(lg, "referralLevel2").replace("{{pct}}", String(p2))}\n`;
+      rest += `• ${L(lg, "referralLevel3").replace("{{pct}}", String(p3))}\n`;
+      rest += "\n" + L(lg, "referralBonusNote");
+      rest += "\n\n" + L(lg, "referralYourLinks");
+      if (linkSite) rest += "\n\n" + L(lg, "referralSite") + "\n" + linkSite;
+      rest += "\n\n" + L(lg, "referralBot") + "\n" + linkBot;
       const { text: refText, entities: refEntities } = titleWithEmoji("LINK", rest, config?.botEmojis);
-      await editMessageContent(ctx, refText, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), refEntities);
+      await editMessageContent(ctx, refText, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), refEntities);
       return;
     }
 
@@ -2562,23 +2575,23 @@ bot.on("callback_query:data", async (ctx) => {
       awaitingPromoCode.add(userId);
       await editMessageContent(
         ctx,
-        "🎟️ Введите промокод\n\nОтправьте промокод сообщением в этот чат.",
-        backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds),
+        L(lg, "promocodeTitle") + "\n\n" + L(lg, "promocodeSendHint"),
+        backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg),
       );
       return;
     }
 
     if (data === "menu:trial") {
       const days = config?.trialDays ?? 0;
-      const daysText = days > 0 ? formatRuDays(days) + " триала." : "Триал без оплаты.";
-      const trialTitle = titleWithEmoji("TRIAL", `Попробовать бесплатно\n\n${daysText}\n\nАктивировать?`, config?.botEmojis);
+      const daysText = days > 0 ? formatDaysI18n(days, lg) + " " + L(lg, "trialDaysSuffix") : L(lg, "trialNoPay");
+      const trialTitle = titleWithEmoji("TRIAL", `${L(lg, "trialTitle")}\n\n${daysText}\n\n${L(lg, "trialActivate")}`, config?.botEmojis);
       await editMessageContent(ctx, trialTitle.text, trialConfirmButton(innerStyles, innerEmojiIds), trialTitle.entities);
       return;
     }
 
     if (data === "trial:confirm") {
       const result = await api.activateTrial(token);
-      await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+      await editMessageContent(ctx, `✅ ${result.message}`, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
       return;
     }
 
@@ -2586,27 +2599,27 @@ bot.on("callback_query:data", async (ctx) => {
       const subRes = await api.getSubscription(token);
       const vpnUrl = getSubscriptionUrl(subRes.subscription);
       if (!vpnUrl) {
-        await editMessageContent(ctx, "Ссылка на VPN недоступна. Оформите подписку.", backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds));
+        await editMessageContent(ctx, L(lg, "vpnUnavailable"), backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg));
         return;
       }
       const appUrl = config?.publicAppUrl?.replace(/\/$/, "") ?? null;
       const useRemna = config?.useRemnaSubscriptionPage === true;
       if (useRemna) {
-        const vpnTitle = titleWithEmoji("SERVERS", "Подключиться к VPN\n\nНажмите кнопку ниже — откроется страница подключения.", config?.botEmojis);
-        await editMessageContent(ctx, vpnTitle.text, openSubscribePageMarkup(appUrl ?? "", config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, vpnUrl), vpnTitle.entities);
+        const vpnTitle = titleWithEmoji("SERVERS", L(lg, "vpnTitle") + "\n\n" + L(lg, "vpnClickBelow"), config?.botEmojis);
+        await editMessageContent(ctx, vpnTitle.text, openSubscribePageMarkup(appUrl ?? "", config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, vpnUrl, lg), vpnTitle.entities);
       } else if (appUrl) {
-        const vpnTitle = titleWithEmoji("SERVERS", "Подключиться к VPN\n\nНажмите кнопку ниже — откроется страница с приложениями и кнопкой «Добавить подписку» (как в кабинете).", config?.botEmojis);
-        await editMessageContent(ctx, vpnTitle.text, openSubscribePageMarkup(appUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), vpnTitle.entities);
+        const vpnTitle = titleWithEmoji("SERVERS", L(lg, "vpnTitle") + "\n\n" + L(lg, "vpnClickBelowApps"), config?.botEmojis);
+        await editMessageContent(ctx, vpnTitle.text, openSubscribePageMarkup(appUrl, config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, undefined, lg), vpnTitle.entities);
       } else {
-        const vpnTitle2 = titleWithEmoji("SERVERS", `Подключиться к VPN\n\nОткройте ссылку в приложении VPN:\n${vpnUrl}`, config?.botEmojis);
-        await editMessageContent(ctx, vpnTitle2.text, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds), vpnTitle2.entities);
+        const vpnTitle2 = titleWithEmoji("SERVERS", `${L(lg, "vpnTitle")}\n\n${L(lg, "vpnOpenInApp")}\n${vpnUrl}`, config?.botEmojis);
+        await editMessageContent(ctx, vpnTitle2.text, backToMenu(config?.botBackLabel ?? null, innerStyles?.back, innerEmojiIds, lg), vpnTitle2.entities);
       }
       return;
     }
 
-    await ctx.answerCallbackQuery({ text: "Неизвестное действие" });
+    await ctx.answerCallbackQuery({ text: L(lg, "unknownAction") });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Ошибка";
+    const msg = e instanceof Error ? e.message : L(lg, "error");
     await ctx.reply(`❌ ${msg}`).catch(() => {});
   }
 });
@@ -2615,30 +2628,31 @@ bot.on("callback_query:data", async (ctx) => {
 bot.on("message:photo", async (ctx) => {
   const userId = ctx.from?.id;
   if (!userId) return;
+  const lg = getLang(userId);
   if (!awaitingBroadcastMessage.has(userId)) return;
   awaitingBroadcastMessage.delete(userId);
   const config = await api.getPublicConfig();
   if (!config?.botAdminTelegramIds?.includes(String(userId))) {
-    await ctx.reply("Доступ запрещён.");
+    await ctx.reply(L(lg, "accessDenied"));
     return;
   }
   const photos = ctx.message.photo;
   if (!photos?.length) {
-    await ctx.reply("Фото не получено. Отправьте фото с подписью или текст.");
+    await ctx.reply(L(lg, "adminPhotoNotReceived"));
     return;
   }
   const largest = photos[photos.length - 1];
   const caption = ctx.message.caption?.trim() ?? "";
   lastBroadcastMessage.set(userId, { text: caption, photoFileId: largest.file_id });
-  await ctx.reply("Кому отправить?", {
+  await ctx.reply(L(lg, "adminBroadcastTo"), {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "📱 Только Telegram", callback_data: "admin:bc:tg" },
-          { text: "📧 Только Email", callback_data: "admin:bc:email" },
+          { text: L(lg, "adminBcTelegram"), callback_data: "admin:bc:tg" },
+          { text: L(lg, "adminBcEmail"), callback_data: "admin:bc:email" },
         ],
-        [{ text: "📱+📧 Telegram и Email", callback_data: "admin:bc:both" }],
-        [{ text: "◀️ Отмена", callback_data: "admin:menu" }],
+        [{ text: L(lg, "adminBcBoth"), callback_data: "admin:bc:both" }],
+        [{ text: L(lg, "cancel"), callback_data: "admin:menu" }],
       ],
     },
   });
@@ -2649,30 +2663,31 @@ bot.on("message:text", async (ctx) => {
   if (ctx.message.text?.startsWith("/")) return;
   const userId = ctx.from?.id;
   if (!userId) return;
+  const lg = getLang(userId);
 
   // Админ: ввод текста рассылки
   if (awaitingBroadcastMessage.has(userId)) {
     awaitingBroadcastMessage.delete(userId);
     const config = await api.getPublicConfig();
     if (!config?.botAdminTelegramIds?.includes(String(userId))) {
-      await ctx.reply("Доступ запрещён.");
+      await ctx.reply(L(lg, "accessDenied"));
       return;
     }
     const text = ctx.message.text?.trim() ?? "";
     if (!text) {
-      await ctx.reply("Введите непустой текст сообщения.");
+      await ctx.reply(L(lg, "adminEnterNonEmpty"));
       return;
     }
     lastBroadcastMessage.set(userId, { text });
-    await ctx.reply("Кому отправить?", {
+    await ctx.reply(L(lg, "adminBroadcastTo"), {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: "📱 Только Telegram", callback_data: "admin:bc:tg" },
-            { text: "📧 Только Email", callback_data: "admin:bc:email" },
+            { text: L(lg, "adminBcTelegram"), callback_data: "admin:bc:tg" },
+            { text: L(lg, "adminBcEmail"), callback_data: "admin:bc:email" },
           ],
-          [{ text: "📱+📧 Telegram и Email", callback_data: "admin:bc:both" }],
-          [{ text: "◀️ Отмена", callback_data: "admin:menu" }],
+          [{ text: L(lg, "adminBcBoth"), callback_data: "admin:bc:both" }],
+          [{ text: L(lg, "cancel"), callback_data: "admin:menu" }],
         ],
       },
     });
@@ -2685,19 +2700,19 @@ bot.on("message:text", async (ctx) => {
     awaitingAdminBalance.delete(userId);
     const config = await api.getPublicConfig();
     if (!config?.botAdminTelegramIds?.includes(String(userId)) || !clientId) {
-      await ctx.reply("Доступ запрещён или сессия истекла.");
+      await ctx.reply(L(lg, "adminAccessDeniedOrExpired"));
       return;
     }
     const num = Number(ctx.message.text?.replace(/,/, "."));
     if (!Number.isFinite(num) || num <= 0 || num > 1000000) {
-      await ctx.reply("Введите положительное число (до 1 000 000).");
+      await ctx.reply(L(lg, "adminEnterPositive"));
       return;
     }
     try {
       const result = await api.patchBotAdminClientBalance(userId, clientId, num);
-      await ctx.reply(`✅ Баланс пополнен. Новый баланс: ${result.newBalance}`);
+      await ctx.reply(`${L(lg, "adminBalanceTopupped")} ${result.newBalance}`);
     } catch (e: unknown) {
-      await ctx.reply(`❌ ${e instanceof Error ? e.message : "Ошибка"}`);
+      await ctx.reply(`❌ ${e instanceof Error ? e.message : L(lg, "error")}`);
     }
     return;
   }
@@ -2707,7 +2722,7 @@ bot.on("message:text", async (ctx) => {
     awaitingAdminSearch.delete(userId);
     const config = await api.getPublicConfig();
     if (!config?.botAdminTelegramIds?.includes(String(userId))) {
-      await ctx.reply("Доступ запрещён.");
+      await ctx.reply(L(lg, "accessDenied"));
       return;
     }
     const searchQuery = ctx.message.text?.trim() ?? "";
@@ -2716,14 +2731,14 @@ bot.on("message:text", async (ctx) => {
       const { items, total, limit } = await api.getBotAdminClients(userId, 1, searchQuery || undefined);
       const totalPages = Math.max(1, Math.ceil(total / limit));
       const msg =
-        (searchQuery ? `👥 Поиск «${searchQuery}» (${total})\n\n` : `👥 Клиенты (${total})\n\n`) +
+        (searchQuery ? `${L(lg, "adminClientSearch")} «${searchQuery}» (${total})\n\n` : `${L(lg, "adminClientsTitle")} (${total})\n\n`) +
         items
           .map(
             (c, i) =>
               `${i + 1}. ${c.email || c.telegramUsername || c.telegramId || c.id.slice(0, 8)} ${c.isBlocked ? "🚫" : ""}`
           )
           .join("\n") +
-        `\n\nСтр. 1/${totalPages}`;
+        `\n\n${L(lg, "adminPage")} 1/${totalPages}`;
       const rows: InlineMarkup["inline_keyboard"] = items.map((c) => [
         {
           text: `${c.email || c.telegramUsername || c.telegramId || c.id.slice(0, 8)} ${c.isBlocked ? "🚫" : ""}`,
@@ -2731,15 +2746,15 @@ bot.on("message:text", async (ctx) => {
         },
       ]);
       const nav: InlineMarkup["inline_keyboard"][0] = [
-        { text: "◀️ В админку", callback_data: "admin:menu" },
+        { text: L(lg, "backToAdmin"), callback_data: "admin:menu" },
       ];
-      if (searchQuery) nav.push({ text: "✖ Сбросить поиск", callback_data: "admin:clients:clear" });
-      if (totalPages > 1) nav.push({ text: "Вперёд ▶", callback_data: "admin:clients:2" });
+      if (searchQuery) nav.push({ text: L(lg, "adminResetSearch"), callback_data: "admin:clients:clear" });
+      if (totalPages > 1) nav.push({ text: L(lg, "adminNext"), callback_data: "admin:clients:2" });
       rows.push(nav);
       await ctx.reply(msg, { reply_markup: { inline_keyboard: rows } });
     } catch (e: unknown) {
       lastAdminSearch.delete(userId);
-      const errMsg = e instanceof Error ? e.message : "Ошибка поиска";
+      const errMsg = e instanceof Error ? e.message : L(lg, "adminSearchError");
       await ctx.reply(`❌ ${errMsg}`);
     }
     return;
@@ -2755,7 +2770,7 @@ bot.on("message:text", async (ctx) => {
     awaitingPromoCode.delete(userId);
     const code = ctx.message.text.trim();
     if (!code) {
-      await ctx.reply("❌ Промокод не может быть пустым.");
+      await ctx.reply(L(lg, "promocodeEmpty"));
       return;
     }
     try {
@@ -2764,18 +2779,18 @@ bot.on("message:text", async (ctx) => {
       if (checkResult.type === "FREE_DAYS") {
         // Активируем сразу
         const activateResult = await api.activatePromoCode(token, code);
-        await ctx.reply(`✅ ${activateResult.message}\n\nНажмите /start чтобы открыть меню.`);
+        await ctx.reply(`✅ ${activateResult.message}\n\n${L(lg, "pressStartForMenu")}`);
       } else if (checkResult.type === "DISCOUNT") {
         const desc = checkResult.discountPercent
-          ? `скидка ${checkResult.discountPercent}%`
+          ? L(lg, "promocodeDiscountPercent").replace("{{pct}}", String(checkResult.discountPercent))
           : checkResult.discountFixed
-            ? `скидка ${checkResult.discountFixed}`
-            : "скидка";
+            ? L(lg, "promocodeDiscountFixed").replace("{{amount}}", String(checkResult.discountFixed))
+            : L(lg, "promocodeDiscount");
         activeDiscountCode.set(userId, code);
-        await ctx.reply(`✅ Промокод «${checkResult.name}» принят! ${desc}.\n\nСкидка будет автоматически применена при следующей оплате тарифа.`);
+        await ctx.reply(`${L(lg, "promocodeAccepted").replace("{{name}}", checkResult.name)} ${desc}.\n\n${L(lg, "promocodeWillApply")}`);
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Ошибка активации промокода";
+      const msg = e instanceof Error ? e.message : L(lg, "promocodeActivationError");
       await ctx.reply(`❌ ${msg}`);
     }
     return;
@@ -2791,7 +2806,7 @@ bot.on("message:text", async (ctx) => {
     const yookassaEnabledMsg = !!config?.yookassaEnabled;
     const cryptopayEnabledMsg = !!config?.cryptopayEnabled;
     if (!methods.length && !yooEnabled && !yookassaEnabledMsg && !cryptopayEnabledMsg) {
-      await ctx.reply("Пополнение временно недоступно.");
+      await ctx.reply(L(lg, "topupUnavailable"));
       return;
     }
     const client = await api.getMe(token);
@@ -2809,7 +2824,7 @@ bot.on("message:text", async (ctx) => {
         }
       : undefined;
     if (methods.length > 1 || (methods.length >= 1 && (yooEnabled || yookassaEnabledMsg || cryptopayEnabledMsg)) || (methods.length === 0 && ((yooEnabled && yookassaEnabledMsg) || (yooEnabled && cryptopayEnabledMsg) || (yookassaEnabledMsg && cryptopayEnabledMsg)))) {
-      const topupMsg1 = titleWithEmoji("CARD", `Пополнение на ${formatMoney(num, client.preferredCurrency)}\n\nВыберите способ оплаты:`, config?.botEmojis);
+      const topupMsg1 = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(num, client.preferredCurrency)}\n\n${L(lg, "topupChoosePayMethod")}:`, config?.botEmojis);
       await ctx.reply(topupMsg1.text, {
         entities: topupMsg1.entities.length ? topupMsg1.entities : undefined,
         reply_markup: topupPaymentMethodButtons(String(num), methods, config?.botBackLabel ?? null, backStyle, msgEmojiIds, yooEnabled, yookassaEnabledMsg, cryptopayEnabledMsg),
@@ -2819,30 +2834,30 @@ bot.on("message:text", async (ctx) => {
     // Если только ЮMoney (нет platega, нет ЮKassa) — сразу создаём
     if (methods.length === 0 && yooEnabled) {
       const payment = await api.createYoomoneyPayment(token, { amount: num, paymentType: "AC" });
-      const topupMsgYoo = titleWithEmoji("CARD", `Пополнение на ${formatMoney(num, client.preferredCurrency)}\n\nНажмите кнопку ниже для оплаты через ЮMoney:`, config?.botEmojis);
+      const topupMsgYoo = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(num, client.preferredCurrency)}\n\n${L(lg, "paymentClickButtonYoomoney")}:`, config?.botEmojis);
       await ctx.reply(topupMsgYoo.text, {
         entities: topupMsgYoo.entities.length ? topupMsgYoo.entities : undefined,
-        reply_markup: payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, backStyle, msgEmojiIds),
+        reply_markup: payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, backStyle, msgEmojiIds, lg),
       });
       return;
     }
     // Если только ЮKassa
     if (methods.length === 0 && yookassaEnabledMsg) {
       const payment = await api.createYookassaPayment(token, { amount: num, currency: "RUB" });
-      const topupMsgYoo = titleWithEmoji("CARD", `Пополнение на ${formatMoney(num, "RUB")}\n\nНажмите кнопку ниже для оплаты через ЮKassa:`, config?.botEmojis);
+      const topupMsgYoo = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(num, "RUB")}\n\n${L(lg, "paymentClickButtonYookassa")}:`, config?.botEmojis);
       await ctx.reply(topupMsgYoo.text, {
         entities: topupMsgYoo.entities.length ? topupMsgYoo.entities : undefined,
-        reply_markup: payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, backStyle, msgEmojiIds),
+        reply_markup: payUrlMarkup(payment.confirmationUrl, config?.botBackLabel ?? null, backStyle, msgEmojiIds, lg),
       });
       return;
     }
     // Если только Crypto Pay
     if (methods.length === 0 && cryptopayEnabledMsg) {
       const payment = await api.createCryptopayPayment(token, { amount: num, currency: client.preferredCurrency });
-      const topupMsgCp = titleWithEmoji("CARD", `Пополнение на ${formatMoney(num, client.preferredCurrency)}\n\nНажмите кнопку ниже для оплаты через Crypto Bot:`, config?.botEmojis);
+      const topupMsgCp = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(num, client.preferredCurrency)}\n\n${L(lg, "paymentClickButtonCryptoBot")}:`, config?.botEmojis);
       await ctx.reply(topupMsgCp.text, {
         entities: topupMsgCp.entities.length ? topupMsgCp.entities : undefined,
-        reply_markup: payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, backStyle, msgEmojiIds),
+        reply_markup: payUrlMarkup(payment.payUrl, config?.botBackLabel ?? null, backStyle, msgEmojiIds, lg),
       });
       return;
     }
@@ -2850,12 +2865,12 @@ bot.on("message:text", async (ctx) => {
       amount: num,
       currency: client.preferredCurrency,
       paymentMethod: methods[0].id,
-      description: "Пополнение баланса",
+      description: L(lg, "descriptionTopup"),
     });
-    const topupMsg2 = titleWithEmoji("CARD", `Пополнение на ${formatMoney(num, client.preferredCurrency)}\n\nНажмите кнопку ниже для оплаты:`, config?.botEmojis);
+    const topupMsg2 = titleWithEmoji("CARD", `${L(lg, "topupFor")} ${formatMoney(num, client.preferredCurrency)}\n\n${L(lg, "paymentClickButtonBelow")}:`, config?.botEmojis);
     await ctx.reply(topupMsg2.text, {
       entities: topupMsg2.entities.length ? topupMsg2.entities : undefined,
-      reply_markup: payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, backStyle, msgEmojiIds),
+      reply_markup: payUrlMarkup(payment.paymentUrl, config?.botBackLabel ?? null, backStyle, msgEmojiIds, lg),
     });
   } catch {
     // не число или ошибка — игнорируем
