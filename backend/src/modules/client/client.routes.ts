@@ -472,7 +472,7 @@ clientAuthRouter.post("/forgot-password", async (req, res) => {
     select: { id: true, email: true, preferredLang: true, isBlocked: true },
   });
 
-  const successLang = client?.preferredLang ?? "ru";
+  const successLang = client?.preferredLang ?? "zh";
   const successMessage = getPasswordResetSuccessMessage(successLang);
 
   if (!client?.email || client.isBlocked) {
@@ -667,7 +667,7 @@ clientAuthRouter.post("/telegram-miniapp", async (req, res) => {
       remnawaveUuid,
       referralCode,
       referrerId: null,
-      preferredLang: configForDefaults.defaultLanguage ?? "ru",
+      preferredLang: configForDefaults.defaultLanguage ?? "zh",
       preferredCurrency: configForDefaults.defaultCurrency ?? "usd",
       telegramId,
       telegramUsername,
@@ -821,7 +821,7 @@ clientAuthRouter.post("/google", async (req, res) => {
       remnawaveUuid,
       referralCode,
       referrerId: null,
-      preferredLang: configForDefaults.defaultLanguage ?? "ru",
+      preferredLang: configForDefaults.defaultLanguage ?? "zh",
       preferredCurrency: configForDefaults.defaultCurrency ?? "usd",
       telegramId: null,
       telegramUsername: null,
@@ -906,7 +906,7 @@ clientAuthRouter.post("/apple", async (req, res) => {
       remnawaveUuid,
       referralCode,
       referrerId: null,
-      preferredLang: configForDefaults.defaultLanguage ?? "ru",
+      preferredLang: configForDefaults.defaultLanguage ?? "zh",
       preferredCurrency: configForDefaults.defaultCurrency ?? "usd",
       telegramId: null,
       telegramUsername: null,

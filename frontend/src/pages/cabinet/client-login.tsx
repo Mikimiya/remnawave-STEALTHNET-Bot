@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/components/auth-shell";
-import { cn } from "@/lib/utils";
+import { cn, translateBackendMessage } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -121,7 +121,7 @@ export function ClientLoginPage() {
     } catch {}
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     setLoading(true);
-    loginByGoogle(idToken).then(() => navigate("/cabinet/dashboard", { replace: true })).catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error"))).finally(() => setLoading(false));
+    loginByGoogle(idToken).then(() => navigate("/cabinet/dashboard", { replace: true })).catch((err: unknown) => setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("common.error"))).finally(() => setLoading(false));
   }, [loginByGoogle, navigate, t]);
 
   const handleAppleLogin = useCallback(async () => {
@@ -143,7 +143,7 @@ export function ClientLoginPage() {
       url.searchParams.set("state", state);
       window.location.href = url.toString();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.error"));
+      setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("common.error"));
       setLoading(false);
     }
   }, [appleEnabled, t]);
@@ -157,7 +157,7 @@ export function ClientLoginPage() {
     if (!idToken) return;
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     setLoading(true);
-    loginByApple(idToken).then(() => navigate("/cabinet/dashboard", { replace: true })).catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error"))).finally(() => setLoading(false));
+    loginByApple(idToken).then(() => navigate("/cabinet/dashboard", { replace: true })).catch((err: unknown) => setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("common.error"))).finally(() => setLoading(false));
   }, [loginByApple, navigate, t]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -169,7 +169,7 @@ export function ClientLoginPage() {
       await login(email, password);
       navigate("/cabinet/dashboard", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("auth.loginError"));
+      setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("auth.loginError"));
     } finally {
       setLoading(false);
     }

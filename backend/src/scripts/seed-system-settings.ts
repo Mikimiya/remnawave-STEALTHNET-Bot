@@ -1,7 +1,7 @@
 import { prisma } from "../db.js";
 
 const DEFAULTS: Array<[string, string]> = [
-  ["active_languages", "ru,en"],
+  ["active_languages", "zh,en,ru"],
   ["active_currencies", "usd,rub,cny"],
   ["default_referral_percent", "10"],
   ["trial_days", "3"],

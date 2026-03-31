@@ -59,7 +59,7 @@ export async function syncFromRemna(): Promise<{
   // Берём настройки панели (язык/валюта по умолчанию),
   // чтобы новые клиенты из Remna создавались с теми же значениями.
   const config = await getSystemConfig();
-  const defaultLang = config.defaultLanguage ?? "ru";
+  const defaultLang = config.defaultLanguage ?? "zh";
   const defaultCurrency = (config.defaultCurrency ?? "usd").toLowerCase();
 
   let page = 1;

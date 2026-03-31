@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/components/auth-shell";
-import { cn } from "@/lib/utils";
+import { cn, translateBackendMessage } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -184,7 +184,7 @@ export function ClientRegisterPage() {
     setLoading(true);
     loginByGoogle(idToken)
       .then(() => navigate("/cabinet/dashboard", { replace: true }))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error")))
+      .catch((err: unknown) => setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("common.error")))
       .finally(() => setLoading(false));
   }, [loginByGoogle, navigate, t]);
 
@@ -207,7 +207,7 @@ export function ClientRegisterPage() {
       url.searchParams.set("state", state);
       window.location.href = url.toString();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.error"));
+      setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("common.error"));
       setLoading(false);
     }
   }, [appleEnabled, t]);
@@ -223,7 +223,7 @@ export function ClientRegisterPage() {
     setLoading(true);
     loginByApple(idToken)
       .then(() => navigate("/cabinet/dashboard", { replace: true }))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : t("common.error")))
+      .catch((err: unknown) => setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("common.error")))
       .finally(() => setLoading(false));
   }, [loginByApple, navigate, t]);
 
@@ -250,7 +250,7 @@ export function ClientRegisterPage() {
         navigate("/cabinet/dashboard", { replace: true });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("auth.registerError"));
+      setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("auth.registerError"));
     } finally {
       setLoading(false);
     }

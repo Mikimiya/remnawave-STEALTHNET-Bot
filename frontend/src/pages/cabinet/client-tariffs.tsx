@@ -186,7 +186,7 @@ export function ClientTariffsPage() {
         setPromoResult(null);
         setPromoInput("");
         setPayModal(null);
-        alert(activateRes.message);
+        alert(translateBackendMessage(activateRes.message, t));
         await refreshProfile();
         return;
       }
@@ -248,7 +248,7 @@ export function ClientTariffsPage() {
       setPromoResult(null);
       const msg = res.tariffName && res.amount != null && res.currency
         ? t("tariffs.balancePaySuccess", { name: res.tariffName, amount: res.amount.toFixed(2), currency: res.currency })
-        : res.message;
+        : translateBackendMessage(res.message, t);
       alert(msg);
       await refreshProfile();
     } catch (e) {

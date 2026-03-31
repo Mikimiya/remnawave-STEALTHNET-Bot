@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { GlassSelect } from "@/components/ui/glass-select";
 import { LayoutDashboard, Package, User, LogOut, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X, Megaphone } from "lucide-react";
 import { useTheme, ACCENT_PALETTES, type ThemeMode, type ThemeAccent } from "@/contexts/theme";
-import { cn, formatMoney } from "@/lib/utils";
+import { cn, formatMoney, translateBackendMessage } from "@/lib/utils";
 import { FloatingChat } from "@/components/floating-chat";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "@/i18n";
@@ -73,7 +73,7 @@ function Client2FAStepScreen() {
       try {
         await submit2FACode(code.trim());
       } catch (err) {
-  setError(err instanceof Error ? err.message : t("cabinetLayout.twoFa.invalidCode"));
+  setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("cabinetLayout.twoFa.invalidCode"));
       } finally {
         setLoading(false);
       }

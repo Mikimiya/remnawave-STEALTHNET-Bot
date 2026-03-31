@@ -5,6 +5,7 @@ import { Mail, Shield, Loader2 } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "react-i18next";
+import { translateBackendMessage } from "@/lib/utils";
 
 export function ClientVerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -28,7 +29,7 @@ export function ClientVerifyEmailPage() {
       })
       .catch((err) => {
         setStatus("error");
-        setMessage(err instanceof Error ? err.message : t("auth.invalidLinkExpired"));
+        setMessage(err instanceof Error ? translateBackendMessage(err.message, t) : t("auth.invalidLinkExpired"));
       });
   }, [token, verifyEmail, navigate, t]);
 

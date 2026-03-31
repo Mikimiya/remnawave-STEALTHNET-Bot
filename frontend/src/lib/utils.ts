@@ -19,6 +19,7 @@ const BACKEND_RU_MAP: Record<string, string> = {
   "Триал уже использован": "backendErrors.trialAlreadyUsed",
   "Триал не настроен": "backendErrors.trialNotConfigured",
   "Сервис временно недоступен": "backendErrors.serviceUnavailable",
+  "Триал активирован": "backendErrors.trialActivated",
   // Promo
   "Промокод не указан": "backendErrors.promoCodeEmpty",
   "Промокод не найден или неактивен": "backendErrors.promoCodeNotFound",
@@ -27,24 +28,48 @@ const BACKEND_RU_MAP: Record<string, string> = {
   "Срок действия промокода истёк": "backendErrors.promoCodeExpired",
   "Лимит использований промокода исчерпан": "backendErrors.promoCodeUsesExhausted",
   "Вы уже использовали этот промокод": "backendErrors.promoCodeAlreadyUsedByYou",
+  "Промокод активирован! Подписка подключена.": "backendErrors.promoCodeActivated",
+  "Промокод на скидку применяется при оплате тарифа": "backendErrors.promoCodeDiscountOnly",
+  "Промокод не полностью настроен": "backendErrors.promoCodeNotFullyConfigured",
   // 2FA
   "Неверный код": "backendErrors.invalidCode",
   "Неверный код. Проверьте время на устройстве.": "backendErrors.invalidCodeCheckTime",
   "Сначала запустите настройку 2FA": "backendErrors.start2FAFirst",
   "Введите 6-значный код из приложения": "backendErrors.enter6DigitCode",
+  "Введите 6-значный код": "backendErrors.enter6DigitCode",
+  "Двухфакторная аутентификация включена": "backendErrors.twoFaEnabled",
+  "Двухфакторная аутентификация отключена": "backendErrors.twoFaDisabled",
   // Password
   "Неверный текущий пароль": "backendErrors.wrongCurrentPassword",
   "Пароль уже установлен. Используйте смену пароля.": "backendErrors.passwordAlreadySet",
+  "Пароль успешно изменён": "backendErrors.passwordChanged",
+  "Пароль установлен": "backendErrors.passwordSet",
+  "У вас нет пароля. Используйте вход через Telegram или Email.": "backendErrors.noPasswordUseOther",
   // Email
   "Почта уже привязана": "backendErrors.emailAlreadyLinked",
   "Некорректный email": "backendErrors.invalidEmail",
   "Эта почта уже используется другим аккаунтом": "backendErrors.emailUsedByOther",
   "Не удалось отправить письмо. Попробуйте позже.": "backendErrors.emailSendFailed",
   "Отправка писем не настроена. Обратитесь в поддержку.": "backendErrors.emailNotConfigured",
-  // Auth
+  "Письмо с ссылкой отправлено на указанный email": "backendErrors.emailLinkSent",
+  "Не задан URL приложения в настройках": "backendErrors.appUrlNotSet",
+  // Auth / Telegram
   "Недействительные или устаревшие данные Telegram": "backendErrors.invalidTelegramData",
+  "Нет данных пользователя": "backendErrors.noUserData",
+  "Сессия истекла. Войдите снова.": "backendErrors.sessionExpired",
   "Ошибка создания пользователя": "backendErrors.userCreationError",
   "Ошибка создания пользователя VPN": "backendErrors.vpnUserCreationError",
+  "Сервис временно недоступен. Не удалось создать учётную запись VPN. Попробуйте позже.": "backendErrors.vpnAccountCreationFailed",
+  // Link
+  "Недействительная или просроченная ссылка": "backendErrors.invalidOrExpiredLink",
+  "Ссылка просрочена. Запросите привязку почты снова.": "backendErrors.linkExpiredRetry",
+  "Эта почта уже привязана к другому аккаунту.": "backendErrors.emailAlreadyLinkedOther",
+  // Subscription
+  "Подписка не привязана": "backendErrors.subscriptionNotLinked",
+  "Устройство удалено": "backendErrors.deviceRemoved",
+  // Password reset
+  "Если аккаунт с этой почтой существует, мы отправили письмо для сброса пароля.": "backendErrors.resetEmailSentIfExists",
+  "Ссылка действительна. Можно задать новый пароль.": "backendErrors.resetLinkValid",
 };
 
 /**

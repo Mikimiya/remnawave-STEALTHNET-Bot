@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { translateBackendMessage } from "@/lib/utils";
 import { useCabinetConfig } from "@/contexts/cabinet-config";
 
 export function ClientForgotPasswordPage() {
@@ -27,9 +28,9 @@ export function ClientForgotPasswordPage() {
     setLoading(true);
     try {
       const res = await api.clientForgotPassword(email.trim());
-      setMessage(res.message);
+      setMessage(translateBackendMessage(res.message, t));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.error"));
+      setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("common.error"));
     } finally {
       setLoading(false);
     }

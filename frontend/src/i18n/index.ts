@@ -22,7 +22,7 @@ i18n
       en: { translation: en },
       zh: { translation: zh },
     },
-    fallbackLng: "en",
+    fallbackLng: "zh",
     supportedLngs: ["ru", "en", "zh"],
     detection: {
       order: ["localStorage", "navigator"],
@@ -50,7 +50,7 @@ function formatRuDays(n: number): string {
 
 /** 按当前 UI 语言格式化天数（ru/en/zh） */
 export function formatDays(n: number, lang: string): string {
-  const l = (lang || "ru").toLowerCase().slice(0, 2);
+  const l = (lang || "zh").toLowerCase().slice(0, 2);
   if (l === "zh") return `${n} 天`;
   if (l === "en") return n === 1 ? `${n} day` : `${n} days`;
   return formatRuDays(n);

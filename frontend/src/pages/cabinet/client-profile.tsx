@@ -434,7 +434,7 @@ export function ClientProfilePage() {
       setLinkEmailSent(true);
       setLinkEmailValue("");
     } catch (err) {
-      setLinkEmailError(err instanceof Error ? err.message : t("profile.linkEmailError"));
+      setLinkEmailError(err instanceof Error ? translateBackendMessage(err.message, t) : t("profile.linkEmailError"));
     } finally {
       setLinkEmailLoading(false);
     }
@@ -618,7 +618,7 @@ export function ClientProfilePage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground mb-0.5">{t("profile.registrationDate")}</p>
-                    <p className="text-sm font-medium">{new Date(client.createdAt).toLocaleDateString(lang === "zh" ? "zh-CN" : "ru-RU", { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                    <p className="text-sm font-medium">{new Date(client.createdAt).toLocaleDateString(lang === "zh" ? "zh-CN" : lang === "en" ? "en-US" : "ru-RU", { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                   </div>
                 </div>
               )}

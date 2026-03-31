@@ -30,13 +30,19 @@ import type { ClientPayment, ClientReferralStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTranslation } from "react-i18next";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, translateBackendMessage } from "@/lib/utils";
+
+function getLocale(lang?: string): string {
+  const l = (lang || "zh").slice(0, 2);
+  if (l === "zh") return "zh-CN";
+  if (l === "en") return "en-US";
+  return "ru-RU";
+}
 
 function formatDate(s: string | null, lang?: string) {
   if (!s) return "—";
   try {
-    const locale = lang === "zh" ? "zh-CN" : "ru-RU";
-    return new Date(s).toLocaleDateString(locale, {
+    return new Date(s).toLocaleDateString(getLocale(lang), {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -47,9 +53,10 @@ function formatDate(s: string | null, lang?: string) {
 }
 
 function formatBytes(bytes: number, lang?: string) {
-  const gbLabel = lang === "zh" ? "GB" : "ГБ";
-  const mbLabel = lang === "zh" ? "MB" : "МБ";
-  const kbLabel = lang === "zh" ? "KB" : "КБ";
+  const l = (lang || "zh").slice(0, 2);
+  const gbLabel = l === "ru" ? "ГБ" : "GB";
+  const mbLabel = l === "ru" ? "МБ" : "MB";
+  const kbLabel = l === "ru" ? "КБ" : "KB";
   if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(1) + " " + gbLabel;
   if (bytes >= 1024 ** 2) return (bytes / 1024 ** 2).toFixed(1) + " " + mbLabel;
   return (bytes / 1024).toFixed(0) + " " + kbLabel;
@@ -173,11 +180,11 @@ export function ClientDashboardPage() {
         setTariffCategoryName(subRes.tariffCategoryName ?? null);
         setTrafficResetStrategy(subRes.trafficResetStrategy ?? null);
         setIsTrial(subRes.isTrial ?? false);
-        if (subRes.message) setSubscriptionError(subRes.message);
+        if (subRes.message) setSubscriptionError(translateBackendMessage(subRes.message, t));
         setPayments(payRes.items ?? []);
       })
       .catch((e) => {
-        if (!cancelled) setSubscriptionError(e instanceof Error ? e.message : t("dashboard.loadError"));
+        if (!cancelled) setSubscriptionError(e instanceof Error ? translateBackendMessage(e.message, t) : t("dashboard.loadError"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -199,7 +206,7 @@ export function ClientDashboardPage() {
       await refreshProfile();
       setRefreshKey((k) => k + 1);
     } catch (e) {
-      setTrialError(e instanceof Error ? e.message : t("dashboard.trialError"));
+      setTrialError(e instanceof Error ? translateBackendMessage(e.message, t) : t("dashboard.trialError"));
     } finally {
       setTrialLoading(false);
     }

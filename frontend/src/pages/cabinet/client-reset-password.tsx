@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { translateBackendMessage } from "@/lib/utils";
 import { useCabinetConfig } from "@/contexts/cabinet-config";
 
 export function ClientResetPasswordPage() {
@@ -37,12 +38,12 @@ export function ClientResetPasswordPage() {
     setChecking(true);
     api.clientVerifyPasswordReset(token)
       .then((res) => {
-        setMessage(res.message);
+        setMessage(translateBackendMessage(res.message, t));
         setEmail(res.email);
         setError("");
       })
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : t("auth.invalidLinkExpired"));
+        setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("auth.invalidLinkExpired"));
       })
       .finally(() => setChecking(false));
   }, [token, t]);
@@ -62,10 +63,10 @@ export function ClientResetPasswordPage() {
     setError("");
     try {
       const res = await api.clientResetPassword(token, password);
-      setMessage(res.message);
+      setMessage(translateBackendMessage(res.message, t));
       window.setTimeout(() => navigate("/cabinet/login", { replace: true }), 1200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.error"));
+      setError(err instanceof Error ? translateBackendMessage(err.message, t) : t("common.error"));
     } finally {
       setLoading(false);
     }

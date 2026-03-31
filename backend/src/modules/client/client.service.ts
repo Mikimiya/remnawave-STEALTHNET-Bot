@@ -318,7 +318,7 @@ export function getLocalizedBotMenuTexts(
   config: { botMenuTexts: Required<BotMenuTexts>; botMenuTextsEn?: Record<string, string> | null; botMenuTextsZh?: Record<string, string> | null; botMenuTextsRu?: Record<string, string> | null; defaultLanguage?: string },
   preferredLang: string
 ): Required<BotMenuTexts> {
-  const lang = (preferredLang || "ru").toLowerCase().slice(0, 5).trim();
+  const lang = (preferredLang || "zh").toLowerCase().slice(0, 5).trim();
   const langMap: Record<string, Record<string, string> | null | undefined> = {
     en: config.botMenuTextsEn,
     zh: config.botMenuTextsZh,
@@ -330,7 +330,7 @@ export function getLocalizedBotMenuTexts(
     return { ...DEFAULT_BOT_MENU_TEXTS, ...config.botMenuTexts, ...specific };
   }
   // 2. fallback：默认语言的覆盖文本
-  const defLang = (config.defaultLanguage || "ru").toLowerCase().slice(0, 5);
+  const defLang = (config.defaultLanguage || "zh").toLowerCase().slice(0, 5);
   if (defLang !== lang) {
     const defSpecific = langMap[defLang];
     if (defSpecific && typeof defSpecific === "object" && Object.keys(defSpecific).length > 0) {
@@ -442,12 +442,12 @@ export async function getSystemConfig() {
     where: { key: { in: SYSTEM_CONFIG_KEYS } },
   });
   const map = Object.fromEntries(settings.map((s: { key: string; value: string }) => [s.key, s.value]));
-  const activeLangs = (map.active_languages || "ru,en").split(",").map((s: string) => s.trim());
+  const activeLangs = (map.active_languages || "zh,en,ru").split(",").map((s: string) => s.trim());
   const activeCurrs = (map.active_currencies || "usd,rub,cny").split(",").map((s: string) => s.trim());
   return {
     activeLanguages: activeLangs,
     activeCurrencies: activeCurrs,
-    defaultLanguage: map.default_language && activeLangs.includes(map.default_language) ? map.default_language : activeLangs[0] ?? "ru",
+    defaultLanguage: map.default_language && activeLangs.includes(map.default_language) ? map.default_language : activeLangs[0] ?? "zh",
     defaultCurrency: map.default_currency && activeCurrs.includes(map.default_currency) ? map.default_currency : activeCurrs[0] ?? "usd",
     defaultReferralPercent: parseFloat(map.default_referral_percent || "30"),
     referralPercentLevel2: parseFloat(map.referral_percent_level_2 || "10"),

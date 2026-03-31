@@ -44,7 +44,7 @@ function formatBytes(bytes: string | null): string {
 
 function formatDate(iso: string) {
   try {
-    return new Date(iso).toLocaleString("ru-RU", {
+    return new Date(iso).toLocaleString(undefined, {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -142,7 +142,7 @@ export function ClientSingboxPage() {
     try {
       const res = await api.clientPayByBalance(token, { singboxTariffId: tariff.id });
       setPayModal(null);
-      alert(res.message);
+      alert(translateBackendMessage(res.message, t));
       await refreshProfile();
       const r = await api.getSingboxSlots(token);
       setSlots(r.slots ?? []);
