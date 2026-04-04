@@ -372,11 +372,13 @@ function getLocaleTexts(
 
 /**
  * Maps a Telegram language_code (e.g. "zh-hans", "en-US") to a supported
- * activeLanguages entry. Falls back to "zh" if none matches.
+ * activeLanguages entry. Falls back to first activeLanguage or "zh".
+ * NOTE: Only used for NEW user registration. Existing users always use
+ * their stored preferredLang from the database.
  */
 function resolveLangCode(tgLang: string | undefined, activeLanguages?: string[] | null): string {
-  if (!tgLang) return "zh";
   const supported = activeLanguages?.length ? activeLanguages : ["zh", "en", "ru"];
+  if (!tgLang) return supported[0] ?? "zh";
   const normalized = tgLang.toLowerCase().split("-")[0];
   // Map Telegram codes to our codes
   const aliases: Record<string, string> = { "zh": "zh", "hans": "zh", "hant": "zh" };

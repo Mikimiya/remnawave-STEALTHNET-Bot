@@ -138,8 +138,18 @@ export function mainMenu(opts: {
   const configButtons = opts.botButtons ?? [];
   const fromConfig = configButtons.length > 0;
   let list = fromConfig ? [...configButtons] : [...getDefaultButtons(lang)];
-  if (fromConfig && !list.some((b) => b.id === "devices")) {
-    list.push({ id: "devices", visible: true, label: L(lang, "btnDevices"), order: 1.5, style: "primary" });
+  // If buttons come from config, override labels with i18n translations for the user's language
+  if (fromConfig) {
+    list = list.map((b) => {
+      const localeKey = BTN_LOCALE_MAP[b.id];
+      if (localeKey) {
+        return { ...b, label: L(lang, localeKey) };
+      }
+      return b;
+    });
+    if (!list.some((b) => b.id === "devices")) {
+      list.push({ id: "devices", visible: true, label: L(lang, "btnDevices"), order: 1.5, style: "primary" });
+    }
   }
   list = list
     .filter((b) => b.visible)

@@ -3850,6 +3850,7 @@ publicConfigRouter.get("/tariffs", async (_req, res) => {
     const config = await getSystemConfig();
     const categoryEmojis = config.categoryEmojis ?? { ordinary: "📦", premium: "⭐" };
     const list = await prisma.tariffCategory.findMany({
+      where: { visible: true },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
         tariffs: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },

@@ -30,7 +30,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // На macOS порт 5000 часто занят AirPlay. Бэкенд по умолчанию на 5001.
-      "/api": { target: "http://localhost:5001", changeOrigin: true },
+      "/api": { target: "https://coolgo.network", changeOrigin: true },
     },
   },
 });

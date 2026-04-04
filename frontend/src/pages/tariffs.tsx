@@ -24,6 +24,8 @@ import {
   Check,
   GripVertical,
   Layers,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   DndContext,
@@ -85,6 +87,7 @@ function SortableCategoryCard({
   cat,
   onEditCategory,
   onDeleteCategory,
+  onToggleVisibility,
   onAddTariff,
   onEditTariff,
   onDeleteTariff,
@@ -98,6 +101,7 @@ function SortableCategoryCard({
   cat: TariffCategoryWithTariffs;
   onEditCategory: () => void;
   onDeleteCategory: () => void;
+  onToggleVisibility: () => void;
   onAddTariff: () => void;
   onEditTariff: (t: TariffRecord) => void;
   onDeleteTariff: (id: string) => void;
@@ -140,8 +144,23 @@ function SortableCategoryCard({
               <FolderOpen className="h-5 w-5" />
             </span>
             {cat.name}
+            {!cat.visible && (
+              <span className="ml-1 text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                {t("admin.tariffs.hidden")}
+              </span>
+            )}
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`rounded-lg ${cat.visible ? "" : "text-muted-foreground"}`}
+              onClick={onToggleVisibility}
+              title={cat.visible ? t("admin.tariffs.hideCategory") : t("admin.tariffs.showCategory")}
+            >
+              {cat.visible ? <Eye className="h-3.5 w-3.5 mr-1" /> : <EyeOff className="h-3.5 w-3.5 mr-1" />}
+              {cat.visible ? t("admin.tariffs.hideCategory") : t("admin.tariffs.showCategory")}
+            </Button>
             <Button variant="outline" size="sm" className="rounded-lg" onClick={onAddSubGroup} title={t("admin.tariffs.addSubGroup")}>
               <Layers className="h-3.5 w-3.5 mr-1" />
               {t("admin.tariffs.addSubGroup")}
@@ -383,6 +402,16 @@ export function TariffsPage() {
     }
   };
 
+  const handleToggleCategoryVisibility = async (cat: TariffCategoryWithTariffs) => {
+    if (!token) return;
+    try {
+      await api.updateTariffCategory(token, cat.id, { visible: !cat.visible });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("admin.tariffs.errorOrder"));
+    }
+  };
+
   const handleDeleteTariff = async (id: string) => {
     if (!token || !confirm(t("admin.tariffs.deleteTariffConfirm"))) return;
     try {
@@ -528,6 +557,7 @@ export function TariffsPage() {
                   cat={cat}
                   onEditCategory={() => setCategoryModal({ edit: cat })}
                   onDeleteCategory={() => handleDeleteCategory(cat.id)}
+                  onToggleVisibility={() => handleToggleCategoryVisibility(cat)}
                   onAddTariff={() => setTariffModal({ kind: "add", categoryId: cat.id })}
                   onEditTariff={(t) => setTariffModal({ kind: "edit", category: cat, tariff: t })}
                   onDeleteTariff={handleDeleteTariff}

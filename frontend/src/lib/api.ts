@@ -755,11 +755,11 @@ export const api = {
     return request("/admin/tariff-categories", { token });
   },
 
-  async createTariffCategory(token: string, data: { name: string; sortOrder?: number; emojiKey?: string | null }): Promise<TariffCategoryRecord> {
+  async createTariffCategory(token: string, data: { name: string; sortOrder?: number; emojiKey?: string | null; visible?: boolean }): Promise<TariffCategoryRecord> {
     return request("/admin/tariff-categories", { method: "POST", body: JSON.stringify(data), token });
   },
 
-  async updateTariffCategory(token: string, id: string, data: { name?: string; sortOrder?: number; emojiKey?: string | null }): Promise<TariffCategoryRecord> {
+  async updateTariffCategory(token: string, id: string, data: { name?: string; sortOrder?: number; emojiKey?: string | null; visible?: boolean }): Promise<TariffCategoryRecord> {
     return request(`/admin/tariff-categories/${id}`, { method: "PATCH", body: JSON.stringify(data), token });
   },
 
@@ -2083,6 +2083,7 @@ export interface TariffCategoryRecord {
   name: string;
   emojiKey: string | null;
   sortOrder: number;
+  visible: boolean;
   createdAt: string;
   updatedAt: string;
 }

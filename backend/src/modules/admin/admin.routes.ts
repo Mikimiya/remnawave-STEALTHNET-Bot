@@ -334,6 +334,7 @@ adminRouter.get("/tariff-categories", async (_req, res) => {
         name: c.name,
         emojiKey: c.emojiKey ?? null,
         sortOrder: c.sortOrder,
+        visible: c.visible,
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),
         tariffs: c.tariffs.map(tariffToJson),
@@ -363,11 +364,13 @@ const createTariffCategorySchema = z.object({
   name: z.string().min(1).max(255),
   sortOrder: z.number().int().optional(),
   emojiKey: z.string().max(32).optional().nullable(),
+  visible: z.boolean().optional(),
 });
 const updateTariffCategorySchema = z.object({
   name: z.string().min(1).max(255).optional(),
   sortOrder: z.number().int().optional(),
   emojiKey: z.string().max(32).optional().nullable(),
+  visible: z.boolean().optional(),
 });
 
 adminRouter.post("/tariff-categories", async (req, res) => {
@@ -378,6 +381,7 @@ adminRouter.post("/tariff-categories", async (req, res) => {
       name: body.data.name,
       sortOrder: body.data.sortOrder ?? 0,
       emojiKey: body.data.emojiKey ?? undefined,
+      visible: body.data.visible ?? true,
     },
   });
   return res.status(201).json({
@@ -385,6 +389,7 @@ adminRouter.post("/tariff-categories", async (req, res) => {
     name: created.name,
     emojiKey: created.emojiKey,
     sortOrder: created.sortOrder,
+    visible: created.visible,
     createdAt: created.createdAt.toISOString(),
     updatedAt: created.updatedAt.toISOString(),
   });
@@ -395,10 +400,11 @@ adminRouter.patch("/tariff-categories/:id", async (req, res) => {
   if (!idParse.success) return res.status(400).json({ message: "Invalid id" });
   const body = updateTariffCategorySchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
-  const data: { name?: string; sortOrder?: number; emojiKey?: string | null } = {};
+  const data: { name?: string; sortOrder?: number; emojiKey?: string | null; visible?: boolean } = {};
   if (body.data.name !== undefined) data.name = body.data.name;
   if (body.data.sortOrder !== undefined) data.sortOrder = body.data.sortOrder;
   if (body.data.emojiKey !== undefined) data.emojiKey = body.data.emojiKey;
+  if (body.data.visible !== undefined) data.visible = body.data.visible;
   const updated = await prisma.tariffCategory.update({
     where: { id: idParse.data.id },
     data,
@@ -408,6 +414,7 @@ adminRouter.patch("/tariff-categories/:id", async (req, res) => {
     name: updated.name,
     emojiKey: updated.emojiKey,
     sortOrder: updated.sortOrder,
+    visible: updated.visible,
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
   });

@@ -336,6 +336,7 @@ model TariffCategory {
   name      String
   emojiKey  String?  @map("emoji_key") // ordinary | premium — подставляется эмодзи из настройки category_emojis
   sortOrder Int      @default(0) @map("sort_order")
+  visible   Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
