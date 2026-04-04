@@ -102,6 +102,8 @@ model Client {
   tickets     Ticket[]
   contestWinners ContestWinner[]
   passwordResetTokens PasswordResetToken[]
+  notifications  ClientNotification[]
+  trafficLogs    TrafficLog[]
 
   @@index([telegramId])
   @@index([email])
@@ -648,4 +650,40 @@ model ContestWinner {
   @@unique([contestId, place])
   @@index([contestId])
   @@map("contest_winners")
+}
+
+// ——— Уведомления пользователя (in-app notification center) ———
+model ClientNotification {
+  id        String   @id @default(cuid())
+  clientId  String   @map("client_id")
+  type      String   @db.VarChar(50)   // payment_success | trial_activated | subscription_expiring | subscription_expired | broadcast | promo_activated | balance_topup | system
+  title     String   @db.VarChar(500)
+  body      String   @db.Text
+  isRead    Boolean  @default(false) @map("is_read")
+  metadata  String?  @db.Text          // JSON (optional extra data)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, isRead])
+  @@index([clientId, createdAt])
+  @@map("client_notifications")
+}
+
+// ——— Ежедневный снимок трафика пользователя (для графиков) ———
+model TrafficLog {
+  id              String   @id @default(cuid())
+  clientId        String   @map("client_id")
+  date            DateTime @db.Date                  // Дата снимка (без времени)
+  usedBytes       BigInt   @default(0) @map("used_bytes")       // Общий трафик на дату
+  uploadBytes     BigInt   @default(0) @map("upload_bytes")     // Отправлено
+  downloadBytes   BigInt   @default(0) @map("download_bytes")   // Получено
+  source          String   @default("vpn") @db.VarChar(20)      // vpn | proxy | singbox
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, date, source])
+  @@index([clientId, date])
+  @@map("traffic_logs")
 }

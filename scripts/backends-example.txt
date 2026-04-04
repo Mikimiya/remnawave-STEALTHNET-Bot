@@ -1,0 +1,36 @@
+# HAProxy SNI 分流 — 落地机批量导入文件
+# 格式: 名称,SNI域名,落地机IP,落地机端口
+# 每行一条，# 开头为注释
+#
+# 伪装域名选择原则：
+#   ✅ 离落地机近的大型网站
+#   ✅ 支持 TLS 1.3
+#   ✅ 不会按地区重定向
+#   ✅ 流量模式合理（大流量长连接正常的网站）
+
+# ── 美国节点（洛杉矶）──
+us1,www.microsoft.com,落地机IP,443
+us2,www.spacex.com,落地机IP,443
+us3,www.aboutamazon.com,落地机IP,443
+
+# ── 香港节点 ──
+hk1,www.hkjc.com,落地机IP,443
+hk2,www.hkex.com.hk,落地机IP,443
+hk3,www.cathaypacific.com,落地机IP,443
+
+# ── 日本节点 ──
+jp1,www.nintendo.co.jp,落地机IP,443
+jp2,www.sony.co.jp,落地机IP,443
+
+# ── 新加坡节点 ──
+sg1,www.grab.com,落地机IP,443
+sg2,shopee.sg,落地机IP,443
+
+# ── 台湾节点 ──
+tw1,www.asus.com,落地机IP,443
+
+# ── 德国节点 ──
+de1,www.siemens.com,落地机IP,443
+
+# ── 韩国节点 ──
+kr1,www.samsung.com,落地机IP,443

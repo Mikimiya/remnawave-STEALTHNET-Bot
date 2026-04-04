@@ -25,6 +25,7 @@ import {
   notifyAdminsAboutNewTicket,
 } from "../notification/telegram-notify.service.js";
 import { requireClientAuth } from "./client.middleware.js";
+import { createClientNotification } from "../notification/client-notification.service.js";
 import { remnaCreateUser, remnaUpdateUser, isRemnaConfigured, remnaGetUser, remnaGetUserByUsername, remnaGetUserByEmail, remnaGetUserByTelegramId, extractRemnaUuid, remnaUsernameFromClient, remnaGetUserHwidDevices, remnaDeleteUserHwidDevice } from "../remna/remna.client.js";
 import { sendVerificationEmail, sendLinkEmailVerification, sendPasswordResetEmail, isSmtpConfigured } from "../mail/mail.service.js";
 import { createPlategaTransaction, isPlategaConfigured } from "../platega/platega.service.js";
@@ -1365,6 +1366,7 @@ clientRouter.post("/trial", async (req, res) => {
       data: { remnawaveUuid: existingUuid, trialUsed: true },
     });
     const updated = await prisma.client.findUnique({ where: { id: client.id }, select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, createdAt: true } });
+    createClientNotification({ clientId: client.id, type: "trial_activated", title: "🎁 试用已激活", body: `您的 ${trialDays} 天免费试用已成功激活。` }).catch(() => {});
     return res.json({ message: "Триал активирован", client: updated ? toClientShape(updated) : null });
   }
 
@@ -1373,6 +1375,7 @@ clientRouter.post("/trial", async (req, res) => {
     data: { trialUsed: true },
   });
   const updated = await prisma.client.findUnique({ where: { id: client.id }, select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, createdAt: true } });
+  createClientNotification({ clientId: client.id, type: "trial_activated", title: "🎁 试用已激活", body: `您的 ${trialDays} 天免费试用已成功激活。` }).catch(() => {});
   return res.json({ message: "Триал активирован", client: updated ? toClientShape(updated) : null });
 });
 
@@ -2164,6 +2167,7 @@ clientRouter.post("/payments/balance", async (req, res) => {
     newBalance: clientDb.balance - finalPrice,
   });
 });
+
 
 // ——— Гибкий тариф (собери сам): расчёт и оплата балансом ———
 function getCustomBuildConfig(config: Awaited<ReturnType<typeof getSystemConfig>>) {
@@ -3934,3 +3938,54 @@ publicConfigRouter.get("/singbox-tariffs", async (_req, res) => {
   }
 });
 
+// ——————————————— Notification center (in-app) ———————————————
+
+import {
+  getClientNotifications,
+  getUnreadCount,
+  markNotificationsRead,
+  markAllNotificationsRead,
+} from "../notification/client-notification.service.js";
+
+/** GET /api/client/notifications?cursor=xxx&limit=30 */
+clientRouter.get("/notifications", async (req, res) => {
+  const client = (req as any).client as { id: string };
+  const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+  const limit = Math.min(parseInt(String(req.query.limit ?? "30"), 10) || 30, 100);
+
+  const result = await getClientNotifications(client.id, { cursor, limit });
+  return res.json(result);
+});
+
+/** GET /api/client/notifications/unread-count */
+clientRouter.get("/notifications/unread-count", async (req, res) => {
+  const client = (req as any).client as { id: string };
+  const count = await getUnreadCount(client.id);
+  return res.json({ count });
+});
+
+/** POST /api/client/notifications/read  body: { ids: string[] } | { all: true } */
+clientRouter.post("/notifications/read", async (req, res) => {
+  const client = (req as any).client as { id: string };
+  const body = req.body as { ids?: string[]; all?: boolean };
+  if (body.all) {
+    await markAllNotificationsRead(client.id);
+  } else if (Array.isArray(body.ids) && body.ids.length > 0) {
+    await markNotificationsRead(client.id, body.ids.slice(0, 200));
+  }
+  return res.json({ ok: true });
+});
+
+// ——————————————— Traffic usage logs (charts) ———————————————
+
+import { getTrafficLogs } from "../notification/traffic-log.service.js";
+
+/** GET /api/client/traffic-log?days=30&source=vpn */
+clientRouter.get("/traffic-log", async (req, res) => {
+  const client = (req as any).client as { id: string };
+  const days = parseInt(String(req.query.days ?? "30"), 10) || 30;
+  const source = typeof req.query.source === "string" ? req.query.source : undefined;
+
+  const logs = await getTrafficLogs(client.id, { days, source });
+  return res.json({ logs });
+});

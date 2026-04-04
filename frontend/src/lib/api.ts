@@ -1227,7 +1227,61 @@ export const api = {
   async clientActivatePromoCode(token: string, code: string): Promise<{ message: string }> {
     return request("/client/promo-code/activate", { method: "POST", body: JSON.stringify({ code }), token });
   },
+
+  // ——— Уведомления (клиент) ———
+  async clientGetNotifications(
+    token: string,
+    opts?: { cursor?: string; limit?: number }
+  ): Promise<{ items: ClientNotification[]; nextCursor: string | null }> {
+    const params = new URLSearchParams();
+    if (opts?.cursor) params.set("cursor", opts.cursor);
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    return request(`/client/notifications${qs ? `?${qs}` : ""}`, { token });
+  },
+
+  async clientGetUnreadCount(token: string): Promise<{ count: number }> {
+    return request("/client/notifications/unread-count", { token });
+  },
+
+  async clientMarkNotificationsRead(
+    token: string,
+    data: { ids?: string[]; all?: boolean }
+  ): Promise<{ updated: number }> {
+    return request("/client/notifications/read", { method: "POST", body: JSON.stringify(data), token });
+  },
+
+  // ——— Статистика трафика (клиент) ———
+  async clientGetTrafficLog(
+    token: string,
+    opts?: { days?: number; source?: string }
+  ): Promise<TrafficLogEntry[]> {
+    const params = new URLSearchParams();
+    if (opts?.days) params.set("days", String(opts.days));
+    if (opts?.source) params.set("source", opts.source);
+    const qs = params.toString();
+    return request(`/client/traffic-log${qs ? `?${qs}` : ""}`, { token });
+  },
 };
+
+// ——— Типы: Уведомления и трафик ———
+export interface ClientNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  isRead: boolean;
+  metadata: string | null;
+  createdAt: string;
+}
+
+export interface TrafficLogEntry {
+  date: string;
+  usedBytes: string;
+  uploadBytes: string;
+  downloadBytes: string;
+  source: string;
+}
 
 export interface ClientReferralStats {
   referralCode: string | null;

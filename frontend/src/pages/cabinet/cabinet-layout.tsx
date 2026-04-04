@@ -7,7 +7,7 @@ import { useIsMiniapp } from "@/hooks/use-is-miniapp";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { GlassSelect } from "@/components/ui/glass-select";
-import { LayoutDashboard, Package, User, LogOut, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X, Megaphone } from "lucide-react";
+import { LayoutDashboard, Package, User, LogOut, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X, Megaphone, Bell, BarChart3 } from "lucide-react";
 import { useTheme, ACCENT_PALETTES, type ThemeMode, type ThemeAccent } from "@/contexts/theme";
 import { cn, formatMoney, translateBackendMessage } from "@/lib/utils";
 import { FloatingChat } from "@/components/floating-chat";
@@ -144,6 +144,8 @@ const ALL_NAV_ITEMS = [
   { to: "/cabinet/proxy", labelKey: "nav.proxy", icon: Globe, alwaysMore: false },
   { to: "/cabinet/singbox", labelKey: "nav.singbox", icon: KeyRound, alwaysMore: false },
   { to: "/cabinet/referral", labelKey: "nav.referral", icon: Users, alwaysMore: false },
+  { to: "/cabinet/notifications", labelKey: "nav.notifications", icon: Bell, alwaysMore: true },
+  { to: "/cabinet/traffic", labelKey: "nav.traffic", icon: BarChart3, alwaysMore: true },
   { to: "/cabinet/profile", labelKey: "nav.profile", icon: User, alwaysMore: true },
   { to: "/cabinet/extra-options", labelKey: "nav.extraOptions", icon: PlusCircle, alwaysMore: true },
   { to: "/cabinet/tickets", labelKey: "nav.tickets", icon: MessageSquare, alwaysMore: true },
@@ -383,6 +385,37 @@ function SettingsPopover() {
   );
 }
 
+/** Колокольчик уведомлений с бейджем непрочитанных */
+function NotificationBell() {
+  const { state } = useClientAuth();
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!state.token) return;
+    let cancelled = false;
+    const load = () => {
+      api.clientGetUnreadCount(state.token!).then((r) => { if (!cancelled) setCount(r.count); }).catch(() => {});
+    };
+    load();
+    const id = window.setInterval(load, 30_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [state.token]);
+
+  return (
+    <Link
+      to="/cabinet/notifications"
+      className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-background/20 text-muted-foreground transition-colors hover:bg-background/40 hover:text-foreground"
+    >
+      <Bell className="h-5 w-5" />
+      {count > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground shadow-sm">
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 function resolveNavItems(config: { sellOptionsEnabled?: boolean; showProxyEnabled?: boolean; showSingboxEnabled?: boolean; ticketsEnabled?: boolean; customBuildConfig?: { enabled: true } | null } | null) {
   let items = ALL_NAV_ITEMS;
   if (!config?.ticketsEnabled) items = items.filter((i) => i.to !== "/cabinet/tickets");
@@ -453,6 +486,7 @@ function MobileCabinetShell() {
             {serviceName ? <span className="truncate">{serviceName}</span> : null}
           </Link>
           <div className="flex items-center gap-1.5 shrink-0">
+            <NotificationBell />
             <ThemePopover />
             <SettingsPopover />
             <Link
@@ -738,6 +772,7 @@ function CabinetShell() {
             )}
           </nav>
           <div className="flex items-center gap-2 shrink-0">
+            <NotificationBell />
             <ThemePopover />
             <SettingsPopover />
             <div className="hidden lg:flex h-9 items-center rounded-full border border-border/60 bg-background/35 shadow-sm backdrop-blur-xl overflow-hidden">

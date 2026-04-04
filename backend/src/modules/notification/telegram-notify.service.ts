@@ -5,6 +5,7 @@
 
 import { prisma } from "../../db.js";
 import { getSystemConfig } from "../client/client.service.js";
+import { createClientNotification } from "./client-notification.service.js";
 
 type AdminNotificationEventType = "balance_topup" | "tariff_payment" | "new_client" | "new_ticket";
 
@@ -111,6 +112,14 @@ export async function notifyBalanceToppedUp(clientId: string, amount: number, cu
   if (client.telegramId && textForClient) {
     await sendTelegramToUser(client.telegramId, textForClient);
   }
+  // In-app notification
+  await createClientNotification({
+    clientId,
+    type: "balance_topup",
+    title: "💰 余额充值成功",
+    body: `您的余额已充值 ${formatMoney(amount, currency)}。`,
+    metadata: { amount, currency },
+  }).catch(() => {});
   const clientLabel =
     client.email?.trim() ||
     (client.telegramUsername ? `@${client.telegramUsername}` : client.id);
@@ -140,6 +149,14 @@ export async function notifyTariffActivated(clientId: string, paymentId: string)
     const textClient = `✅ <b>Тариф «${escapeHtml(tariffName)}»</b> оплачен и активирован.\n\nМожете подключаться к VPN.`;
     await sendTelegramToUser(client.telegramId, textClient);
   }
+  // In-app notification
+  await createClientNotification({
+    clientId,
+    type: "payment_success",
+    title: "✅ 套餐已激活",
+    body: `套餐「${tariffName}」已付款并激活，您现在可以连接 VPN。`,
+    metadata: { tariffName, paymentId },
+  }).catch(() => {});
   const clientLabel =
     client.email?.trim() ||
     (client.telegramUsername ? `@${client.telegramUsername}` : client.id);

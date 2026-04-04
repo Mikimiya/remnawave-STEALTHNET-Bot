@@ -112,7 +112,7 @@ export function ClientRegisterPage() {
 
   function validatePassword(value: string): string {
     if (!value) return t("auth.passwordRequired");
-    if (value.length < 6) return t("auth.passwordTooShort");
+    if (value.length < 8) return t("auth.passwordTooShort");
     return "";
   }
 
