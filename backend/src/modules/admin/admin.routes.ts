@@ -45,7 +45,13 @@ import {
   notifyAdminsAboutTicketStatusChange,
 } from "../notification/telegram-notify.service.js";
 import { runRule, runAllRules, getEligibleClientIds } from "../auto-broadcast/auto-broadcast.service.js";
+import { t } from "../../i18n/index.js";
 
+
+function adminLang(req: import("express").Request): string {
+  const h = req.headers["accept-language"];
+  return h ? h.slice(0, 2) : "en";
+}
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
 
@@ -319,7 +325,7 @@ function tariffToJson(t: { id: string; categoryId: string; subGroupId?: string |
 // ——— Категории тарифов ———
 const tariffCategoryIdSchema = z.object({ id: z.string().min(1) });
 
-adminRouter.get("/tariff-categories", async (_req, res) => {
+adminRouter.get("/tariff-categories", async (req, res) => {
   try {
     const list = await prisma.tariffCategory.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -353,10 +359,10 @@ adminRouter.get("/tariff-categories", async (_req, res) => {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("does not exist") || msg.includes("tariff_categories")) {
       return res.status(503).json({
-        message: "Таблицы тарифов не найдены. Выполните в папке backend: npx prisma db push",
+        message: t(adminLang(req), "tariffTablesNotFound"),
       });
     }
-    return res.status(500).json({ message: "Ошибка загрузки категорий тарифов", error: msg });
+    return res.status(500).json({ message: t(adminLang(req), "errorLoadingTariffCategories"), error: msg });
   }
 });
 
@@ -375,7 +381,7 @@ const updateTariffCategorySchema = z.object({
 
 adminRouter.post("/tariff-categories", async (req, res) => {
   const body = createTariffCategorySchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "invalidData"), errors: body.error.flatten() });
   const created = await prisma.tariffCategory.create({
     data: {
       name: body.data.name,
@@ -399,7 +405,7 @@ adminRouter.patch("/tariff-categories/:id", async (req, res) => {
   const idParse = tariffCategoryIdSchema.safeParse({ id: req.params.id });
   if (!idParse.success) return res.status(400).json({ message: "Invalid id" });
   const body = updateTariffCategorySchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "invalidData"), errors: body.error.flatten() });
   const data: { name?: string; sortOrder?: number; emojiKey?: string | null; visible?: boolean } = {};
   if (body.data.name !== undefined) data.name = body.data.name;
   if (body.data.sortOrder !== undefined) data.sortOrder = body.data.sortOrder;
@@ -441,9 +447,9 @@ const updateSubGroupSchema = z.object({
 
 adminRouter.post("/tariff-sub-groups", async (req, res) => {
   const body = createSubGroupSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "invalidData"), errors: body.error.flatten() });
   const category = await prisma.tariffCategory.findUnique({ where: { id: body.data.categoryId } });
-  if (!category) return res.status(400).json({ message: "Категория не найдена" });
+  if (!category) return res.status(400).json({ message: t(adminLang(req), "categoryNotFound") });
   const created = await prisma.tariffSubGroup.create({
     data: {
       categoryId: body.data.categoryId,
@@ -465,7 +471,7 @@ adminRouter.patch("/tariff-sub-groups/:id", async (req, res) => {
   const idParse = subGroupIdSchema.safeParse({ id: req.params.id });
   if (!idParse.success) return res.status(400).json({ message: "Invalid id" });
   const body = updateSubGroupSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "invalidData"), errors: body.error.flatten() });
   const data: { name?: string; sortOrder?: number } = {};
   if (body.data.name !== undefined) data.name = body.data.name;
   if (body.data.sortOrder !== undefined) data.sortOrder = body.data.sortOrder;
@@ -534,9 +540,9 @@ adminRouter.get("/tariffs", async (req, res) => {
 
 adminRouter.post("/tariffs", async (req, res) => {
   const body = createTariffSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "invalidData"), errors: body.error.flatten() });
   const category = await prisma.tariffCategory.findUnique({ where: { id: body.data.categoryId } });
-  if (!category) return res.status(400).json({ message: "Категория не найдена" });
+  if (!category) return res.status(400).json({ message: t(adminLang(req), "categoryNotFound") });
   const created = await prisma.tariff.create({
     data: {
       categoryId: body.data.categoryId,
@@ -560,7 +566,7 @@ adminRouter.patch("/tariffs/:id", async (req, res) => {
   const idParse = tariffIdSchema.safeParse({ id: req.params.id });
   if (!idParse.success) return res.status(400).json({ message: "Invalid id" });
   const body = updateTariffSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Неверные данные", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "invalidData"), errors: body.error.flatten() });
   const data: { name?: string; subGroupId?: string | null; description?: string | null; durationDays?: number; internalSquadUuids?: string[]; trafficLimitBytes?: bigint | null; deviceLimit?: number | null; price?: number; currency?: string; sortOrder?: number; trafficResetStrategy?: string } = {};
   if (body.data.name != null) data.name = body.data.name;
   if (body.data.subGroupId !== undefined) data.subGroupId = body.data.subGroupId ?? null;
@@ -686,7 +692,7 @@ adminRouter.get("/clients", async (req, res) => {
   } catch (e) {
     console.error("GET /admin/clients error:", e);
     const msg = e instanceof Error ? e.message : String(e);
-    return res.status(500).json({ message: "Ошибка загрузки клиентов. Выполните: cd backend && npx prisma db push", error: msg });
+    return res.status(500).json({ message: t(adminLang(req), "errorLoadingClients"), error: msg });
   }
 });
 
@@ -715,7 +721,7 @@ adminRouter.get("/clients/:id", async (req, res) => {
       _count: { select: { referrals: true } },
     },
   });
-  if (!client) return res.status(404).json({ message: "Клиент не найден" });
+  if (!client) return res.status(404).json({ message: t(adminLang(req), "clientNotFound") });
   return res.json(client);
 });
 
@@ -735,7 +741,7 @@ adminRouter.patch("/clients/:id", async (req, res) => {
   const body = updateClientSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
   const client = await prisma.client.findUnique({ where: { id: parsed.data.id } });
-  if (!client) return res.status(404).json({ message: "Клиент не найден" });
+  if (!client) return res.status(404).json({ message: t(adminLang(req), "clientNotFound") });
   const updates: Record<string, unknown> = {};
   if (body.data.email !== undefined) updates.email = body.data.email;
   if (body.data.preferredLang !== undefined) updates.preferredLang = body.data.preferredLang;
@@ -778,20 +784,20 @@ adminRouter.patch("/clients/:id/password", async (req, res) => {
   const body = setClientPasswordSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
   const client = await prisma.client.findUnique({ where: { id: parsed.data.id } });
-  if (!client) return res.status(404).json({ message: "Клиент не найден" });
+  if (!client) return res.status(404).json({ message: t(adminLang(req), "clientNotFound") });
   const passwordHash = await hashClientPassword(body.data.newPassword);
   await prisma.client.update({
     where: { id: parsed.data.id },
     data: { passwordHash },
   });
-  return res.json({ success: true, message: "Пароль установлен" });
+  return res.json({ success: true, message: t(adminLang(req), "passwordSet") });
 });
 
 adminRouter.delete("/clients/:id", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const client = await prisma.client.findUnique({ where: { id: parsed.data.id }, select: { id: true, remnawaveUuid: true } });
-  if (!client) return res.status(404).json({ message: "Клиент не найден" });
+  if (!client) return res.status(404).json({ message: t(adminLang(req), "clientNotFound") });
   if (client.remnawaveUuid && isRemnaConfigured()) {
     const remnaRes = await remnaDeleteUser(client.remnawaveUuid);
     if (remnaRes.error) {
@@ -814,7 +820,7 @@ adminRouter.get("/clients/:id/remna", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaGetUser(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   return res.json(result.data ?? {});
@@ -855,7 +861,7 @@ adminRouter.patch("/clients/:id/remna", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const body = remnaUpdateBodySchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
   const getRes = await remnaGetUser(remnaUuid);
@@ -875,7 +881,7 @@ adminRouter.post("/clients/:id/remna/revoke-subscription", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaRevokeUserSubscription(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   return res.json(result.data ?? {});
@@ -885,7 +891,7 @@ adminRouter.post("/clients/:id/remna/disable", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaDisableUser(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   return res.json(result.data ?? {});
@@ -895,7 +901,7 @@ adminRouter.post("/clients/:id/remna/enable", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaEnableUser(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   return res.json(result.data ?? {});
@@ -905,7 +911,7 @@ adminRouter.post("/clients/:id/remna/reset-traffic", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaResetUserTraffic(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   return res.json(result.data ?? {});
@@ -917,7 +923,7 @@ adminRouter.post("/clients/:id/remna/squads/add", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const body = squadActionSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input" });
   // Получаем текущие сквады пользователя, чтобы добавить новый без потери существующих
@@ -944,7 +950,7 @@ adminRouter.post("/clients/:id/remna/squads/remove", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const body = squadActionSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input" });
   // По api-1.yaml у DELETE .../remove-users нет requestBody — только uuid сквада в path; эндпоинт может убирать всех из сквада. Поэтому убираем сквад только у этого пользователя через PATCH user (как при add).
@@ -1924,7 +1930,7 @@ adminRouter.get("/tickets/:id", asyncRoute(async (req, res) => {
       messages: { orderBy: { createdAt: "asc" } },
     },
   });
-  if (!ticket) return res.status(404).json({ message: "Тикет не найден" });
+  if (!ticket) return res.status(404).json({ message: t(adminLang(req), "ticketNotFound") });
   return res.json({
     id: ticket.id,
     subject: ticket.subject,
@@ -1958,7 +1964,7 @@ adminRouter.post("/tickets/:id/messages", asyncRoute(async (req, res) => {
   const body = adminTicketMessageSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
   const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
-  if (!ticket) return res.status(404).json({ message: "Тикет не найден" });
+  if (!ticket) return res.status(404).json({ message: t(adminLang(req), "ticketNotFound") });
   const msg = await prisma.ticketMessage.create({
     data: { ticketId: ticket.id, authorType: "support", content: body.data.content.trim() },
   });
@@ -2358,7 +2364,7 @@ adminRouter.post("/promo-codes", async (req, res) => {
 
   // Проверяем уникальность кода
   const exists = await prisma.promoCode.findUnique({ where: { code: d.code } });
-  if (exists) return res.status(400).json({ message: "Промокод с таким кодом уже существует" });
+  if (exists) return res.status(400).json({ message: t(adminLang(req), "promoCodeAlreadyExists") });
 
   const code = await prisma.promoCode.create({
     data: {

@@ -5,6 +5,7 @@
 
 import { prisma } from "../../db.js";
 import { getSystemConfig } from "../client/client.service.js";
+import { t } from "../../i18n/index.js";
 
 const TELEGRAM_DELAY_MS = 80;
 
@@ -39,32 +40,32 @@ function activeContestWhere(now: Date) {
   };
 }
 
-function formatPrizeLine(prizeType: string, prizeValue: string): string {
+function formatPrizeLine(prizeType: string, prizeValue: string, lang: string): string {
   const v = (prizeValue || "").trim();
   if (!v) return "—";
-  if (prizeType === "balance") return `${v} ₽ на баланс`;
-  if (prizeType === "vpn_days") return `${v} дней VPN`;
+  if (prizeType === "balance") return t(lang, "prizeBalance", { value: v });
+  if (prizeType === "vpn_days") return t(lang, "prizeVpnDays", { value: v });
   return v;
 }
 
 /** Собирает полный текст уведомления о старте конкурса: название, период, описание (dailyMessage), призы. */
-function buildContestStartMessage(contest: { name: string; startAt: Date; endAt: Date; dailyMessage: string | null; prize1Type: string; prize1Value: string; prize2Type: string; prize2Value: string; prize3Type: string; prize3Value: string }): string {
+function buildContestStartMessage(contest: { name: string; startAt: Date; endAt: Date; dailyMessage: string | null; prize1Type: string; prize1Value: string; prize2Type: string; prize2Value: string; prize3Type: string; prize3Value: string }, lang: string): string {
   const startStr = contest.startAt.toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" });
   const endStr = contest.endAt.toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" });
   const lines: string[] = [
-    `🏆 Конкурс «${contest.name}» запущен!`,
+    t(lang, "contestStartTitle", { name: contest.name }),
     "",
-    `📅 Период: с ${startStr} по ${endStr}.`,
+    t(lang, "contestPeriod", { start: startStr, end: endStr }),
   ];
   if (contest.dailyMessage && contest.dailyMessage.trim()) {
     lines.push("", contest.dailyMessage.trim());
   }
   lines.push(
     "",
-    "🎁 Призы:",
-    `1 место — ${formatPrizeLine(contest.prize1Type, contest.prize1Value)}`,
-    `2 место — ${formatPrizeLine(contest.prize2Type, contest.prize2Value)}`,
-    `3 место — ${formatPrizeLine(contest.prize3Type, contest.prize3Value)}`
+    t(lang, "contestPrizes"),
+    t(lang, "contestPlace", { place: "1", prize: formatPrizeLine(contest.prize1Type, contest.prize1Value, lang) }),
+    t(lang, "contestPlace", { place: "2", prize: formatPrizeLine(contest.prize2Type, contest.prize2Value, lang) }),
+    t(lang, "contestPlace", { place: "3", prize: formatPrizeLine(contest.prize3Type, contest.prize3Value, lang) })
   );
   return lines.join("\n");
 }
@@ -84,7 +85,7 @@ export async function runContestDailyReminder(): Promise<{ sent: number; errors:
 
   const clients = await prisma.client.findMany({
     where: { telegramId: { not: null }, isBlocked: false },
-    select: { telegramId: true },
+    select: { telegramId: true, preferredLang: true },
   });
   if (clients.length === 0) return { sent: 0, errors: 0 };
 
@@ -97,14 +98,15 @@ export async function runContestDailyReminder(): Promise<{ sent: number; errors:
     orderBy: { startAt: "desc" },
   });
   for (const contest of contestsForDaily) {
-    const text =
-      (contest.dailyMessage && contest.dailyMessage.trim()) ||
-      `🏆 Конкурс «${contest.name}» идёт до ${contest.endAt.toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" })}. Участвуйте — призы за 1, 2 и 3 место!`;
     let sent = 0;
     let err = 0;
     for (const c of clients) {
       const tid = c.telegramId?.trim();
       if (!tid) continue;
+      const lang = c.preferredLang || "en";
+      const text =
+        (contest.dailyMessage && contest.dailyMessage.trim()) ||
+        t(lang, "contestDailyReminder", { name: contest.name, endDate: contest.endAt.toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" }) });
       if (await sendTelegram(botToken, tid, text)) sent++;
       else err++;
       await delay(TELEGRAM_DELAY_MS);
@@ -122,12 +124,13 @@ export async function runContestDailyReminder(): Promise<{ sent: number; errors:
     orderBy: { startAt: "desc" },
   });
   if (contestJustStarted) {
-    const text = buildContestStartMessage(contestJustStarted);
     let sent = 0;
     let err = 0;
     for (const c of clients) {
       const tid = c.telegramId?.trim();
       if (!tid) continue;
+      const lang = c.preferredLang || "en";
+      const text = buildContestStartMessage(contestJustStarted, lang);
       if (await sendTelegram(botToken, tid, text)) sent++;
       else err++;
       await delay(TELEGRAM_DELAY_MS);
@@ -150,25 +153,26 @@ export async function runContestDailyReminder(): Promise<{ sent: number; errors:
  */
 export async function sendContestStartNotification(contestId: string): Promise<{ ok: boolean; sent?: number; errors?: number; error?: string }> {
   const contest = await prisma.contest.findUnique({ where: { id: contestId } });
-  if (!contest) return { ok: false, error: "Конкурс не найден" };
+  if (!contest) return { ok: false, error: t("en", "contestNotFound") };
 
   const config = await getSystemConfig();
   const botToken = config.telegramBotToken?.trim();
-  if (!botToken) return { ok: false, error: "Не задан токен бота (Настройки → Telegram)" };
+  if (!botToken) return { ok: false, error: t("en", "contestBotTokenNotSet") };
 
   const clients = await prisma.client.findMany({
     where: { telegramId: { not: null }, isBlocked: false },
-    select: { telegramId: true },
+    select: { telegramId: true, preferredLang: true },
   });
 
   const now = new Date();
-  const text = buildContestStartMessage(contest);
 
   let sent = 0;
   let err = 0;
   for (const c of clients) {
     const tid = c.telegramId?.trim();
     if (!tid) continue;
+    const lang = c.preferredLang || "en";
+    const text = buildContestStartMessage(contest, lang);
     if (await sendTelegram(botToken, tid, text)) sent++;
     else err++;
     await delay(TELEGRAM_DELAY_MS);

@@ -8,6 +8,12 @@ import { prisma } from "../../db.js";
 import { requireAuth, requireAdminSection } from "../auth/middleware.js";
 import { getEligibleParticipants, runDraw, parseConditions } from "./contest.service.js";
 import { sendContestStartNotification } from "./contest-daily-reminder.service.js";
+import { t } from "../../i18n/index.js";
+
+function adminLang(req: express.Request): string {
+  const h = req.headers["accept-language"];
+  return h ? h.slice(0, 2) : "en";
+}
 
 function asyncRoute(fn: (req: express.Request, res: express.Response) => Promise<void | express.Response>) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -60,14 +66,14 @@ contestAdminRouter.get("/:id", asyncRoute(async (req, res) => {
       },
     },
   });
-  if (!contest) return res.status(404).json({ message: "Конкурс не найден" });
+  if (!contest) return res.status(404).json({ message: t(adminLang(req), "contestNotFound") });
   return res.json(contest);
 }));
 
 contestAdminRouter.post("/", asyncRoute(async (req, res) => {
   const parsed = createContestSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ message: "Неверные данные", errors: parsed.error.flatten() });
+    return res.status(400).json({ message: t(adminLang(req), "invalidData"), errors: parsed.error.flatten() });
   }
   const data = parsed.data;
   const contest = await prisma.contest.create({
@@ -94,7 +100,7 @@ contestAdminRouter.patch("/:id", asyncRoute(async (req, res) => {
   const id = req.params.id;
   const parsed = updateContestSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ message: "Неверные данные", errors: parsed.error.flatten() });
+    return res.status(400).json({ message: t(adminLang(req), "invalidData"), errors: parsed.error.flatten() });
   }
   const data = parsed.data;
   const update: Record<string, unknown> = {};
@@ -121,9 +127,9 @@ contestAdminRouter.patch("/:id", asyncRoute(async (req, res) => {
 contestAdminRouter.patch("/:id/status", asyncRoute(async (req, res) => {
   const id = req.params.id;
   const body = z.object({ status: z.enum(["draft", "active", "ended"]) }).safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Укажите status" });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "specifyStatus") });
   const contest = await prisma.contest.findUnique({ where: { id } });
-  if (!contest) return res.status(404).json({ message: "Конкурс не найден" });
+  if (!contest) return res.status(404).json({ message: t(adminLang(req), "contestNotFound") });
   const now = new Date();
   let newStatus = body.data.status;
   if (newStatus === "active" && contest.startAt <= now && contest.endAt >= now) {
@@ -143,7 +149,7 @@ contestAdminRouter.patch("/:id/status", asyncRoute(async (req, res) => {
 contestAdminRouter.get("/:id/participants-preview", asyncRoute(async (req, res) => {
   const id = req.params.id;
   const contest = await prisma.contest.findUnique({ where: { id } });
-  if (!contest) return res.status(404).json({ message: "Конкурс не найден" });
+  if (!contest) return res.status(404).json({ message: t(adminLang(req), "contestNotFound") });
   const conditions = parseConditions(contest.conditionsJson);
   const participants = await getEligibleParticipants(contest.startAt, contest.endAt, conditions);
   return res.json({
@@ -162,7 +168,7 @@ contestAdminRouter.post("/:id/launch", asyncRoute(async (req, res) => {
   const id = req.params.id;
   const result = await sendContestStartNotification(id);
   if (!result.ok) return res.status(400).json({ message: result.error });
-  return res.json({ message: "Конкурс запущен, уведомление отправлено", sent: result.sent, errors: result.errors });
+  return res.json({ message: t(adminLang(req), "contestLaunchedNotificationSent"), sent: result.sent, errors: result.errors });
 }));
 
 /** Провести розыгрыш (выбрать победителей и применить призы balance). */
@@ -170,7 +176,7 @@ contestAdminRouter.post("/:id/draw", asyncRoute(async (req, res) => {
   const id = req.params.id;
   const result = await runDraw(id);
   if (!result.ok) return res.status(400).json({ message: result.error });
-  return res.json({ message: "Розыгрыш проведён", winners: result.winners });
+  return res.json({ message: t(adminLang(req), "drawCompleted"), winners: result.winners });
 }));
 
 contestAdminRouter.delete("/:id", asyncRoute(async (req, res) => {

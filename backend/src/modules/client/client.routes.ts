@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { generateSecret, generateURI, verify } from "otplib";
 import { env } from "../../config/index.js";
-import { Router } from "express";
+import { Router, Request } from "express";
 import { z } from "zod";
 import { prisma } from "../../db.js";
 import {
@@ -39,6 +39,21 @@ import { createYookassaPayment } from "../yookassa/yookassa.service.js";
 import { createCryptopayInvoice, isCryptopayConfigured } from "../cryptopay/cryptopay.service.js";
 import { createHeleketInvoice, isHeleketConfigured } from "../heleket/heleket.service.js";
 import { createEpayPayment, buildEpaySubmitUrl, isEpayConfigured } from "../epay/epay.service.js";
+import { t } from "../../i18n/index.js";
+
+/** Helper: resolve lang from authenticated client on req, or from Accept-Language / body. */
+function reqLang(req: Request): string {
+  const c = (req as Request & { client?: { preferredLang?: string } }).client;
+  if (c?.preferredLang) return c.preferredLang;
+  const bodyLang = (req.body as Record<string, unknown>)?.preferredLang;
+  if (typeof bodyLang === "string" && bodyLang.trim()) return bodyLang.trim();
+  const al = req.headers["accept-language"];
+  if (typeof al === "string") {
+    const code = al.split(",")[0]?.split("-")[0]?.trim().toLowerCase();
+    if (code) return code;
+  }
+  return "en";
+}
 
 /** Извлекает текущий expireAt из ответа Remna. Возвращает Date если в будущем, иначе null. */
 function extractCurrentExpireAt(data: unknown): Date | null {
@@ -93,7 +108,7 @@ const registerSchema = z.object({
 clientAuthRouter.post("/register", async (req, res) => {
   const body = registerSchema.safeParse(req.body);
   if (!body.success) {
-    return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+    return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   }
 
   const data = body.data;
@@ -101,13 +116,13 @@ clientAuthRouter.post("/register", async (req, res) => {
   const hasTelegram = data.telegramId;
 
   if (!hasEmail && !hasTelegram) {
-    return res.status(400).json({ message: "Provide email+password or telegramId" });
+    return res.status(400).json({ message: t(reqLang(req), "provideEmailOrTelegram") });
   }
 
   // Регистрация по email: создаём ожидание и отправляем письмо с ссылкой
   if (hasEmail) {
     const existing = await prisma.client.findUnique({ where: { email: data.email! } });
-    if (existing) return res.status(400).json({ message: "Email already registered" });
+    if (existing) return res.status(400).json({ message: t(reqLang(req), "emailAlreadyRegistered") });
 
     const config = await getSystemConfig();
 
@@ -142,7 +157,7 @@ clientAuthRouter.post("/register", async (req, res) => {
         });
       } catch (error) {
         if (!isClientEmailUniqueConflict(error)) throw error;
-        return res.status(400).json({ message: "Email already registered" });
+        return res.status(400).json({ message: t(reqLang(req), "emailAlreadyRegistered") });
       }
       notifyAdminsAboutNewClient(client.id).catch(() => {});
       const token = signClientToken(client.id);
@@ -159,12 +174,12 @@ clientAuthRouter.post("/register", async (req, res) => {
       fromName: config.smtpFromName,
     };
     if (!isSmtpConfigured(smtpConfig)) {
-      return res.status(503).json({ message: "Email registration is not configured. Contact administrator." });
+      return res.status(503).json({ message: t(reqLang(req), "emailRegistrationNotConfigured") });
     }
 
     const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
     if (!appUrl) {
-      return res.status(503).json({ message: "Public app URL is not set in settings." });
+      return res.status(503).json({ message: t(reqLang(req), "publicAppUrlNotSet") });
     }
 
     const verificationToken = randomBytes(32).toString("hex");
@@ -206,10 +221,10 @@ clientAuthRouter.post("/register", async (req, res) => {
     console.log(`[register] Email send result to ${data.email}:`, sendResult);
     if (!sendResult.ok) {
       await prisma.pendingEmailRegistration.deleteMany({ where: { verificationToken } }).catch(() => {});
-      return res.status(500).json({ message: "Failed to send verification email. Try again later." });
+      return res.status(500).json({ message: t(reqLang(req), "failedToSendVerificationEmail") });
     }
 
-    return res.status(201).json({ message: "Check your email to complete registration", requiresVerification: true });
+    return res.status(201).json({ message: t(reqLang(req), "checkEmailToComplete"), requiresVerification: true });
   }
 
   // Регистрация / вход по Telegram (используется ботом). 2FA не требуем — только для входа на сайте.
@@ -219,7 +234,7 @@ clientAuthRouter.post("/register", async (req, res) => {
       select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpEnabled: true, createdAt: true },
     });
     if (existing) {
-      if (existing.isBlocked) return res.status(403).json({ message: "Account is blocked" });
+      if (existing.isBlocked) return res.status(403).json({ message: t(reqLang(req), "accountBlocked") });
       return res.json({ token: signClientToken(existing.id), client: toClientShape(existing) });
     }
   }
@@ -259,18 +274,18 @@ clientAuthRouter.post("/register", async (req, res) => {
 const verifyLinkEmailSchema = z.object({ token: z.string().min(1) });
 clientAuthRouter.post("/verify-link-email", async (req, res) => {
   const parse = verifyLinkEmailSchema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ message: "Invalid input" });
+  if (!parse.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput") });
   const { token } = parse.data;
   const pending = await prisma.pendingEmailLink.findUnique({ where: { verificationToken: token } });
-  if (!pending) return res.status(400).json({ message: "Недействительная или просроченная ссылка" });
+  if (!pending) return res.status(400).json({ message: t(reqLang(req), "invalidOrExpiredLink") });
   if (new Date() > pending.expiresAt) {
     await prisma.pendingEmailLink.deleteMany({ where: { id: pending.id } }).catch(() => {});
-    return res.status(400).json({ message: "Ссылка просрочена. Запросите привязку почты снова." });
+    return res.status(400).json({ message: t(reqLang(req), "emailLinkExpired") });
   }
   const existingByEmail = await prisma.client.findUnique({ where: { email: pending.email } });
   if (existingByEmail && existingByEmail.id !== pending.clientId) {
     await prisma.pendingEmailLink.deleteMany({ where: { id: pending.id } }).catch(() => {});
-    return res.status(400).json({ message: "Эта почта уже привязана к другому аккаунту." });
+    return res.status(400).json({ message: t(reqLang(req), "emailAlreadyLinkedToAnother") });
   }
   const client = await prisma.client.update({
     where: { id: pending.clientId },
@@ -285,16 +300,16 @@ clientAuthRouter.post("/verify-link-email", async (req, res) => {
 const verifyEmailSchema = z.object({ token: z.string().min(1) });
 clientAuthRouter.post("/verify-email", async (req, res) => {
   const parse = verifyEmailSchema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ message: "Invalid input" });
+  if (!parse.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput") });
   const { token } = parse.data;
 
   const pending = await prisma.pendingEmailRegistration.findUnique({
     where: { verificationToken: token },
   });
-  if (!pending) return res.status(400).json({ message: "Invalid or expired link" });
+  if (!pending) return res.status(400).json({ message: t(reqLang(req), "invalidOrExpiredLink") });
   if (new Date() > pending.expiresAt) {
     await prisma.pendingEmailRegistration.delete({ where: { id: pending.id } }).catch(() => {});
-    return res.status(400).json({ message: "Link expired. Please register again." });
+    return res.status(400).json({ message: t(reqLang(req), "linkExpired") });
   }
 
   const existingClient = await prisma.client.findUnique({
@@ -343,7 +358,7 @@ clientAuthRouter.post("/verify-email", async (req, res) => {
     });
     await prisma.pendingEmailRegistration.delete({ where: { id: pending.id } }).catch(() => {});
     if (!existingByEmail) {
-      return res.status(400).json({ message: "Email already registered" });
+      return res.status(400).json({ message: t(reqLang(req), "emailAlreadyRegistered") });
     }
     const auth = buildAuthResponse(existingByEmail);
     return res.json(auth);
@@ -374,25 +389,11 @@ const resetPasswordSchema = z.object({
 });
 
 function getPasswordResetSuccessMessage(lang?: string | null): string {
-  switch ((lang ?? "").trim().toLowerCase()) {
-    case "zh":
-      return "如果该邮箱已注册，我们已向您发送重置密码邮件。";
-    case "en":
-      return "If an account with this email exists, we've sent a password reset email.";
-    default:
-      return "Если аккаунт с этой почтой существует, мы отправили письмо для сброса пароля.";
-  }
+  return t(lang, "passwordResetEmailSentIfExists");
 }
 
 function getPasswordResetValidationMessage(lang?: string | null): string {
-  switch ((lang ?? "").trim().toLowerCase()) {
-    case "zh":
-      return "链接有效。您可以设置新密码。";
-    case "en":
-      return "Link is valid. You can set a new password.";
-    default:
-      return "Ссылка действительна. Можно задать новый пароль.";
-  }
+  return t(lang, "passwordResetLinkValid");
 }
 
 function isMissingPasswordResetTokensTable(error: unknown): boolean {
@@ -465,7 +466,7 @@ async function findPasswordResetTokenRecord(token: string): Promise<PasswordRese
 clientAuthRouter.post("/forgot-password", async (req, res) => {
   const body = forgotPasswordSchema.safeParse(req.body);
   if (!body.success) {
-    return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+    return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   }
 
   const client = await prisma.client.findUnique({
@@ -492,12 +493,12 @@ clientAuthRouter.post("/forgot-password", async (req, res) => {
   };
 
   if (!isSmtpConfigured(smtpConfig)) {
-    return res.status(503).json({ message: "Password recovery email is not configured. Contact administrator." });
+    return res.status(503).json({ message: t(reqLang(req), "passwordRecoveryNotConfigured") });
   }
 
   const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
   if (!appUrl) {
-    return res.status(503).json({ message: "Public app URL is not set in settings." });
+    return res.status(503).json({ message: t(reqLang(req), "publicAppUrlNotSet") });
   }
 
   const token = randomBytes(32).toString("hex");
@@ -508,7 +509,7 @@ clientAuthRouter.post("/forgot-password", async (req, res) => {
     await createPasswordResetTokenRecord(client.id, token, expiresAt);
   } catch (error) {
     if (!isMissingPasswordResetTokensTable(error)) throw error;
-    return res.status(503).json({ message: "Password recovery is temporarily unavailable. Please contact administrator." });
+    return res.status(503).json({ message: t(reqLang(req), "passwordRecoveryUnavailable") });
   }
 
   const resetLink = `${appUrl}/cabinet/reset-password?token=${token}`;
@@ -522,7 +523,7 @@ clientAuthRouter.post("/forgot-password", async (req, res) => {
 
   if (!sendResult.ok) {
     await deletePasswordResetTokenByToken(token).catch(() => {});
-    return res.status(500).json({ message: "Failed to send password reset email. Try again later." });
+    return res.status(500).json({ message: t(reqLang(req), "failedToSendResetEmail") });
   }
 
   return res.json({ message: successMessage });
@@ -530,23 +531,23 @@ clientAuthRouter.post("/forgot-password", async (req, res) => {
 
 clientAuthRouter.post("/verify-password-reset", async (req, res) => {
   const body = verifyPasswordResetSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Invalid input" });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput") });
 
   let resetToken;
   try {
     resetToken = await findPasswordResetTokenRecord(body.data.token);
   } catch (error) {
     if (!isMissingPasswordResetTokensTable(error)) throw error;
-    return res.status(400).json({ message: "Invalid or expired link" });
+    return res.status(400).json({ message: t(reqLang(req), "invalidOrExpiredLink") });
   }
 
   if (!resetToken || resetToken.isBlocked) {
-    return res.status(400).json({ message: "Invalid or expired link" });
+    return res.status(400).json({ message: t(reqLang(req), "invalidOrExpiredLink") });
   }
 
   if (new Date() > resetToken.expiresAt) {
     await deletePasswordResetTokenById(resetToken.id).catch(() => {});
-    return res.status(400).json({ message: "Invalid or expired link" });
+    return res.status(400).json({ message: t(reqLang(req), "invalidOrExpiredLink") });
   }
 
   return res.json({
@@ -558,22 +559,22 @@ clientAuthRouter.post("/verify-password-reset", async (req, res) => {
 clientAuthRouter.post("/login", async (req, res) => {
   const body = loginSchema.safeParse(req.body);
   if (!body.success) {
-    return res.status(400).json({ message: "Invalid input" });
+    return res.status(400).json({ message: t(reqLang(req), "invalidInput") });
   }
 
   const client = await prisma.client.findUnique({ where: { email: body.data.email } });
   if (!client || !client.passwordHash || client.isBlocked) {
-    return res.status(401).json({ message: "Invalid email or password" });
+    return res.status(401).json({ message: t(reqLang(req), "invalidEmailOrPassword") });
   }
 
   const valid = await verifyPassword(body.data.password, client.passwordHash);
-  if (!valid) return res.status(401).json({ message: "Invalid email or password" });
+  if (!valid) return res.status(401).json({ message: t(reqLang(req), "invalidEmailOrPassword") });
 
   const full = await prisma.client.findUnique({
     where: { id: client.id },
     select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpEnabled: true, createdAt: true },
   });
-  if (!full) return res.status(401).json({ message: "Invalid email or password" });
+  if (!full) return res.status(401).json({ message: t(reqLang(req), "invalidEmailOrPassword") });
   const auth = buildAuthResponse(full);
   return res.json(auth);
 });
@@ -617,15 +618,15 @@ const telegramMiniappSchema = z.object({ initData: z.string().min(1) });
 clientAuthRouter.post("/telegram-miniapp", async (req, res) => {
   const body = telegramMiniappSchema.safeParse(req.body);
   if (!body.success) {
-    return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+    return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   }
   const config = await getSystemConfig();
   const botToken = config.telegramBotToken ?? "";
   if (!validateTelegramInitData(body.data.initData, botToken)) {
-    return res.status(401).json({ message: "Invalid or expired Telegram data" });
+    return res.status(401).json({ message: t(reqLang(req), "invalidOrExpiredTelegramData") });
   }
   const tgUser = parseTelegramUser(body.data.initData);
-  if (!tgUser) return res.status(400).json({ message: "Missing user in init data" });
+  if (!tgUser) return res.status(400).json({ message: t(reqLang(req), "missingUserData") });
 
   const telegramId = String(tgUser.id);
   const telegramUsername = tgUser.username?.trim() ?? null;
@@ -634,7 +635,7 @@ clientAuthRouter.post("/telegram-miniapp", async (req, res) => {
     select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpEnabled: true, createdAt: true },
   });
   if (existing) {
-    if (existing.isBlocked) return res.status(403).json({ message: "Account is blocked" });
+    if (existing.isBlocked) return res.status(403).json({ message: t(reqLang(req), "accountBlocked") });
     const auth = buildAuthResponse(existing);
     return res.json(auth);
   }
@@ -657,7 +658,7 @@ clientAuthRouter.post("/telegram-miniapp", async (req, res) => {
     remnawaveUuid = extractRemnaUuid(remnaRes.data);
     if (remnaRes.error || remnawaveUuid == null) {
       console.error("[Remna] create user (telegram initData) failed:", { error: remnaRes.error, status: remnaRes.status, data: remnaRes.data });
-      return res.status(503).json({ message: "Сервис временно недоступен. Не удалось создать учётную запись VPN. Попробуйте позже." });
+      return res.status(503).json({ message: t(reqLang(req), "serviceTemporarilyUnavailableVpnCreation") });
     }
   }
   const referralCode = generateReferralCode();
@@ -681,16 +682,16 @@ clientAuthRouter.post("/telegram-miniapp", async (req, res) => {
 const twoFaLoginSchema = z.object({ tempToken: z.string().min(1), code: z.string().length(6, "Код 6 цифр").regex(/^\d+$/) });
 clientAuthRouter.post("/2fa-login", async (req, res) => {
   const body = twoFaLoginSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Введите 6-значный код", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "enter6DigitCode"), errors: body.error.flatten() });
   const payload = verifyClient2FAPendingToken(body.data.tempToken);
-  if (!payload) return res.status(401).json({ message: "Сессия истекла. Войдите снова." });
+  if (!payload) return res.status(401).json({ message: t(reqLang(req), "sessionExpiredLoginAgain") });
   const client = await prisma.client.findUnique({
     where: { id: payload.clientId },
     select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpSecret: true, totpEnabled: true, createdAt: true },
   });
-  if (!client?.totpEnabled || !client.totpSecret) return res.status(401).json({ message: "2FA не включена. Войдите снова." });
+  if (!client?.totpEnabled || !client.totpSecret) return res.status(401).json({ message: t(reqLang(req), "twoFANotEnabledLoginAgain") });
   const result = await verify({ secret: client.totpSecret, token: body.data.code });
-  if (!result.valid) return res.status(401).json({ message: "Неверный код" });
+  if (!result.valid) return res.status(401).json({ message: t(reqLang(req), "invalidCode") });
   const token = signClientToken(client.id);
   return res.json({ token, client: toClientShape(client) });
 });
@@ -701,7 +702,7 @@ clientAuthRouter.get("/me", requireClientAuth, async (req, res) => {
     where: { id: client.id },
     select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpEnabled: true, createdAt: true },
   });
-  if (!full) return res.status(401).json({ message: "Unauthorized" });
+  if (!full) return res.status(401).json({ message: t(reqLang(req), "unauthorized") });
   return res.json(toClientShape(full));
 });
 
@@ -753,10 +754,10 @@ function buildAuthResponse(c: { id: string; totpEnabled?: boolean } & Parameters
 const googleAuthSchema = z.object({ idToken: z.string().min(1) });
 clientAuthRouter.post("/google", async (req, res) => {
   const parse = googleAuthSchema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ message: "Invalid input" });
+  if (!parse.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput") });
   const config = await getSystemConfig();
   if (!config.googleLoginEnabled || !config.googleClientId) {
-    return res.status(403).json({ message: "Google login is not enabled" });
+    return res.status(403).json({ message: t(reqLang(req), "googleLoginNotEnabled") });
   }
   let payload: { sub?: string; email?: string; email_verified?: boolean } | undefined;
   try {
@@ -769,9 +770,9 @@ clientAuthRouter.post("/google", async (req, res) => {
     payload = ticket.getPayload();
   } catch (err) {
     console.error("[Google OAuth] verify error:", err);
-    return res.status(401).json({ message: "Invalid Google token" });
+    return res.status(401).json({ message: t(reqLang(req), "invalidGoogleToken") });
   }
-  if (!payload?.sub) return res.status(401).json({ message: "Invalid Google token" });
+  if (!payload?.sub) return res.status(401).json({ message: t(reqLang(req), "invalidGoogleToken") });
   const googleId = payload.sub;
   const googleEmail = payload.email ?? null;
 
@@ -780,7 +781,7 @@ clientAuthRouter.post("/google", async (req, res) => {
     select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpEnabled: true, createdAt: true },
   });
   if (existing) {
-    if (existing.isBlocked) return res.status(403).json({ message: "Account is blocked" });
+    if (existing.isBlocked) return res.status(403).json({ message: t(reqLang(req), "accountBlocked") });
     const auth = buildAuthResponse(existing);
     return res.json(auth);
   }
@@ -791,7 +792,7 @@ clientAuthRouter.post("/google", async (req, res) => {
       select: { id: true, email: true, googleId: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpEnabled: true, createdAt: true },
     });
     if (byEmail) {
-      if (byEmail.isBlocked) return res.status(403).json({ message: "Account is blocked" });
+      if (byEmail.isBlocked) return res.status(403).json({ message: t(reqLang(req), "accountBlocked") });
       await prisma.client.update({ where: { id: byEmail.id }, data: { googleId } });
       const auth = buildAuthResponse(byEmail);
       return res.json(auth);
@@ -811,7 +812,7 @@ clientAuthRouter.post("/google", async (req, res) => {
     remnawaveUuid = extractRemnaUuid(remnaRes.data);
     if (remnaRes.error || remnawaveUuid == null) {
       console.error("[Remna] create user (google) failed:", { error: remnaRes.error, data: remnaRes.data });
-      return res.status(503).json({ message: "Service temporarily unavailable" });
+      return res.status(503).json({ message: t(reqLang(req), "serviceTemporarilyUnavailable") });
     }
   }
   const referralCode = generateReferralCode();
@@ -837,10 +838,10 @@ clientAuthRouter.post("/google", async (req, res) => {
 const appleAuthSchema = z.object({ idToken: z.string().min(1) });
 clientAuthRouter.post("/apple", async (req, res) => {
   const parse = appleAuthSchema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ message: "Invalid input" });
+  if (!parse.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput") });
   const config = await getSystemConfig();
   if (!config.appleLoginEnabled || !config.appleClientId) {
-    return res.status(403).json({ message: "Apple login is not enabled" });
+    return res.status(403).json({ message: t(reqLang(req), "appleLoginNotEnabled") });
   }
 
   let appleSub: string | null = null;
@@ -856,16 +857,16 @@ clientAuthRouter.post("/apple", async (req, res) => {
     appleEmail = (jwtPayload as { email?: string }).email ?? null;
   } catch (err) {
     console.error("[Apple OAuth] verify error:", err);
-    return res.status(401).json({ message: "Invalid Apple token" });
+    return res.status(401).json({ message: t(reqLang(req), "invalidAppleToken") });
   }
-  if (!appleSub) return res.status(401).json({ message: "Invalid Apple token" });
+  if (!appleSub) return res.status(401).json({ message: t(reqLang(req), "invalidAppleToken") });
 
   const existing = await prisma.client.findUnique({
     where: { appleId: appleSub },
     select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpEnabled: true, createdAt: true },
   });
   if (existing) {
-    if (existing.isBlocked) return res.status(403).json({ message: "Account is blocked" });
+    if (existing.isBlocked) return res.status(403).json({ message: t(reqLang(req), "accountBlocked") });
     const auth = buildAuthResponse(existing);
     return res.json(auth);
   }
@@ -876,7 +877,7 @@ clientAuthRouter.post("/apple", async (req, res) => {
       select: { id: true, email: true, appleId: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, referralPercent: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, yoomoneyAccessToken: true, totpEnabled: true, createdAt: true },
     });
     if (byEmail) {
-      if (byEmail.isBlocked) return res.status(403).json({ message: "Account is blocked" });
+      if (byEmail.isBlocked) return res.status(403).json({ message: t(reqLang(req), "accountBlocked") });
       await prisma.client.update({ where: { id: byEmail.id }, data: { appleId: appleSub } });
       const auth = buildAuthResponse(byEmail);
       return res.json(auth);
@@ -896,7 +897,7 @@ clientAuthRouter.post("/apple", async (req, res) => {
     remnawaveUuid = extractRemnaUuid(remnaRes.data);
     if (remnaRes.error || remnawaveUuid == null) {
       console.error("[Remna] create user (apple) failed:", { error: remnaRes.error, data: remnaRes.data });
-      return res.status(503).json({ message: "Service temporarily unavailable" });
+      return res.status(503).json({ message: t(reqLang(req), "serviceTemporarilyUnavailable") });
     }
   }
   const referralCode = generateReferralCode();
@@ -985,7 +986,7 @@ const twoFaConfirmSchema = z.object({ code: z.string().length(6, "Код дол�
 clientRouter.post("/2fa/setup", async (req, res) => {
   const client = (req as unknown as { client: { id: string; email: string | null } }).client;
   const current = await prisma.client.findUnique({ where: { id: client.id }, select: { totpEnabled: true } });
-  if (current?.totpEnabled) return res.status(400).json({ message: "2FA уже включена" });
+  if (current?.totpEnabled) return res.status(400).json({ message: t(reqLang(req), "twoFAAlreadyEnabled") });
   const secret = generateSecret();
   const label = client.email?.trim() || `client-${client.id}`;
   const otpauthUrl = generateURI({ issuer: "STEALTHNET", label, secret });
@@ -998,31 +999,31 @@ clientRouter.post("/2fa/setup", async (req, res) => {
 clientRouter.post("/2fa/confirm", async (req, res) => {
   const client = (req as unknown as { client: { id: string } }).client;
   const body = twoFaConfirmSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Введите 6-значный код из приложения", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "enter6DigitCodeFromApp"), errors: body.error.flatten() });
   const row = await prisma.client.findUnique({ where: { id: client.id }, select: { totpSecret: true, totpEnabled: true } });
-  if (!row?.totpSecret) return res.status(400).json({ message: "Сначала запустите настройку 2FA" });
-  if (row.totpEnabled) return res.status(400).json({ message: "2FA уже включена" });
+  if (!row?.totpSecret) return res.status(400).json({ message: t(reqLang(req), "startTwoFASetupFirst") });
+  if (row.totpEnabled) return res.status(400).json({ message: t(reqLang(req), "twoFAAlreadyEnabled") });
   const result = await verify({ secret: row.totpSecret, token: body.data.code });
-  if (!result.valid) return res.status(400).json({ message: "Неверный код. Проверьте время на устройстве." });
+  if (!result.valid) return res.status(400).json({ message: t(reqLang(req), "invalidCodeCheckTime") });
   await prisma.client.update({
     where: { id: client.id },
     data: { totpEnabled: true },
   });
-  return res.json({ message: "Двухфакторная аутентификация включена" });
+  return res.json({ message: t(reqLang(req), "twoFAEnabled") });
 });
 clientRouter.post("/2fa/disable", async (req, res) => {
   const client = (req as unknown as { client: { id: string } }).client;
   const body = twoFaConfirmSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Введите 6-значный код из приложения", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "enter6DigitCodeFromApp"), errors: body.error.flatten() });
   const row = await prisma.client.findUnique({ where: { id: client.id }, select: { totpSecret: true, totpEnabled: true } });
-  if (!row?.totpEnabled || !row.totpSecret) return res.status(400).json({ message: "2FA не включена" });
+  if (!row?.totpEnabled || !row.totpSecret) return res.status(400).json({ message: t(reqLang(req), "twoFANotEnabled") });
   const result = await verify({ secret: row.totpSecret, token: body.data.code });
-  if (!result.valid) return res.status(400).json({ message: "Неверный код" });
+  if (!result.valid) return res.status(400).json({ message: t(reqLang(req), "invalidCode") });
   await prisma.client.update({
     where: { id: client.id },
     data: { totpSecret: null, totpEnabled: false },
   });
-  return res.json({ message: "Двухфакторная аутентификация отключена" });
+  return res.json({ message: t(reqLang(req), "twoFADisabled") });
 });
 
 // ——— Change Password ———
@@ -1035,7 +1036,7 @@ clientRouter.post("/change-password", requireClientAuth, async (req, res) => {
   const client = (req as unknown as { client: { id: string; passwordHash: string | null } }).client;
   const body = changePasswordSchema.safeParse(req.body);
   if (!body.success) {
-    return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+    return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   }
 
   // Получаем актуальный passwordHash из базы
@@ -1045,12 +1046,12 @@ clientRouter.post("/change-password", requireClientAuth, async (req, res) => {
   });
 
   if (!clientData?.passwordHash) {
-    return res.status(400).json({ message: "У вас нет пароля. Используйте вход через Telegram или Email." });
+    return res.status(400).json({ message: t(reqLang(req), "noPasswordUseTelegramOrEmail") });
   }
 
   const valid = await verifyPassword(body.data.currentPassword, clientData.passwordHash);
   if (!valid) {
-    return res.status(400).json({ message: "Неверный текущий пароль" });
+    return res.status(400).json({ message: t(reqLang(req), "incorrectCurrentPassword") });
   }
 
   const newPasswordHash = await hashPassword(body.data.newPassword);
@@ -1059,7 +1060,7 @@ clientRouter.post("/change-password", requireClientAuth, async (req, res) => {
     data: { passwordHash: newPasswordHash },
   });
 
-  return res.json({ message: "Пароль успешно изменён" });
+  return res.json({ message: t(reqLang(req), "passwordChanged") });
 });
 
 const setPasswordSchema = z.object({
@@ -1070,7 +1071,7 @@ clientRouter.post("/set-password", requireClientAuth, async (req, res) => {
   const client = (req as unknown as { client: { id: string; passwordHash: string | null } }).client;
   const body = setPasswordSchema.safeParse(req.body);
   if (!body.success) {
-    return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+    return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   }
 
   const clientData = await prisma.client.findUnique({
@@ -1079,7 +1080,7 @@ clientRouter.post("/set-password", requireClientAuth, async (req, res) => {
   });
 
   if (clientData?.passwordHash) {
-    return res.status(400).json({ message: "Пароль уже установлен. Используйте смену пароля." });
+    return res.status(400).json({ message: t(reqLang(req), "passwordAlreadySet") });
   }
 
   const newPasswordHash = await hashPassword(body.data.newPassword);
@@ -1088,13 +1089,13 @@ clientRouter.post("/set-password", requireClientAuth, async (req, res) => {
     data: { passwordHash: newPasswordHash },
   });
 
-  return res.json({ message: "Пароль установлен" });
+  return res.json({ message: t(reqLang(req), "passwordSet") });
 });
 
 clientAuthRouter.post("/reset-password", async (req, res) => {
   const body = resetPasswordSchema.safeParse(req.body);
   if (!body.success) {
-    return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+    return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   }
 
   let resetToken;
@@ -1102,16 +1103,16 @@ clientAuthRouter.post("/reset-password", async (req, res) => {
     resetToken = await findPasswordResetTokenRecord(body.data.token);
   } catch (error) {
     if (!isMissingPasswordResetTokensTable(error)) throw error;
-    return res.status(400).json({ message: "Invalid or expired link" });
+    return res.status(400).json({ message: t(reqLang(req), "invalidOrExpiredLink") });
   }
 
   if (!resetToken || resetToken.isBlocked) {
-    return res.status(400).json({ message: "Invalid or expired link" });
+    return res.status(400).json({ message: t(reqLang(req), "invalidOrExpiredLink") });
   }
 
   if (new Date() > resetToken.expiresAt) {
     await deletePasswordResetTokenById(resetToken.id).catch(() => {});
-    return res.status(400).json({ message: "Invalid or expired link" });
+    return res.status(400).json({ message: t(reqLang(req), "invalidOrExpiredLink") });
   }
 
   const passwordHash = await hashPassword(body.data.newPassword);
@@ -1121,7 +1122,7 @@ clientAuthRouter.post("/reset-password", async (req, res) => {
   });
   await deletePasswordResetTokensByClientId(resetToken.clientId).catch(() => {});
 
-  return res.json({ message: "Password reset successful" });
+  return res.json({ message: t(reqLang(req), "passwordResetSuccess") });
 });
 
 const updateProfileSchema = z.object({
@@ -1132,13 +1133,13 @@ const updateProfileSchema = z.object({
 clientRouter.patch("/profile", async (req, res) => {
   const client = (req as unknown as { client: { id: string } }).client;
   const body = updateProfileSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   const updates: { preferredLang?: string; preferredCurrency?: string } = {};
   if (body.data.preferredLang !== undefined) updates.preferredLang = body.data.preferredLang;
   if (body.data.preferredCurrency !== undefined) updates.preferredCurrency = body.data.preferredCurrency;
   if (Object.keys(updates).length === 0) {
     const current = await prisma.client.findUnique({ where: { id: client.id }, select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, createdAt: true } });
-    return res.json(current ? toClientShape(current) : { message: "Not found" });
+    return res.json(current ? toClientShape(current) : { message: t(reqLang(req), "notFound") });
   }
   const updated = await prisma.client.update({
     where: { id: client.id },
@@ -1151,7 +1152,7 @@ clientRouter.patch("/profile", async (req, res) => {
 /** Запросить код для привязки Telegram через бота (аккаунт без Telegram, залогинен по почте) */
 clientRouter.post("/link-telegram-request", async (req, res) => {
   const client = (req as unknown as { client: { id: string; telegramId: string | null } }).client;
-  if (client.telegramId) return res.status(400).json({ message: "Telegram уже привязан" });
+  if (client.telegramId) return res.status(400).json({ message: t(reqLang(req), "telegramAlreadyLinked") });
   await prisma.pendingTelegramLink.deleteMany({ where: { clientId: client.id } });
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -1167,16 +1168,16 @@ clientRouter.post("/link-telegram-request", async (req, res) => {
 const linkTelegramSchema = z.object({ initData: z.string().min(1) });
 clientRouter.post("/link-telegram", async (req, res) => {
   const client = (req as unknown as { client: { id: string; telegramId: string | null } }).client;
-  if (client.telegramId) return res.status(400).json({ message: "Telegram уже привязан" });
+  if (client.telegramId) return res.status(400).json({ message: t(reqLang(req), "telegramAlreadyLinked") });
   const body = linkTelegramSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   const config = await getSystemConfig();
   const botToken = config.telegramBotToken ?? "";
   if (!validateTelegramInitData(body.data.initData, botToken)) {
-    return res.status(401).json({ message: "Недействительные или устаревшие данные Telegram" });
+    return res.status(401).json({ message: t(reqLang(req), "invalidOrExpiredTelegramData") });
   }
   const tgUser = parseTelegramUser(body.data.initData);
-  if (!tgUser) return res.status(400).json({ message: "Нет данных пользователя" });
+  if (!tgUser) return res.status(400).json({ message: t(reqLang(req), "missingUserData") });
   const telegramId = String(tgUser.id);
   const telegramUsername = tgUser.username?.trim() ?? null;
   const other = await prisma.client.findUnique({ where: { telegramId } });
@@ -1199,9 +1200,9 @@ clientRouter.post("/link-telegram", async (req, res) => {
 const linkEmailRequestSchema = z.object({ email: z.string().email() });
 clientRouter.post("/link-email-request", async (req, res) => {
   const client = (req as unknown as { client: { id: string; email: string | null } }).client;
-  if (client.email?.trim()) return res.status(400).json({ message: "Почта уже привязана" });
+  if (client.email?.trim()) return res.status(400).json({ message: t(reqLang(req), "emailAlreadyLinked") });
   const body = linkEmailRequestSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Некорректный email", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "invalidEmail"), errors: body.error.flatten() });
   const email = body.data.email.trim().toLowerCase();
   const config = await getSystemConfig();
   const smtpConfig = {
@@ -1213,13 +1214,13 @@ clientRouter.post("/link-email-request", async (req, res) => {
     fromEmail: config.smtpFromEmail ?? null,
     fromName: config.smtpFromName ?? null,
   };
-  if (!isSmtpConfigured(smtpConfig)) return res.status(503).json({ message: "Отправка писем не настроена. Обратитесь в поддержку." });
+  if (!isSmtpConfigured(smtpConfig)) return res.status(503).json({ message: t(reqLang(req), "smtpNotConfigured") });
   const currentClient = await prisma.client.findUnique({
     where: { id: client.id },
     select: { preferredLang: true },
   });
   const existing = await prisma.client.findUnique({ where: { email } });
-  if (existing && existing.id !== client.id) return res.status(400).json({ message: "Эта почта уже используется другим аккаунтом" });
+  if (existing && existing.id !== client.id) return res.status(400).json({ message: t(reqLang(req), "emailAlreadyUsedByAnother") });
   await prisma.pendingEmailLink.deleteMany({ where: { clientId: client.id } });
   const verificationToken = randomUUID();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -1228,7 +1229,7 @@ clientRouter.post("/link-email-request", async (req, res) => {
   });
   const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
   const verificationLink = appUrl ? `${appUrl}/cabinet/verify-link-email?token=${verificationToken}` : "";
-  if (!verificationLink) return res.status(500).json({ message: "Не задан URL приложения в настройках" });
+  if (!verificationLink) return res.status(500).json({ message: t(reqLang(req), "appUrlNotSetInSettings") });
   const sendResult = await sendLinkEmailVerification(
     smtpConfig,
     email,
@@ -1238,9 +1239,9 @@ clientRouter.post("/link-email-request", async (req, res) => {
   );
   if (!sendResult.ok) {
     await prisma.pendingEmailLink.deleteMany({ where: { verificationToken } }).catch(() => {});
-    return res.status(500).json({ message: "Не удалось отправить письмо. Попробуйте позже." });
+    return res.status(500).json({ message: t(reqLang(req), "failedToSendEmail") });
   }
-  return res.json({ message: "Письмо с ссылкой отправлено на указанный email" });
+  return res.json({ message: t(reqLang(req), "verificationEmailSent") });
 });
 
 clientRouter.get("/referral-stats", async (req, res) => {
@@ -1253,7 +1254,7 @@ clientRouter.get("/referral-stats", async (req, res) => {
       _count: { select: { referrals: true } },
     },
   });
-  if (!c) return res.status(404).json({ message: "Not found" });
+  if (!c) return res.status(404).json({ message: t(reqLang(req), "notFound") });
   const config = await getSystemConfig();
   let referralPercent: number = c.referralPercent ?? 0;
   if (referralPercent === 0) {
@@ -1276,16 +1277,16 @@ clientRouter.get("/referral-stats", async (req, res) => {
 clientRouter.post("/trial", async (req, res) => {
   const client = (req as unknown as { client: { id: string; remnawaveUuid: string | null; trialUsed: boolean; email: string | null; telegramId: string | null; telegramUsername?: string | null } }).client;
   if (client.trialUsed) {
-    return res.status(400).json({ message: "Триал уже использован" });
+    return res.status(400).json({ message: t(reqLang(req), "trialAlreadyUsed") });
   }
   const config = await getSystemConfig();
   const trialDays = config.trialDays ?? 0;
   const trialSquadUuid = config.trialSquadUuid?.trim() || null;
   if (trialDays <= 0 || !trialSquadUuid) {
-    return res.status(503).json({ message: "Триал не настроен" });
+    return res.status(503).json({ message: t(reqLang(req), "trialNotConfigured") });
   }
   if (!isRemnaConfigured()) {
-    return res.status(503).json({ message: "Сервис временно недоступен" });
+    return res.status(503).json({ message: t(reqLang(req), "serviceTemporarilyUnavailable") });
   }
 
   const trafficLimitBytes = config.trialTrafficLimitBytes ?? 0;
@@ -1350,7 +1351,7 @@ clientRouter.post("/trial", async (req, res) => {
     }
 
     if (!existingUuid) {
-      return res.status(502).json({ message: "Ошибка создания пользователя" });
+      return res.status(502).json({ message: t(reqLang(req), "errorCreatingUser") });
     }
 
     await remnaUpdateUser({
@@ -1367,7 +1368,7 @@ clientRouter.post("/trial", async (req, res) => {
     });
     const updated = await prisma.client.findUnique({ where: { id: client.id }, select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, createdAt: true } });
     createClientNotification({ clientId: client.id, type: "trial_activated", title: "🎁 试用已激活", body: `您的 ${trialDays} 天免费试用已成功激活。` }).catch(() => {});
-    return res.json({ message: "Триал активирован", client: updated ? toClientShape(updated) : null });
+    return res.json({ message: t(reqLang(req), "trialActivated"), client: updated ? toClientShape(updated) : null });
   }
 
   await prisma.client.update({
@@ -1375,32 +1376,33 @@ clientRouter.post("/trial", async (req, res) => {
     data: { trialUsed: true },
   });
   const updated = await prisma.client.findUnique({ where: { id: client.id }, select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, createdAt: true } });
-  createClientNotification({ clientId: client.id, type: "trial_activated", title: "🎁 试用已激活", body: `您的 ${trialDays} 天免费试用已成功激活。` }).catch(() => {});
-  return res.json({ message: "Триал активирован", client: updated ? toClientShape(updated) : null });
+  const lang = reqLang(req);
+  createClientNotification({ clientId: client.id, type: "trial_activated", title: t(lang, "inAppTrialActivatedTitle"), body: t(lang, "inAppTrialActivatedBody", { days: String(trialDays) }) }).catch(() => {});
+  return res.json({ message: t(lang, "trialActivated"), client: updated ? toClientShape(updated) : null });
 });
 
 // ——— Активация промо-ссылки ———
 clientRouter.post("/promo/activate", async (req, res) => {
   const client = (req as unknown as { client: { id: string; remnawaveUuid: string | null; email: string | null; telegramId: string | null; telegramUsername?: string | null } }).client;
   const { code } = req.body as { code?: string };
-  if (!code?.trim()) return res.status(400).json({ message: "Промокод не указан" });
+  if (!code?.trim()) return res.status(400).json({ message: t(reqLang(req), "promoCodeNotSpecified") });
 
   const group = await prisma.promoGroup.findUnique({ where: { code: code.trim() } });
-  if (!group || !group.isActive) return res.status(404).json({ message: "Промокод не найден или неактивен" });
+  if (!group || !group.isActive) return res.status(404).json({ message: t(reqLang(req), "promoCodeNotFoundOrInactive") });
 
   // Проверяем, не активировал ли уже этот клиент эту промо-группу
   const existing = await prisma.promoActivation.findUnique({
     where: { promoGroupId_clientId: { promoGroupId: group.id, clientId: client.id } },
   });
-  if (existing) return res.status(400).json({ message: "Вы уже активировали этот промокод" });
+  if (existing) return res.status(400).json({ message: t(reqLang(req), "promoCodeAlreadyActivated") });
 
   // Проверяем лимит активаций
   if (group.maxActivations > 0) {
     const count = await prisma.promoActivation.count({ where: { promoGroupId: group.id } });
-    if (count >= group.maxActivations) return res.status(400).json({ message: "Лимит активаций промокода исчерпан" });
+    if (count >= group.maxActivations) return res.status(400).json({ message: t(reqLang(req), "promoCodeActivationLimitReached") });
   }
 
-  if (!isRemnaConfigured()) return res.status(503).json({ message: "Сервис временно недоступен" });
+  if (!isRemnaConfigured()) return res.status(503).json({ message: t(reqLang(req), "serviceTemporarilyUnavailable") });
 
   const trafficLimitBytes = Number(group.trafficLimitBytes);
   const hwidDeviceLimit = group.deviceLimit ?? null;
@@ -1456,7 +1458,7 @@ clientRouter.post("/promo/activate", async (req, res) => {
       });
       existingUuid = extractRemnaUuid(createRes.data);
     }
-    if (!existingUuid) return res.status(502).json({ message: "Ошибка создания пользователя VPN" });
+    if (!existingUuid) return res.status(502).json({ message: t(reqLang(req), "vpnUserCreationError") });
 
     await remnaUpdateUser({ uuid: existingUuid, expireAt, trafficLimitBytes, hwidDeviceLimit, activeInternalSquads: [group.squadUuid] });
     // Не вызываем add-users: по api-1.yaml эндпоинт добавляет ВСЕХ пользователей в сквад.
@@ -1472,7 +1474,7 @@ clientRouter.post("/promo/activate", async (req, res) => {
     data: { promoGroupId: group.id, clientId: client.id },
   });
 
-  return res.json({ message: "Промокод активирован! Подписка подключена." });
+  return res.json({ message: t(reqLang(req), "promoCodeActivated") });
 });
 
 // ——— Промокоды (скидки / бесплатные дни) ———
@@ -1503,7 +1505,7 @@ async function validatePromoCode(code: string, clientId: string): Promise<Valida
 clientRouter.post("/promo-code/check", async (req, res) => {
   const client = (req as unknown as { client: { id: string } }).client;
   const { code } = req.body as { code?: string };
-  if (!code?.trim()) return res.status(400).json({ message: "Промокод не указан" });
+  if (!code?.trim()) return res.status(400).json({ message: t(reqLang(req), "promoCodeNotSpecified") });
 
   const result = await validatePromoCode(code, client.id);
   if (!result.ok) return res.status(result.status).json({ message: result.error });
@@ -1528,7 +1530,7 @@ clientRouter.post("/promo-code/check", async (req, res) => {
 clientRouter.post("/promo-code/activate", async (req, res) => {
   const client = (req as unknown as { client: { id: string; remnawaveUuid: string | null; email: string | null; telegramId: string | null; telegramUsername?: string | null } }).client;
   const { code } = req.body as { code?: string };
-  if (!code?.trim()) return res.status(400).json({ message: "Промокод не указан" });
+  if (!code?.trim()) return res.status(400).json({ message: t(reqLang(req), "promoCodeNotSpecified") });
 
   const result = await validatePromoCode(code, client.id);
   if (!result.ok) return res.status(result.status).json({ message: result.error });
@@ -1536,15 +1538,15 @@ clientRouter.post("/promo-code/activate", async (req, res) => {
   const promo = result.promo;
 
   if (promo.type === "DISCOUNT") {
-    return res.status(400).json({ message: "Промокод на скидку применяется при оплате тарифа" });
+    return res.status(400).json({ message: t(reqLang(req), "discountPromoAppliedAtPayment") });
   }
 
   // FREE_DAYS
   if (!promo.squadUuid || !promo.durationDays) {
-    return res.status(400).json({ message: "Промокод не полностью настроен" });
+    return res.status(400).json({ message: t(reqLang(req), "promoCodeNotFullyConfigured") });
   }
 
-  if (!isRemnaConfigured()) return res.status(503).json({ message: "Сервис временно недоступен" });
+  if (!isRemnaConfigured()) return res.status(503).json({ message: t(reqLang(req), "serviceTemporarilyUnavailable") });
 
   const trafficLimitBytes = Number(promo.trafficLimitBytes ?? 0);
   const hwidDeviceLimit = promo.deviceLimit ?? null;
@@ -1598,7 +1600,7 @@ clientRouter.post("/promo-code/activate", async (req, res) => {
       });
       existingUuid = extractRemnaUuid(createRes.data);
     }
-    if (!existingUuid) return res.status(502).json({ message: "Ошибка создания пользователя VPN" });
+    if (!existingUuid) return res.status(502).json({ message: t(reqLang(req), "vpnUserCreationError") });
 
     await remnaUpdateUser({ uuid: existingUuid, expireAt, trafficLimitBytes, hwidDeviceLimit, activeInternalSquads: [promo.squadUuid] });
     // Не вызываем add-users: по api-1.yaml эндпоинт добавляет ВСЕХ пользователей в сквад.
@@ -1606,13 +1608,13 @@ clientRouter.post("/promo-code/activate", async (req, res) => {
   }
 
   await prisma.promoCodeUsage.create({ data: { promoCodeId: promo.id, clientId: client.id } });
-  return res.json({ message: `Промокод активирован! Подписка на ${promo.durationDays} дн. подключена.` });
+  return res.json({ message: t(reqLang(req), "promoActivatedWithDays", { days: promo.durationDays }) });
 });
 
 /** Определить отображаемое имя тарифа: Триал, название с сайта или «Тариф не выбран».
  *  Поддерживает activeInternalSquads как массив строк (uuid) или объектов { uuid }.
  *  Приоритет: сначала ищем совпадение с оплаченным тарифом, затем — триал. */
-async function resolveTariffInfo(remnaUserData: unknown): Promise<{ name: string; categoryName: string | null; trafficResetStrategy: string; isTrial: boolean }> {
+async function resolveTariffInfo(remnaUserData: unknown, lang: string): Promise<{ name: string; categoryName: string | null; trafficResetStrategy: string; isTrial: boolean }> {
   const raw = remnaUserData as { response?: { activeInternalSquads?: unknown[] }; activeInternalSquads?: unknown[] };
   const user = raw?.response ?? raw;
   const ais = user?.activeInternalSquads;
@@ -1623,7 +1625,7 @@ async function resolveTariffInfo(remnaUserData: unknown): Promise<{ name: string
       if (typeof u === "string") squadUuids.push(u);
     }
   }
-  if (squadUuids.length === 0) return { name: "Тариф не выбран", categoryName: null, trafficResetStrategy: "NO_RESET", isTrial: false };
+  if (squadUuids.length === 0) return { name: t(lang, "tariffNotSelected"), categoryName: null, trafficResetStrategy: "NO_RESET", isTrial: false };
   const config = await getSystemConfig();
   const trialUuid = config.trialSquadUuid?.trim() || null;
   const tariffs = await prisma.tariff.findMany({ select: { name: true, internalSquadUuids: true, trafficResetStrategy: true, category: { select: { name: true } } } });
@@ -1632,8 +1634,8 @@ async function resolveTariffInfo(remnaUserData: unknown): Promise<{ name: string
     const match = tariffs.find((t) => t.internalSquadUuids.includes(squadUuid));
     if (match?.name) return { name: match.name, categoryName: match.category?.name ?? null, trafficResetStrategy: (match as any).trafficResetStrategy ?? "NO_RESET", isTrial: false };
   }
-  if (trialUuid && squadUuids.includes(trialUuid)) return { name: "Триал", categoryName: null, trafficResetStrategy: "NO_RESET", isTrial: true };
-  return { name: "Тариф не выбран", categoryName: null, trafficResetStrategy: "NO_RESET", isTrial: false };
+  if (trialUuid && squadUuids.includes(trialUuid)) return { name: t(lang, "trialLabel"), categoryName: null, trafficResetStrategy: "NO_RESET", isTrial: true };
+  return { name: t(lang, "tariffNotSelected"), categoryName: null, trafficResetStrategy: "NO_RESET", isTrial: false };
 }
 
 clientRouter.get("/proxy-slots", async (req, res) => {
@@ -1712,7 +1714,7 @@ clientRouter.get("/singbox-slots", async (req, res) => {
 clientRouter.get("/subscription", async (req, res) => {
   const client = (req as unknown as { client: { id: string; remnawaveUuid: string | null } }).client;
   if (!client.remnawaveUuid) {
-    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, trafficResetStrategy: null, isTrial: false, message: "Подписка не привязана" });
+    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, trafficResetStrategy: null, isTrial: false, message: t(reqLang(req), "subscriptionNotLinked") });
   }
   const result = await remnaGetUser(client.remnawaveUuid);
   if (result.error) {
@@ -1739,7 +1741,7 @@ clientRouter.get("/subscription", async (req, res) => {
   }
 
   // 2) 没有付费记录 → 回退到 UUID 匹配（仅用于判断试用等场景）
-  const tariffInfo = await resolveTariffInfo(result.data ?? null);
+  const tariffInfo = await resolveTariffInfo(result.data ?? null, reqLang(req));
   return res.json({
     subscription: result.data ?? null,
     tariffDisplayName: tariffInfo.name,
@@ -1753,7 +1755,7 @@ clientRouter.get("/subscription", async (req, res) => {
 clientRouter.get("/devices", async (req, res) => {
   const client = (req as unknown as { client: { id: string; remnawaveUuid: string | null } }).client;
   if (!client.remnawaveUuid) {
-    return res.status(400).json({ message: "Подписка не привязана" });
+    return res.status(400).json({ message: t(reqLang(req), "subscriptionNotLinked") });
   }
   const result = await remnaGetUserHwidDevices(client.remnawaveUuid);
   if (result.error) {
@@ -1772,15 +1774,15 @@ const deleteDeviceSchema = z.object({ hwid: z.string().min(1).max(500) });
 clientRouter.post("/devices/delete", async (req, res) => {
   const client = (req as unknown as { client: { id: string; remnawaveUuid: string | null } }).client;
   if (!client.remnawaveUuid) {
-    return res.status(400).json({ message: "Подписка не привязана" });
+    return res.status(400).json({ message: t(reqLang(req), "subscriptionNotLinked") });
   }
   const body = deleteDeviceSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   const result = await remnaDeleteUserHwidDevice(client.remnawaveUuid, body.data.hwid);
   if (result.error) {
     return res.status(result.status >= 500 ? 503 : 400).json({ message: result.error });
   }
-  return res.json({ ok: true, message: "Устройство удалено" });
+  return res.json({ ok: true, message: t(reqLang(req), "deviceRemoved") });
 });
 
 const createPlategaPaymentSchema = z.object({
@@ -1799,7 +1801,7 @@ clientRouter.post("/payments/platega", async (req, res) => {
   const clientId = (req as unknown as { clientId: string }).clientId;
   const parsed = createPlategaPaymentSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten() });
+    return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: parsed.error.flatten() });
   }
   const { amount: originalAmount, currency, paymentMethod, description, tariffId, proxyTariffId, singboxTariffId, promoCode: promoCodeStr, extraOption, customBuild: customBuildBody } = parsed.data;
 
@@ -1813,10 +1815,10 @@ clientRouter.post("/payments/platega", async (req, res) => {
   if (customBuildBody) {
     const configForCb = await getSystemConfig();
     const cfg = getCustomBuildConfig(configForCb);
-    if (!cfg) return res.status(400).json({ message: "Гибкий тариф отключён" });
+    if (!cfg) return res.status(400).json({ message: t(reqLang(req), "flexibleTariffDisabled") });
     let { days, devices, trafficGb } = customBuildBody;
     if (days > cfg.maxDays || devices > cfg.maxDevices) {
-      return res.status(400).json({ message: `Дни: 1–${cfg.maxDays}, устройств: 1–${cfg.maxDevices}` });
+      return res.status(400).json({ message: t(reqLang(req), "daysDevicesLimit", { maxDays: cfg.maxDays, maxDevices: cfg.maxDevices }) });
     }
     const trafficLimitBytes =
       cfg.trafficMode === "per_gb" && trafficGb != null && trafficGb >= 0
@@ -1837,7 +1839,7 @@ clientRouter.post("/payments/platega", async (req, res) => {
   } else if (extraOption) {
     const config = await getSystemConfig();
     if (!(config as { sellOptionsEnabled?: boolean }).sellOptionsEnabled) {
-      return res.status(400).json({ message: "Продажа опций отключена" });
+      return res.status(400).json({ message: t(reqLang(req), "optionsSalesDisabled") });
     }
     const cfg = config as {
       sellOptionsTrafficEnabled?: boolean; sellOptionsTrafficProducts?: SellOptionTrafficProduct[];
@@ -1846,19 +1848,19 @@ clientRouter.post("/payments/platega", async (req, res) => {
     };
     if (extraOption.kind === "traffic") {
       const product = cfg.sellOptionsTrafficEnabled && cfg.sellOptionsTrafficProducts?.find((p) => p.id === extraOption.productId);
-      if (!product) return res.status(400).json({ message: "Опция не найдена" });
+      if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
       finalAmount = product.price;
       currencyToUse = product.currency.toUpperCase();
       metadataExtra = { extraOption: { kind: "traffic", trafficBytes: Math.round(product.trafficGb * 1024 ** 3) } };
     } else if (extraOption.kind === "devices") {
       const product = cfg.sellOptionsDevicesEnabled && cfg.sellOptionsDevicesProducts?.find((p) => p.id === extraOption.productId);
-      if (!product) return res.status(400).json({ message: "Опция не найдена" });
+      if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
       finalAmount = product.price;
       currencyToUse = product.currency.toUpperCase();
       metadataExtra = { extraOption: { kind: "devices", deviceCount: product.deviceCount } };
     } else {
       const product = cfg.sellOptionsServersEnabled && cfg.sellOptionsServersProducts?.find((p) => p.id === extraOption.productId);
-      if (!product) return res.status(400).json({ message: "Опция не найдена" });
+      if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
       finalAmount = product.price;
       currencyToUse = product.currency.toUpperCase();
       metadataExtra = {
@@ -1870,30 +1872,30 @@ clientRouter.post("/payments/platega", async (req, res) => {
       };
     }
   } else {
-    if (originalAmount == null || !currency) return res.status(400).json({ message: "Укажите сумму и валюту" });
+    if (originalAmount == null || !currency) return res.status(400).json({ message: t(reqLang(req), "specifyAmountAndCurrency") });
     finalAmount = originalAmount;
     currencyToUse = currency.toUpperCase();
     if (tariffId) {
       const tariff = await prisma.tariff.findUnique({ where: { id: tariffId } });
-      if (!tariff) return res.status(400).json({ message: "Тариф не найден" });
+      if (!tariff) return res.status(400).json({ message: t(reqLang(req), "tariffNotFound") });
       tariffIdToStore = tariffId;
     }
     if (proxyTariffId) {
       const proxyTariff = await prisma.proxyTariff.findUnique({ where: { id: proxyTariffId } });
-      if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: "Прокси-тариф не найден" });
+      if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "proxyTariffNotFound") });
       proxyTariffIdToStore = proxyTariffId;
       if (originalAmount == null) { finalAmount = proxyTariff.price; currencyToUse = proxyTariff.currency.toUpperCase(); }
     }
     if (singboxTariffId) {
       const singboxTariff = await prisma.singboxTariff.findUnique({ where: { id: singboxTariffId } });
-      if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: "Тариф Sing-box не найден" });
+      if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "singboxTariffNotFound") });
       singboxTariffIdToStore = singboxTariffId;
       if (originalAmount == null) { finalAmount = singboxTariff.price; currencyToUse = singboxTariff.currency.toUpperCase(); }
     }
   }
 
   if (finalAmount < 1) {
-    return res.status(400).json({ message: "Минимальная сумма платежа — 1" });
+    return res.status(400).json({ message: t(reqLang(req), "minimumPaymentAmount1") });
   }
 
   // Применяем промокод на скидку (не для опций по умолчанию, можно разрешить — тогда скидка с опции)
@@ -1902,7 +1904,7 @@ clientRouter.post("/payments/platega", async (req, res) => {
     const result = await validatePromoCode(promoCodeStr.trim(), clientId);
     if (!result.ok) return res.status(result.status).json({ message: result.error });
     const promo = result.promo;
-    if (promo.type !== "DISCOUNT") return res.status(400).json({ message: "Этот промокод не даёт скидку на оплату" });
+    if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
 
     if (promo.discountPercent && promo.discountPercent > 0) {
       finalAmount = Math.max(0, finalAmount - finalAmount * promo.discountPercent / 100);
@@ -1911,7 +1913,7 @@ clientRouter.post("/payments/platega", async (req, res) => {
       finalAmount = Math.max(0, finalAmount - promo.discountFixed);
     }
     finalAmount = Math.round(finalAmount * 100) / 100;
-    if (finalAmount <= 0) return res.status(400).json({ message: "Итоговая сумма не может быть 0" });
+    if (finalAmount <= 0) return res.status(400).json({ message: t(reqLang(req), "finalAmountCannotBeZero") });
     promoCodeRecord = promo;
   }
 
@@ -1921,13 +1923,13 @@ clientRouter.post("/payments/platega", async (req, res) => {
     secret: config.plategaSecret || "",
   };
   if (!isPlategaConfigured(plategaConfig)) {
-    return res.status(503).json({ message: "Platega не настроен" });
+    return res.status(503).json({ message: t(reqLang(req), "plategaNotConfigured") });
   }
 
   const methods = config.plategaMethods || [];
   const allowed = methods.find((m) => m.id === paymentMethod && m.enabled);
   if (!allowed) {
-    return res.status(400).json({ message: "Метод оплаты недоступен" });
+    return res.status(400).json({ message: t(reqLang(req), "paymentMethodNotAvailable") });
   }
 
   const serviceName = config.serviceName?.trim() || "STEALTHNET";
@@ -1940,15 +1942,17 @@ clientRouter.post("/payments/platega", async (req, res) => {
   const failedUrl = appUrl
     ? `${appUrl}/cabinet/dashboard?payment=failed&payment_kind=${paymentKind}&oid=${orderId}`
     : "";
+  const _pdLang = reqLang(req);
+  const _pdVars = { service: serviceName, orderId };
   const plategaDescription = tariffIdToStore
-    ? `Тариф ${serviceName} #${orderId}`
+    ? t(_pdLang, "payDescTariff", _pdVars)
     : proxyTariffIdToStore
-      ? `Прокси ${serviceName} #${orderId}`
+      ? t(_pdLang, "payDescProxy", _pdVars)
       : singboxTariffIdToStore
-        ? `Доступы ${serviceName} #${orderId}`
+        ? t(_pdLang, "payDescAccess", _pdVars)
         : metadataExtra
-      ? `Опция ${serviceName} #${orderId}`
-      : `Пополнение баланса ${serviceName} #${orderId}`;
+      ? t(_pdLang, "payDescOption", _pdVars)
+      : t(_pdLang, "balanceTopupDescription", _pdVars);
 
   const paymentMeta = metadataExtra
     ? { ...metadataExtra, ...(promoCodeRecord ? { promoCodeId: promoCodeRecord.id, originalAmount: finalAmount } : {}) }
@@ -2009,22 +2013,22 @@ const payByBalanceSchema = z.object({
   proxyTariffId: z.string().min(1).optional(),
   singboxTariffId: z.string().min(1).optional(),
   promoCode: z.string().max(50).optional(),
-}).refine((d) => (d.tariffId ? 1 : 0) + (d.proxyTariffId ? 1 : 0) + (d.singboxTariffId ? 1 : 0) === 1, { message: "Укажите tariffId, proxyTariffId или singboxTariffId" });
+}).refine((d) => (d.tariffId ? 1 : 0) + (d.proxyTariffId ? 1 : 0) + (d.singboxTariffId ? 1 : 0) === 1, { message: "Specify tariffId, proxyTariffId, or singboxTariffId" });
 
 clientRouter.post("/payments/balance", async (req, res) => {
   const clientRaw = (req as unknown as { client: { id: string; remnawaveUuid: string | null; email: string | null; telegramId: string | null } }).client;
   const parsed = payByBalanceSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: parsed.error.flatten() });
 
   const { tariffId, proxyTariffId, singboxTariffId, promoCode: promoCodeStr } = parsed.data;
 
   if (proxyTariffId) {
     const tariff = await prisma.proxyTariff.findUnique({ where: { id: proxyTariffId } });
-    if (!tariff || !tariff.enabled) return res.status(400).json({ message: "Прокси-тариф не найден" });
+    if (!tariff || !tariff.enabled) return res.status(400).json({ message: t(reqLang(req), "proxyTariffNotFound") });
     const clientDb = await prisma.client.findUnique({ where: { id: clientRaw.id } });
-    if (!clientDb) return res.status(401).json({ message: "Unauthorized" });
+    if (!clientDb) return res.status(401).json({ message: t(reqLang(req), "unauthorized") });
     if (clientDb.balance < tariff.price) {
-      return res.status(400).json({ message: `Недостаточно средств. Баланс: ${clientDb.balance.toFixed(2)}, нужно: ${tariff.price.toFixed(2)}` });
+      return res.status(400).json({ message: t(reqLang(req), "insufficientFunds", { balance: clientDb.balance.toFixed(2), needed: tariff.price.toFixed(2) }) });
     }
     const payment = await prisma.payment.create({
       data: {
@@ -2049,18 +2053,18 @@ clientRouter.post("/payments/balance", async (req, res) => {
     const { notifyProxySlotsCreated } = await import("../notification/telegram-notify.service.js");
     await notifyProxySlotsCreated(clientRaw.id, proxyResult.slotIds, tariff.name).catch(() => {});
     return res.json({
-      message: `Прокси «${tariff.name}» оплачены! Списано ${tariff.price.toFixed(2)} ${tariff.currency.toUpperCase()} с баланса.`,
+      message: t(reqLang(req), "proxyPaidFromBalance", { name: tariff.name, amount: tariff.price.toFixed(2), currency: tariff.currency.toUpperCase() }),
       newBalance: clientDb.balance - tariff.price,
     });
   }
 
   if (singboxTariffId) {
     const tariff = await prisma.singboxTariff.findUnique({ where: { id: singboxTariffId } });
-    if (!tariff || !tariff.enabled) return res.status(400).json({ message: "Тариф Sing-box не найден" });
+    if (!tariff || !tariff.enabled) return res.status(400).json({ message: t(reqLang(req), "singboxTariffNotFound") });
     const clientDb = await prisma.client.findUnique({ where: { id: clientRaw.id } });
-    if (!clientDb) return res.status(401).json({ message: "Unauthorized" });
+    if (!clientDb) return res.status(401).json({ message: t(reqLang(req), "unauthorized") });
     if (clientDb.balance < tariff.price) {
-      return res.status(400).json({ message: `Недостаточно средств. Баланс: ${clientDb.balance.toFixed(2)}, нужно: ${tariff.price.toFixed(2)}` });
+      return res.status(400).json({ message: t(reqLang(req), "insufficientFunds", { balance: clientDb.balance.toFixed(2), needed: tariff.price.toFixed(2) }) });
     }
     const payment = await prisma.payment.create({
       data: {
@@ -2085,13 +2089,13 @@ clientRouter.post("/payments/balance", async (req, res) => {
     const { notifySingboxSlotsCreated } = await import("../notification/telegram-notify.service.js");
     await notifySingboxSlotsCreated(clientRaw.id, singboxResult.slotIds, tariff.name).catch(() => {});
     return res.json({
-      message: `Доступы «${tariff.name}» оплачены! Списано ${tariff.price.toFixed(2)} ${tariff.currency.toUpperCase()} с баланса.`,
+      message: t(reqLang(req), "singboxPaidFromBalance", { name: tariff.name, amount: tariff.price.toFixed(2), currency: tariff.currency.toUpperCase() }),
       newBalance: clientDb.balance - tariff.price,
     });
   }
 
   const tariff = await prisma.tariff.findUnique({ where: { id: tariffId! } });
-  if (!tariff) return res.status(400).json({ message: "Тариф не найден" });
+  if (!tariff) return res.status(400).json({ message: t(reqLang(req), "tariffNotFound") });
 
   let finalPrice = tariff.price;
 
@@ -2101,7 +2105,7 @@ clientRouter.post("/payments/balance", async (req, res) => {
     const result = await validatePromoCode(promoCodeStr.trim(), clientRaw.id);
     if (!result.ok) return res.status(result.status).json({ message: result.error });
     const promo = result.promo;
-    if (promo.type !== "DISCOUNT") return res.status(400).json({ message: "Этот промокод не даёт скидку на оплату" });
+    if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
 
     if (promo.discountPercent && promo.discountPercent > 0) {
       finalPrice = Math.max(0, finalPrice - finalPrice * promo.discountPercent / 100);
@@ -2115,9 +2119,9 @@ clientRouter.post("/payments/balance", async (req, res) => {
 
   // Проверяем баланс
   const clientDb = await prisma.client.findUnique({ where: { id: clientRaw.id } });
-  if (!clientDb) return res.status(401).json({ message: "Unauthorized" });
+  if (!clientDb) return res.status(401).json({ message: t(reqLang(req), "unauthorized") });
   if (clientDb.balance < finalPrice) {
-    return res.status(400).json({ message: `Недостаточно средств. Баланс: ${clientDb.balance.toFixed(2)}, нужно: ${finalPrice.toFixed(2)}` });
+    return res.status(400).json({ message: t(reqLang(req), "insufficientFunds", { balance: clientDb.balance.toFixed(2), needed: finalPrice.toFixed(2) }) });
   }
 
   // Активируем тариф в Remnawave
@@ -2159,7 +2163,7 @@ clientRouter.post("/payments/balance", async (req, res) => {
   await distributeReferralRewards(payment.id).catch(() => {});
 
   return res.json({
-    message: `Тариф «${tariff.name}» активирован! Списано ${finalPrice.toFixed(2)} ${tariff.currency.toUpperCase()} с баланса.`,
+    message: t(reqLang(req), "tariffActivatedFromBalance", { name: tariff.name, amount: finalPrice.toFixed(2), currency: tariff.currency.toUpperCase() }),
     tariffName: tariff.name,
     amount: finalPrice,
     currency: tariff.currency.toUpperCase(),
@@ -2205,15 +2209,15 @@ const customBuildPayByBalanceSchema = z.object({
 clientRouter.post("/custom-build/pay-balance", async (req, res) => {
   const clientRaw = (req as unknown as { client: { id: string } }).client;
   const parsed = customBuildPayByBalanceSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Неверные параметры", errors: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "invalidParams"), errors: parsed.error.flatten() });
 
   const config = await getSystemConfig();
   const cfg = getCustomBuildConfig(config);
-  if (!cfg) return res.status(400).json({ message: "Гибкий тариф отключён" });
+  if (!cfg) return res.status(400).json({ message: t(reqLang(req), "flexibleTariffDisabled") });
 
   let { days, devices, trafficGb } = parsed.data;
   if (days > cfg.maxDays || devices > cfg.maxDevices) {
-    return res.status(400).json({ message: `Дни: 1–${cfg.maxDays}, устройств: 1–${cfg.maxDevices}` });
+    return res.status(400).json({ message: t(reqLang(req), "daysDevicesLimit", { maxDays: cfg.maxDays, maxDevices: cfg.maxDevices }) });
   }
   const trafficLimitBytes =
     cfg.trafficMode === "per_gb"
@@ -2231,7 +2235,7 @@ clientRouter.post("/custom-build/pay-balance", async (req, res) => {
     const result = await validatePromoCode(parsed.data.promoCode.trim(), clientRaw.id);
     if (!result.ok) return res.status(result.status).json({ message: result.error });
     const promo = result.promo;
-    if (promo.type !== "DISCOUNT") return res.status(400).json({ message: "Этот промокод не даёт скидку на оплату" });
+    if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
     if (promo.discountPercent && promo.discountPercent > 0) {
       finalPrice = Math.max(0, finalPrice - finalPrice * promo.discountPercent / 100);
     }
@@ -2243,10 +2247,10 @@ clientRouter.post("/custom-build/pay-balance", async (req, res) => {
   }
 
   const clientDb = await prisma.client.findUnique({ where: { id: clientRaw.id } });
-  if (!clientDb) return res.status(401).json({ message: "Unauthorized" });
+  if (!clientDb) return res.status(401).json({ message: t(reqLang(req), "unauthorized") });
   if (clientDb.balance < finalPrice) {
     return res.status(400).json({
-      message: `Недостаточно средств. Баланс: ${clientDb.balance.toFixed(2)}, нужно: ${finalPrice.toFixed(2)} ${cfg.currency.toUpperCase()}`,
+      message: t(reqLang(req), "insufficientFunds", { balance: clientDb.balance.toFixed(2), needed: `${finalPrice.toFixed(2)} ${cfg.currency.toUpperCase()}` }),
     });
   }
 
@@ -2291,7 +2295,7 @@ clientRouter.post("/custom-build/pay-balance", async (req, res) => {
   await distributeReferralRewards(payment.id).catch((e) => console.error("[referral] Error:", e));
 
   return res.json({
-    message: `Подписка на ${days} дн., ${devices} ${devices === 1 ? "устройство" : "устройства"} активирована. Списано ${finalPrice.toFixed(2)} ${cfg.currency.toUpperCase()}.`,
+    message: t(reqLang(req), "customBuildActivated", { days, devices, amount: finalPrice.toFixed(2), currency: cfg.currency.toUpperCase() }),
     paymentId: payment.id,
     newBalance: clientDb.balance - finalPrice,
   });
@@ -2304,11 +2308,11 @@ const payOptionByBalanceSchema = z.object({
 clientRouter.post("/payments/balance/option", async (req, res) => {
   const clientRaw = (req as unknown as { clientId: string }).clientId;
   const parsed = payOptionByBalanceSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: parsed.error.flatten() });
 
   const config = await getSystemConfig();
   if (!(config as { sellOptionsEnabled?: boolean }).sellOptionsEnabled) {
-    return res.status(400).json({ message: "Продажа опций отключена" });
+    return res.status(400).json({ message: t(reqLang(req), "optionsSalesDisabled") });
   }
 
   const cfg = config as {
@@ -2323,19 +2327,19 @@ clientRouter.post("/payments/balance/option", async (req, res) => {
 
   if (kind === "traffic") {
     const product = cfg.sellOptionsTrafficEnabled && cfg.sellOptionsTrafficProducts?.find((p) => p.id === productId);
-    if (!product) return res.status(400).json({ message: "Опция не найдена" });
+    if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
     price = product.price;
     currency = product.currency;
     metadataExtra = { extraOption: { kind: "traffic", trafficBytes: Math.round(product.trafficGb * 1024 ** 3) } };
   } else if (kind === "devices") {
     const product = cfg.sellOptionsDevicesEnabled && cfg.sellOptionsDevicesProducts?.find((p) => p.id === productId);
-    if (!product) return res.status(400).json({ message: "Опция не найдена" });
+    if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
     price = product.price;
     currency = product.currency;
     metadataExtra = { extraOption: { kind: "devices", deviceCount: product.deviceCount } };
   } else {
     const product = cfg.sellOptionsServersEnabled && cfg.sellOptionsServersProducts?.find((p) => p.id === productId);
-    if (!product) return res.status(400).json({ message: "Опция не найдена" });
+    if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
     price = product.price;
     currency = product.currency;
     metadataExtra = {
@@ -2348,9 +2352,9 @@ clientRouter.post("/payments/balance/option", async (req, res) => {
   }
 
   const clientDb = await prisma.client.findUnique({ where: { id: clientRaw } });
-  if (!clientDb) return res.status(401).json({ message: "Unauthorized" });
+  if (!clientDb) return res.status(401).json({ message: t(reqLang(req), "unauthorized") });
   if (clientDb.balance < price) {
-    return res.status(400).json({ message: `Недостаточно средств. Баланс: ${clientDb.balance.toFixed(2)}, нужно: ${price.toFixed(2)}` });
+    return res.status(400).json({ message: t(reqLang(req), "insufficientFunds", { balance: clientDb.balance.toFixed(2), needed: price.toFixed(2) }) });
   }
 
   const orderId = randomUUID();
@@ -2370,7 +2374,7 @@ clientRouter.post("/payments/balance/option", async (req, res) => {
   const applyResult = await applyExtraOptionByPaymentId(payment.id);
   if (!applyResult.ok) {
     await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED" } });
-    return res.status(applyResult.status).json({ message: (applyResult as { error?: string }).error || "Ошибка применения опции" });
+    return res.status(applyResult.status).json({ message: (applyResult as { error?: string }).error || t(reqLang(req), "optionApplyError") });
   }
 
   await prisma.client.update({
@@ -2383,7 +2387,7 @@ clientRouter.post("/payments/balance/option", async (req, res) => {
 
   const newBalance = clientDb.balance - price;
   return res.json({
-    message: "Опция применена. Списано с баланса.",
+    message: t(reqLang(req), "optionAppliedFromBalance"),
     paymentId: payment.id,
     newBalance,
   });
@@ -2396,7 +2400,7 @@ clientRouter.get("/yoomoney/auth-url", async (req, res) => {
   const config = await getSystemConfig();
   const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
   if (!config.yoomoneyClientId?.trim() || !appUrl) {
-    return res.status(503).json({ message: "ЮMoney не настроен или не указан URL приложения" });
+    return res.status(503).json({ message: t(reqLang(req), "yoomoneyNotConfiguredOrNoUrl") });
   }
   const redirectUri = `${appUrl}/api/client/yoomoney/callback`;
   const state = yoomoneyStateSign(clientId);
@@ -2408,14 +2412,14 @@ const yoomoneyRequestTopupSchema = z.object({ amount: z.number().positive().max(
 clientRouter.post("/yoomoney/request-topup", async (req, res) => {
   const client = (req as unknown as { client: { id: string; yoomoneyAccessToken?: string | null } }).client;
   const parsed = yoomoneyRequestTopupSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Укажите сумму", errors: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "specifyAmount"), errors: parsed.error.flatten() });
   const { amount } = parsed.data;
   if (!client.yoomoneyAccessToken?.trim()) {
-    return res.status(400).json({ message: "Сначала подключите кошелёк ЮMoney" });
+    return res.status(400).json({ message: t(reqLang(req), "connectYoomoneyFirst") });
   }
   const config = await getSystemConfig();
   const receiver = config.yoomoneyReceiverWallet?.trim();
-  if (!receiver) return res.status(503).json({ message: "ЮMoney не настроен" });
+  if (!receiver) return res.status(503).json({ message: t(reqLang(req), "yoomoneyNotConfigured") });
 
   const serviceName = config.serviceName?.trim() || "STEALTHNET";
   const amountRounded = Math.round(amount * 100) / 100;
@@ -2436,8 +2440,8 @@ clientRouter.post("/yoomoney/request-topup", async (req, res) => {
     to: receiver,
     amount_due: amountRounded,
     label: payment.id,
-    message: `Пополнение баланса ${serviceName}. Заказ ${orderId}`,
-    comment: `Пополнение баланса`,
+    message: t(reqLang(req), "balanceTopupMessage", { service: serviceName, orderId }),
+    comment: t(reqLang(req), "balanceTopupComment"),
   });
 
   if (result.status === "refused") {
@@ -2467,19 +2471,19 @@ const yoomoneyProcessPaymentSchema = z.object({
 clientRouter.post("/yoomoney/process-payment", async (req, res) => {
   const client = (req as unknown as { client: { id: string; yoomoneyAccessToken?: string | null } }).client;
   const parsed = yoomoneyProcessPaymentSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Неверные параметры", errors: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "invalidParams"), errors: parsed.error.flatten() });
   const { paymentId, request_id, money_source, csc } = parsed.data;
 
   const payment = await prisma.payment.findFirst({
     where: { id: paymentId, clientId: client.id, status: "PENDING", provider: "yoomoney" },
   });
-  if (!payment) return res.status(404).json({ message: "Платёж не найден или уже обработан" });
-  if (!client.yoomoneyAccessToken?.trim()) return res.status(400).json({ message: "Кошелёк ЮMoney не подключён" });
+  if (!payment) return res.status(404).json({ message: t(reqLang(req), "paymentNotFoundOrProcessed") });
+  if (!client.yoomoneyAccessToken?.trim()) return res.status(400).json({ message: t(reqLang(req), "yoomoneyWalletNotConnected") });
 
   const result = await processPayment(client.yoomoneyAccessToken, { request_id, money_source, csc });
 
   if (result.status === "in_progress") {
-    return res.status(202).json({ status: "in_progress", message: "Платёж обрабатывается, повторите запрос через минуту" });
+    return res.status(202).json({ status: "in_progress", message: t(reqLang(req), "paymentInProgress") });
   }
   if (result.status === "ext_auth_required") {
     return res.status(200).json({ status: "ext_auth_required", acs_uri: result.acs_uri, acs_params: result.acs_params });
@@ -2498,7 +2502,7 @@ clientRouter.post("/yoomoney/process-payment", async (req, res) => {
     select: { balance: true },
   });
 
-  return res.json({ message: "Баланс пополнен", newBalance: updated.balance });
+  return res.json({ message: t(reqLang(req), "balanceToppedUp"), newBalance: updated.balance });
 });
 
 // ——— ЮMoney: форма перевода (оплата картой). Пополнение баланса, тариф или опция ———
@@ -2515,11 +2519,11 @@ const yoomoneyFormPaymentSchema = z.object({
 clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
   const clientId = (req as unknown as { clientId: string }).clientId;
   const parsed = yoomoneyFormPaymentSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Укажите сумму и способ оплаты", errors: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "specifyAmountAndMethod"), errors: parsed.error.flatten() });
   const { amount: amountBody, paymentType, tariffId: tariffIdBody, proxyTariffId: proxyTariffIdBody, singboxTariffId: singboxTariffIdBody, promoCode: promoCodeStr, extraOption, customBuild: customBuildBody } = parsed.data;
   const config = await getSystemConfig();
   const receiver = config.yoomoneyReceiverWallet?.trim();
-  if (!receiver) return res.status(503).json({ message: "ЮMoney не настроен" });
+  if (!receiver) return res.status(503).json({ message: t(reqLang(req), "yoomoneyNotConfigured") });
 
   let tariffIdToStore: string | null = null;
   let proxyTariffIdToStore: string | null = null;
@@ -2531,10 +2535,10 @@ clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
 
   if (customBuildBody) {
     const cfg = getCustomBuildConfig(config);
-    if (!cfg) return res.status(400).json({ message: "Гибкий тариф отключён" });
+    if (!cfg) return res.status(400).json({ message: t(reqLang(req), "flexibleTariffDisabled") });
     let { days, devices, trafficGb } = customBuildBody;
     if (days > cfg.maxDays || devices > cfg.maxDevices) {
-      return res.status(400).json({ message: `Дни: 1–${cfg.maxDays}, устройств: 1–${cfg.maxDevices}` });
+      return res.status(400).json({ message: t(reqLang(req), "daysDevicesLimit", { maxDays: cfg.maxDays, maxDevices: cfg.maxDevices }) });
     }
     const trafficLimitBytes =
       cfg.trafficMode === "per_gb" && trafficGb != null && trafficGb >= 0
@@ -2554,7 +2558,7 @@ clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
     };
   } else if (extraOption) {
     if (!(config as { sellOptionsEnabled?: boolean }).sellOptionsEnabled) {
-      return res.status(400).json({ message: "Продажа опций отключена" });
+      return res.status(400).json({ message: t(reqLang(req), "optionsSalesDisabled") });
     }
     const cfg = config as {
       sellOptionsTrafficEnabled?: boolean; sellOptionsTrafficProducts?: SellOptionTrafficProduct[];
@@ -2563,17 +2567,17 @@ clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
     };
     if (extraOption.kind === "traffic") {
       const product = cfg.sellOptionsTrafficEnabled && cfg.sellOptionsTrafficProducts?.find((p) => p.id === extraOption.productId);
-      if (!product) return res.status(400).json({ message: "Опция не найдена" });
+      if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
       amountRounded = Math.round(product.price * 100) / 100;
       metadataObj = { paymentType, extraOption: { kind: "traffic", trafficBytes: Math.round(product.trafficGb * 1024 ** 3) } };
     } else if (extraOption.kind === "devices") {
       const product = cfg.sellOptionsDevicesEnabled && cfg.sellOptionsDevicesProducts?.find((p) => p.id === extraOption.productId);
-      if (!product) return res.status(400).json({ message: "Опция не найдена" });
+      if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
       amountRounded = Math.round(product.price * 100) / 100;
       metadataObj = { paymentType, extraOption: { kind: "devices", deviceCount: product.deviceCount } };
     } else {
       const product = cfg.sellOptionsServersEnabled && cfg.sellOptionsServersProducts?.find((p) => p.id === extraOption.productId);
-      if (!product) return res.status(400).json({ message: "Опция не найдена" });
+      if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
       amountRounded = Math.round(product.price * 100) / 100;
       metadataObj = {
         paymentType,
@@ -2585,10 +2589,10 @@ clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
       };
     }
   } else {
-    if (amountBody == null && !proxyTariffIdBody && !singboxTariffIdBody) return res.status(400).json({ message: "Укажите сумму" });
+    if (amountBody == null && !proxyTariffIdBody && !singboxTariffIdBody) return res.status(400).json({ message: t(reqLang(req), "specifyAmount") });
     if (tariffIdBody) {
       const tariff = await prisma.tariff.findUnique({ where: { id: tariffIdBody } });
-      if (!tariff) return res.status(400).json({ message: "Тариф не найден" });
+      if (!tariff) return res.status(400).json({ message: t(reqLang(req), "tariffNotFound") });
       tariffIdToStore = tariffIdBody;
       amountRounded = Math.round((amountBody ?? tariff.price) * 100) / 100;
       if (promoCodeStr?.trim()) {
@@ -2604,12 +2608,12 @@ clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
       }
     } else if (proxyTariffIdBody) {
       const proxyTariff = await prisma.proxyTariff.findUnique({ where: { id: proxyTariffIdBody } });
-      if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: "Прокси-тариф не найден" });
+      if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "proxyTariffNotFound") });
       proxyTariffIdToStore = proxyTariffIdBody;
       amountRounded = Math.round((amountBody ?? proxyTariff.price) * 100) / 100;
     } else if (singboxTariffIdBody) {
       const singboxTariff = await prisma.singboxTariff.findUnique({ where: { id: singboxTariffIdBody } });
-      if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: "Тариф Sing-box не найден" });
+      if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "singboxTariffNotFound") });
       singboxTariffIdToStore = singboxTariffIdBody;
       amountRounded = Math.round((amountBody ?? singboxTariff.price) * 100) / 100;
     } else {
@@ -2618,7 +2622,7 @@ clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
   }
 
   if (amountRounded < 1) {
-    return res.status(400).json({ message: "Минимальная сумма платежа — 1" });
+    return res.status(400).json({ message: t(reqLang(req), "minimumPaymentAmount1") });
   }
 
   if (yoomoneyPromoRecord != null && yoomoneyOriginalAmount != null) {
@@ -2648,17 +2652,19 @@ clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
   const serviceName = config.serviceName?.trim() || "STEALTHNET";
   const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
   const successURL = appUrl ? `${appUrl}/cabinet?yoomoney_form=success` : "";
+  const _ymfLang = reqLang(req);
+  const _ymfVars = { service: serviceName, orderId };
   const targets = tariffIdToStore
-    ? `Тариф ${serviceName} #${orderId}`
+    ? t(_ymfLang, "payDescTariff", _ymfVars)
     : proxyTariffIdToStore
-      ? `Прокси ${serviceName} #${orderId}`
+      ? t(_ymfLang, "payDescProxy", _ymfVars)
       : singboxTariffIdToStore
-        ? `Доступы ${serviceName} #${orderId}`
+        ? t(_ymfLang, "payDescAccess", _ymfVars)
         : customBuildBody
-          ? `Гибкий тариф ${serviceName} #${orderId}`
+          ? t(_ymfLang, "payDescFlexTariff", _ymfVars)
           : extraOption
-            ? `Опция ${serviceName} #${orderId}`
-            : `Пополнение баланса ${serviceName} #${orderId}`;
+            ? t(_ymfLang, "payDescOption", _ymfVars)
+            : t(_ymfLang, "balanceTopupDescription", _ymfVars);
   const params = new URLSearchParams({
     receiver,
     "quickpay-form": "shop",
@@ -2687,17 +2693,17 @@ clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
 clientRouter.get("/yoomoney/form-payment/:paymentId", async (req, res) => {
   const clientId = (req as unknown as { clientId: string }).clientId;
   const paymentId = typeof req.params.paymentId === "string" ? req.params.paymentId : "";
-  if (!paymentId) return res.status(400).json({ message: "paymentId required" });
+  if (!paymentId) return res.status(400).json({ message: t(reqLang(req), "paymentIdRequired") });
 
   const payment = await prisma.payment.findFirst({
     where: { id: paymentId, clientId, status: "PENDING", provider: "yoomoney_form" },
     select: { id: true, amount: true, metadata: true },
   });
-  if (!payment) return res.status(404).json({ message: "Платёж не найден или уже оплачен" });
+  if (!payment) return res.status(404).json({ message: t(reqLang(req), "paymentNotFoundOrPaid") });
 
   const config = await getSystemConfig();
   const receiver = config.yoomoneyReceiverWallet?.trim();
-  if (!receiver) return res.status(503).json({ message: "ЮMoney не настроен" });
+  if (!receiver) return res.status(503).json({ message: t(reqLang(req), "yoomoneyNotConfigured") });
 
   let paymentType = "PC";
   try {
@@ -2739,12 +2745,12 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
   try {
     const clientId = (req as unknown as { clientId: string }).clientId;
     const parsed = yookassaCreatePaymentSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Неверные параметры", errors: parsed.error.flatten() });
+    if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "invalidParams"), errors: parsed.error.flatten() });
     const { amount: amountBody, currency: currencyBody, tariffId: tariffIdBody, proxyTariffId: proxyTariffIdBody, singboxTariffId: singboxTariffIdBody, promoCode, extraOption, customBuild: customBuildBody } = parsed.data;
     const config = await getSystemConfig();
     const shopId = config.yookassaShopId?.trim();
     const secretKey = config.yookassaSecretKey?.trim();
-    if (!shopId || !secretKey) return res.status(503).json({ message: "ЮKassa не настроена" });
+    if (!shopId || !secretKey) return res.status(503).json({ message: t(reqLang(req), "yookassaNotConfigured") });
 
     let amountRounded: number;
     let currencyUpper: string;
@@ -2755,10 +2761,10 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
 
     if (customBuildBody) {
       const cfg = getCustomBuildConfig(config);
-      if (!cfg) return res.status(400).json({ message: "Гибкий тариф отключён" });
+      if (!cfg) return res.status(400).json({ message: t(reqLang(req), "flexibleTariffDisabled") });
       let { days, devices, trafficGb } = customBuildBody;
       if (days > cfg.maxDays || devices > cfg.maxDevices) {
-        return res.status(400).json({ message: `Дни: 1–${cfg.maxDays}, устройств: 1–${cfg.maxDevices}` });
+        return res.status(400).json({ message: t(reqLang(req), "daysDevicesLimit", { maxDays: cfg.maxDays, maxDevices: cfg.maxDevices }) });
       }
       const trafficLimitBytes =
         cfg.trafficMode === "per_gb" && trafficGb != null && trafficGb >= 0
@@ -2776,10 +2782,10 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
           internalSquadUuids: [cfg.squadUuid],
         },
       };
-      if (currencyUpper !== "RUB") return res.status(400).json({ message: "ЮKassa принимает только рубли (RUB)" });
+      if (currencyUpper !== "RUB") return res.status(400).json({ message: t(reqLang(req), "yookassaRubOnly") });
     } else if (extraOption) {
       if (!(config as { sellOptionsEnabled?: boolean }).sellOptionsEnabled) {
-        return res.status(400).json({ message: "Продажа опций отключена" });
+        return res.status(400).json({ message: t(reqLang(req), "optionsSalesDisabled") });
       }
       const cfg = config as {
         sellOptionsTrafficEnabled?: boolean;
@@ -2791,19 +2797,19 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
       };
       if (extraOption.kind === "traffic") {
         const product = cfg.sellOptionsTrafficEnabled && cfg.sellOptionsTrafficProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Опция не найдена" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "traffic", trafficBytes: Math.round(product.trafficGb * 1024 ** 3) } };
       } else if (extraOption.kind === "devices") {
         const product = cfg.sellOptionsDevicesEnabled && cfg.sellOptionsDevicesProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Опция не найдена" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "devices", deviceCount: product.deviceCount } };
       } else {
         const product = cfg.sellOptionsServersEnabled && cfg.sellOptionsServersProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Опция не найдена" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = {
@@ -2814,33 +2820,33 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
         },
       };
       }
-      if (currencyUpper !== "RUB") return res.status(400).json({ message: "ЮKassa принимает только рубли (RUB)" });
+      if (currencyUpper !== "RUB") return res.status(400).json({ message: t(reqLang(req), "yookassaRubOnly") });
     } else {
       currencyUpper = (currencyBody ?? "RUB").toUpperCase();
-      if (currencyUpper !== "RUB") return res.status(400).json({ message: "ЮKassa принимает только рубли (RUB)" });
+      if (currencyUpper !== "RUB") return res.status(400).json({ message: t(reqLang(req), "yookassaRubOnly") });
       if (tariffIdBody) {
         const tariff = await prisma.tariff.findUnique({ where: { id: tariffIdBody } });
-        if (!tariff) return res.status(400).json({ message: "Тариф не найден" });
+        if (!tariff) return res.status(400).json({ message: t(reqLang(req), "tariffNotFound") });
         tariffIdToStore = tariffIdBody;
         amountRounded = Math.round((amountBody ?? tariff.price) * 100) / 100;
       } else if (proxyTariffIdBody) {
         const proxyTariff = await prisma.proxyTariff.findUnique({ where: { id: proxyTariffIdBody } });
-        if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: "Прокси-тариф не найден" });
+        if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "proxyTariffNotFound") });
         proxyTariffIdToStore = proxyTariffIdBody;
         amountRounded = Math.round((amountBody ?? proxyTariff.price) * 100) / 100;
       } else if (singboxTariffIdBody) {
         const singboxTariff = await prisma.singboxTariff.findUnique({ where: { id: singboxTariffIdBody } });
-        if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: "Тариф Sing-box не найден" });
+        if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "singboxTariffNotFound") });
         singboxTariffIdToStore = singboxTariffIdBody;
         amountRounded = Math.round((amountBody ?? singboxTariff.price) * 100) / 100;
     } else {
-      if (amountBody == null) return res.status(400).json({ message: "Укажите сумму" });
+      if (amountBody == null) return res.status(400).json({ message: t(reqLang(req), "specifyAmount") });
       amountRounded = Math.round(amountBody * 100) / 100;
     }
   }
 
     if (amountRounded < 1) {
-      return res.status(400).json({ message: "Минимальная сумма платежа — 1" });
+      return res.status(400).json({ message: t(reqLang(req), "minimumPaymentAmount1") });
     }
 
     const client = await prisma.client.findUnique({
@@ -2868,15 +2874,17 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
     const serviceName = config.serviceName?.trim() || "STEALTHNET";
     const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
     const returnUrl = appUrl ? `${appUrl}/cabinet?yookassa=success` : "";
+    const _ykLang = reqLang(req);
+    const _ykVars = { service: serviceName, orderId };
     const description = tariffIdToStore
-      ? `Тариф ${serviceName} #${orderId}`
+      ? t(_ykLang, "payDescTariff", _ykVars)
       : proxyTariffIdToStore
-        ? `Прокси ${serviceName} #${orderId}`
+        ? t(_ykLang, "payDescProxy", _ykVars)
         : singboxTariffIdToStore
-          ? `Доступы ${serviceName} #${orderId}`
+          ? t(_ykLang, "payDescAccess", _ykVars)
         : extraOption
-          ? `Опция ${serviceName} #${orderId}`
-          : `Пополнение баланса ${serviceName} #${orderId}`;
+          ? t(_ykLang, "payDescOption", _ykVars)
+          : t(_ykLang, "balanceTopupDescription", _ykVars);
 
     const result = await createYookassaPayment({
       shopId,
@@ -2902,7 +2910,7 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[yookassa/create-payment]", message, err);
-    return res.status(500).json({ message: message || "Ошибка создания платежа" });
+    return res.status(500).json({ message: message || t(reqLang(req), "paymentCreationError") });
   }
 });
 
@@ -2923,13 +2931,13 @@ clientRouter.post("/cryptopay/create-payment", async (req, res) => {
   try {
     const clientId = (req as unknown as { clientId: string }).clientId;
     const parsed = cryptopayCreatePaymentSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Неверные параметры", errors: parsed.error.flatten() });
+    if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "invalidParams"), errors: parsed.error.flatten() });
     const config = await getSystemConfig();
     const cryptopayConfig = {
       apiToken: (config as { cryptopayApiToken?: string | null }).cryptopayApiToken ?? "",
       testnet: (config as { cryptopayTestnet?: boolean }).cryptopayTestnet ?? false,
     };
-    if (!isCryptopayConfigured(cryptopayConfig)) return res.status(503).json({ message: "Crypto Pay не настроен" });
+    if (!isCryptopayConfigured(cryptopayConfig)) return res.status(503).json({ message: t(reqLang(req), "cryptopayNotConfigured") });
 
     const { amount: amountBody, currency: currencyBody, tariffId: tariffIdBody, proxyTariffId: proxyTariffIdBody, singboxTariffId: singboxTariffIdBody, promoCode: promoCodeStr, extraOption, customBuild: customBuildBody } = parsed.data;
     let amountRounded: number;
@@ -2941,10 +2949,10 @@ clientRouter.post("/cryptopay/create-payment", async (req, res) => {
 
     if (customBuildBody) {
       const cfg = getCustomBuildConfig(config);
-      if (!cfg) return res.status(400).json({ message: "Гибкий тариф отключён" });
+      if (!cfg) return res.status(400).json({ message: t(reqLang(req), "flexibleTariffDisabled") });
       let { days, devices, trafficGb } = customBuildBody;
       if (days > cfg.maxDays || devices > cfg.maxDevices) {
-        return res.status(400).json({ message: `Дни: 1–${cfg.maxDays}, устройств: 1–${cfg.maxDevices}` });
+        return res.status(400).json({ message: t(reqLang(req), "daysDevicesLimit", { maxDays: cfg.maxDays, maxDevices: cfg.maxDevices }) });
       }
       const trafficLimitBytes =
         cfg.trafficMode === "per_gb" && trafficGb != null && trafficGb >= 0
@@ -2964,22 +2972,22 @@ clientRouter.post("/cryptopay/create-payment", async (req, res) => {
       };
     } else if (extraOption) {
       const cfg = config as { sellOptionsEnabled?: boolean; sellOptionsTrafficEnabled?: boolean; sellOptionsTrafficProducts?: SellOptionTrafficProduct[]; sellOptionsDevicesEnabled?: boolean; sellOptionsDevicesProducts?: SellOptionDeviceProduct[]; sellOptionsServersEnabled?: boolean; sellOptionsServersProducts?: SellOptionServerProduct[] };
-      if (!cfg.sellOptionsEnabled) return res.status(400).json({ message: "Продажа опций отключена" });
+      if (!cfg.sellOptionsEnabled) return res.status(400).json({ message: t(reqLang(req), "optionsSalesDisabled") });
       if (extraOption.kind === "traffic") {
         const product = cfg.sellOptionsTrafficEnabled && cfg.sellOptionsTrafficProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Опция не найдена" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "traffic", trafficBytes: Math.round(product.trafficGb * 1024 ** 3) } };
       } else if (extraOption.kind === "devices") {
         const product = cfg.sellOptionsDevicesEnabled && cfg.sellOptionsDevicesProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Опция не найдена" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "devices", deviceCount: product.deviceCount } };
       } else {
         const product = cfg.sellOptionsServersEnabled && cfg.sellOptionsServersProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Опция не найдена" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "servers", squadUuid: product.squadUuid, ...((product.trafficGb ?? 0) > 0 && { trafficBytes: Math.round((product.trafficGb ?? 0) * 1024 ** 3) }) } };
@@ -2988,28 +2996,28 @@ clientRouter.post("/cryptopay/create-payment", async (req, res) => {
       currencyUpper = (currencyBody ?? "USD").toUpperCase();
       if (tariffIdBody) {
         const tariff = await prisma.tariff.findUnique({ where: { id: tariffIdBody } });
-        if (!tariff) return res.status(400).json({ message: "Тариф не найден" });
+        if (!tariff) return res.status(400).json({ message: t(reqLang(req), "tariffNotFound") });
         tariffIdToStore = tariffIdBody;
         amountRounded = Math.round((amountBody ?? tariff.price) * 100) / 100;
       } else if (proxyTariffIdBody) {
         const proxyTariff = await prisma.proxyTariff.findUnique({ where: { id: proxyTariffIdBody } });
-        if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: "Прокси-тариф не найден" });
+        if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "proxyTariffNotFound") });
         proxyTariffIdToStore = proxyTariffIdBody;
         amountRounded = Math.round((amountBody ?? proxyTariff.price) * 100) / 100;
       } else if (singboxTariffIdBody) {
         const singboxTariff = await prisma.singboxTariff.findUnique({ where: { id: singboxTariffIdBody } });
-        if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: "Тариф Sing-box не найден" });
+        if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "singboxTariffNotFound") });
         singboxTariffIdToStore = singboxTariffIdBody;
         amountRounded = Math.round((amountBody ?? singboxTariff.price) * 100) / 100;
       } else {
-        if (amountBody == null) return res.status(400).json({ message: "Укажите сумму" });
+        if (amountBody == null) return res.status(400).json({ message: t(reqLang(req), "specifyAmount") });
         amountRounded = Math.round(amountBody * 100) / 100;
       }
     }
 
     const fiatSupported = ["USD", "RUB", "EUR", "UAH", "KZT", "BYN", "UZS", "GEL", "TRY", "AMD", "THB", "INR", "CNY", "GBP", "BRL", "IDR", "AZN", "AED", "PLN", "ILS"];
-    if (!fiatSupported.includes(currencyUpper)) return res.status(400).json({ message: "Crypto Pay: поддерживаются USD, RUB, EUR и др. Укажите валюту из списка." });
-    if (amountRounded < 0.5) return res.status(400).json({ message: "Минимальная сумма — 0.5" });
+    if (!fiatSupported.includes(currencyUpper)) return res.status(400).json({ message: t(reqLang(req), "cryptopayCurrencyNotSupported") });
+    if (amountRounded < 0.5) return res.status(400).json({ message: t(reqLang(req), "minimumAmount05") });
 
     const orderId = randomUUID();
     const payment = await prisma.payment.create({
@@ -3028,17 +3036,19 @@ clientRouter.post("/cryptopay/create-payment", async (req, res) => {
     });
 
     const serviceName = config.serviceName?.trim() || "STEALTHNET";
+    const _cpLang = reqLang(req);
+    const _cpVars = { service: serviceName, orderId };
     const description = tariffIdToStore
-      ? `Тариф ${serviceName} #${orderId}`
+      ? t(_cpLang, "payDescTariff", _cpVars)
       : proxyTariffIdToStore
-        ? `Прокси ${serviceName} #${orderId}`
+        ? t(_cpLang, "payDescProxy", _cpVars)
         : singboxTariffIdToStore
-          ? `Доступы ${serviceName} #${orderId}`
+          ? t(_cpLang, "payDescAccess", _cpVars)
           : customBuildBody
-            ? `Гибкий тариф ${serviceName} #${orderId}`
+            ? t(_cpLang, "payDescFlexTariff", _cpVars)
             : extraOption
-              ? `Опция ${serviceName} #${orderId}`
-              : `Пополнение баланса ${serviceName} #${orderId}`;
+              ? t(_cpLang, "payDescOption", _cpVars)
+              : t(_cpLang, "balanceTopupDescription", _cpVars);
 
     const result = await createCryptopayInvoice({
       config: cryptopayConfig,
@@ -3063,7 +3073,7 @@ clientRouter.post("/cryptopay/create-payment", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[cryptopay/create-payment]", message, err);
-    return res.status(500).json({ message: message || "Ошибка создания платежа" });
+    return res.status(500).json({ message: message || t(reqLang(req), "paymentCreationError") });
   }
 });
 
@@ -3084,13 +3094,13 @@ clientRouter.post("/heleket/create-payment", async (req, res) => {
   try {
     const clientId = (req as unknown as { clientId: string }).clientId;
     const parsed = heleketCreatePaymentSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Неверные параметры", errors: parsed.error.flatten() });
+    if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "invalidParams"), errors: parsed.error.flatten() });
     const config = await getSystemConfig();
     const heleketConfig = {
       merchantId: (config as { heleketMerchantId?: string | null }).heleketMerchantId ?? "",
       apiKey: (config as { heleketApiKey?: string | null }).heleketApiKey ?? "",
     };
-    if (!isHeleketConfigured(heleketConfig)) return res.status(503).json({ message: "Heleket не настроен" });
+    if (!isHeleketConfigured(heleketConfig)) return res.status(503).json({ message: t(reqLang(req), "heleketNotConfigured") });
 
     const { amount: amountBody, currency: currencyBody, tariffId: tariffIdBody, proxyTariffId: proxyTariffIdBody, singboxTariffId: singboxTariffIdBody, promoCode: promoCodeStr, extraOption, customBuild: customBuildBody } = parsed.data;
     let amountRounded: number;
@@ -3102,10 +3112,10 @@ clientRouter.post("/heleket/create-payment", async (req, res) => {
 
     if (customBuildBody) {
       const cfg = getCustomBuildConfig(config);
-      if (!cfg) return res.status(400).json({ message: "Гибкий тариф отключён" });
+      if (!cfg) return res.status(400).json({ message: t(reqLang(req), "flexibleTariffDisabled") });
       let { days, devices, trafficGb } = customBuildBody;
       if (days > cfg.maxDays || devices > cfg.maxDevices) {
-        return res.status(400).json({ message: `Дни: 1–${cfg.maxDays}, устройств: 1–${cfg.maxDevices}` });
+        return res.status(400).json({ message: t(reqLang(req), "daysDevicesLimit", { maxDays: cfg.maxDays, maxDevices: cfg.maxDevices }) });
       }
       const trafficLimitBytes =
         cfg.trafficMode === "per_gb" && trafficGb != null && trafficGb >= 0
@@ -3125,22 +3135,22 @@ clientRouter.post("/heleket/create-payment", async (req, res) => {
       };
     } else if (extraOption) {
       const cfg = config as { sellOptionsEnabled?: boolean; sellOptionsTrafficEnabled?: boolean; sellOptionsTrafficProducts?: SellOptionTrafficProduct[]; sellOptionsDevicesEnabled?: boolean; sellOptionsDevicesProducts?: SellOptionDeviceProduct[]; sellOptionsServersEnabled?: boolean; sellOptionsServersProducts?: SellOptionServerProduct[] };
-      if (!cfg.sellOptionsEnabled) return res.status(400).json({ message: "Продажа опций отключена" });
+      if (!cfg.sellOptionsEnabled) return res.status(400).json({ message: t(reqLang(req), "optionsSalesDisabled") });
       if (extraOption.kind === "traffic") {
         const product = cfg.sellOptionsTrafficEnabled && cfg.sellOptionsTrafficProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Опция не найдена" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "traffic", trafficBytes: Math.round(product.trafficGb * 1024 ** 3) } };
       } else if (extraOption.kind === "devices") {
         const product = cfg.sellOptionsDevicesEnabled && cfg.sellOptionsDevicesProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Опция не найдена" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "devices", deviceCount: product.deviceCount } };
       } else {
         const product = cfg.sellOptionsServersEnabled && cfg.sellOptionsServersProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Опция не найдена" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "servers", squadUuid: product.squadUuid, ...((product.trafficGb ?? 0) > 0 && { trafficBytes: Math.round((product.trafficGb ?? 0) * 1024 ** 3) }) } };
@@ -3149,26 +3159,26 @@ clientRouter.post("/heleket/create-payment", async (req, res) => {
       currencyUpper = (currencyBody ?? "USD").toUpperCase();
       if (tariffIdBody) {
         const tariff = await prisma.tariff.findUnique({ where: { id: tariffIdBody } });
-        if (!tariff) return res.status(400).json({ message: "Тариф не найден" });
+        if (!tariff) return res.status(400).json({ message: t(reqLang(req), "tariffNotFound") });
         tariffIdToStore = tariffIdBody;
         amountRounded = Math.round((amountBody ?? tariff.price) * 100) / 100;
       } else if (proxyTariffIdBody) {
         const proxyTariff = await prisma.proxyTariff.findUnique({ where: { id: proxyTariffIdBody } });
-        if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: "Прокси-тариф не найден" });
+        if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "proxyTariffNotFound") });
         proxyTariffIdToStore = proxyTariffIdBody;
         amountRounded = Math.round((amountBody ?? proxyTariff.price) * 100) / 100;
       } else if (singboxTariffIdBody) {
         const singboxTariff = await prisma.singboxTariff.findUnique({ where: { id: singboxTariffIdBody } });
-        if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: "Тариф Sing-box не найден" });
+        if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "singboxTariffNotFound") });
         singboxTariffIdToStore = singboxTariffIdBody;
         amountRounded = Math.round((amountBody ?? singboxTariff.price) * 100) / 100;
       } else {
-        if (amountBody == null) return res.status(400).json({ message: "Укажите сумму" });
+        if (amountBody == null) return res.status(400).json({ message: t(reqLang(req), "specifyAmount") });
         amountRounded = Math.round(amountBody * 100) / 100;
       }
     }
 
-    if (amountRounded < 1) return res.status(400).json({ message: "Минимальная сумма платежа — 1" });
+    if (amountRounded < 1) return res.status(400).json({ message: t(reqLang(req), "minimumPaymentAmount1") });
 
     const orderId = randomUUID();
     const payment = await prisma.payment.create({
@@ -3217,7 +3227,7 @@ clientRouter.post("/heleket/create-payment", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[heleket/create-payment]", message, err);
-    return res.status(500).json({ message: message || "Ошибка создания платежа" });
+    return res.status(500).json({ message: message || t(reqLang(req), "paymentCreationError") });
   }
 });
 
@@ -3240,14 +3250,14 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
   try {
     const clientId = (req as unknown as { clientId: string }).clientId;
     const parsed = epayCreatePaymentSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid params", errors: parsed.error.flatten() });
+    if (!parsed.success) return res.status(400).json({ message: t(reqLang(req), "invalidParams"), errors: parsed.error.flatten() });
     const config = await getSystemConfig();
     const epayConfig = {
       pid: (config as { epayPid?: string | null }).epayPid ?? "",
       key: (config as { epayKey?: string | null }).epayKey ?? "",
       apiUrl: (config as { epayApiUrl?: string | null }).epayApiUrl ?? "",
     };
-    if (!isEpayConfigured(epayConfig)) return res.status(503).json({ message: "ePay not configured" });
+    if (!isEpayConfigured(epayConfig)) return res.status(503).json({ message: t(reqLang(req), "epayNotConfigured") });
 
     const { amount: amountBody, currency: currencyBody, tariffId: tariffIdBody, proxyTariffId: proxyTariffIdBody, singboxTariffId: singboxTariffIdBody, promoCode: promoCodeStr, type: epayType, extraOption, customBuild: customBuildBody } = parsed.data;
     let amountRounded: number;
@@ -3259,10 +3269,10 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
 
     if (customBuildBody) {
       const cfg = getCustomBuildConfig(config);
-      if (!cfg) return res.status(400).json({ message: "Custom build disabled" });
+      if (!cfg) return res.status(400).json({ message: t(reqLang(req), "flexibleTariffDisabled") });
       let { days, devices, trafficGb } = customBuildBody;
       if (days > cfg.maxDays || devices > cfg.maxDevices) {
-        return res.status(400).json({ message: `Days: 1–${cfg.maxDays}, devices: 1–${cfg.maxDevices}` });
+        return res.status(400).json({ message: t(reqLang(req), "daysDevicesLimit", { maxDays: cfg.maxDays, maxDevices: cfg.maxDevices }) });
       }
       const trafficLimitBytes =
         cfg.trafficMode === "per_gb" && trafficGb != null && trafficGb >= 0
@@ -3282,22 +3292,22 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
       };
     } else if (extraOption) {
       const cfg = config as { sellOptionsEnabled?: boolean; sellOptionsTrafficEnabled?: boolean; sellOptionsTrafficProducts?: SellOptionTrafficProduct[]; sellOptionsDevicesEnabled?: boolean; sellOptionsDevicesProducts?: SellOptionDeviceProduct[]; sellOptionsServersEnabled?: boolean; sellOptionsServersProducts?: SellOptionServerProduct[] };
-      if (!cfg.sellOptionsEnabled) return res.status(400).json({ message: "Options disabled" });
+      if (!cfg.sellOptionsEnabled) return res.status(400).json({ message: t(reqLang(req), "optionsSalesDisabled") });
       if (extraOption.kind === "traffic") {
         const product = cfg.sellOptionsTrafficEnabled && cfg.sellOptionsTrafficProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Option not found" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "traffic", trafficBytes: Math.round(product.trafficGb * 1024 ** 3) } };
       } else if (extraOption.kind === "devices") {
         const product = cfg.sellOptionsDevicesEnabled && cfg.sellOptionsDevicesProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Option not found" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "devices", deviceCount: product.deviceCount } };
       } else {
         const product = cfg.sellOptionsServersEnabled && cfg.sellOptionsServersProducts?.find((p) => p.id === extraOption.productId);
-        if (!product) return res.status(400).json({ message: "Option not found" });
+        if (!product) return res.status(400).json({ message: t(reqLang(req), "optionNotFound") });
         amountRounded = Math.round(product.price * 100) / 100;
         currencyUpper = product.currency.toUpperCase();
         metadataObj = { extraOption: { kind: "servers", squadUuid: product.squadUuid, ...((product.trafficGb ?? 0) > 0 && { trafficBytes: Math.round((product.trafficGb ?? 0) * 1024 ** 3) }) } };
@@ -3306,26 +3316,26 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
       currencyUpper = (currencyBody ?? "USD").toUpperCase();
       if (tariffIdBody) {
         const tariff = await prisma.tariff.findUnique({ where: { id: tariffIdBody } });
-        if (!tariff) return res.status(400).json({ message: "Tariff not found" });
+        if (!tariff) return res.status(400).json({ message: t(reqLang(req), "tariffNotFound") });
         tariffIdToStore = tariffIdBody;
         amountRounded = Math.round((amountBody ?? tariff.price) * 100) / 100;
       } else if (proxyTariffIdBody) {
         const proxyTariff = await prisma.proxyTariff.findUnique({ where: { id: proxyTariffIdBody } });
-        if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: "Proxy tariff not found" });
+        if (!proxyTariff || !proxyTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "proxyTariffNotFound") });
         proxyTariffIdToStore = proxyTariffIdBody;
         amountRounded = Math.round((amountBody ?? proxyTariff.price) * 100) / 100;
       } else if (singboxTariffIdBody) {
         const singboxTariff = await prisma.singboxTariff.findUnique({ where: { id: singboxTariffIdBody } });
-        if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: "Singbox tariff not found" });
+        if (!singboxTariff || !singboxTariff.enabled) return res.status(400).json({ message: t(reqLang(req), "singboxTariffNotFound") });
         singboxTariffIdToStore = singboxTariffIdBody;
         amountRounded = Math.round((amountBody ?? singboxTariff.price) * 100) / 100;
       } else {
-        if (amountBody == null) return res.status(400).json({ message: "Amount required" });
+        if (amountBody == null) return res.status(400).json({ message: t(reqLang(req), "specifyAmount") });
         amountRounded = Math.round(amountBody * 100) / 100;
       }
     }
 
-    if (amountRounded < 0.01) return res.status(400).json({ message: "Minimum amount: 0.01" });
+    if (amountRounded < 0.01) return res.status(400).json({ message: t(reqLang(req), "minimumAmount001") });
 
     const orderId = randomUUID();
     const payment = await prisma.payment.create({
@@ -3347,7 +3357,7 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
     const appUrl = (config.publicAppUrl || "").replace(/\/$/, "");
     if (!appUrl) {
       await prisma.payment.delete({ where: { id: payment.id } }).catch(() => {});
-      return res.status(503).json({ message: "publicAppUrl not configured — ePay callbacks will not work" });
+      return res.status(503).json({ message: t(reqLang(req), "publicAppUrlNotSet") });
     }
     const notifyUrl = `${appUrl}/api/webhooks/epay`;
     const returnUrl = `${appUrl}/cabinet?epay=success`;
@@ -3381,7 +3391,7 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[epay/create-payment]", message, err);
-    return res.status(500).json({ message: message || "Payment creation error" });
+    return res.status(500).json({ message: message || t(reqLang(req), "paymentCreationError") });
   }
 });
 
@@ -3398,13 +3408,13 @@ clientRouter.post("/ai/chat", async (req, res) => {
 
     const parsed = aiChatSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: "Неверный формат сообщений", errors: parsed.error.flatten() });
+      return res.status(400).json({ message: t(reqLang(req), "invalidMessageFormat"), errors: parsed.error.flatten() });
     }
 
     const config = await getSystemConfig();
     const publicConfig = await getPublicConfig();
     if ((publicConfig as { aiChatEnabled?: boolean }).aiChatEnabled === false) {
-      return res.status(403).json({ message: "AI-чат отключён" });
+      return res.status(403).json({ message: t(reqLang(req), "aiChatDisabled") });
     }
 
     const apiKey = (config as { groqApiKey?: string | null }).groqApiKey?.trim();
@@ -3560,12 +3570,12 @@ clientRouter.post("/ai/chat", async (req, res) => {
     }
 
     // Если все модели не сработали
-    return res.status(502).json({ message: "Ошибка сервиса AI или превышены лимиты", details: lastErrorDetails });
+    return res.status(502).json({ message: t(reqLang(req), "aiServiceError"), details: lastErrorDetails });
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[ai/chat]", message, err);
-    return res.status(500).json({ message: "Внутренняя ошибка сервера" });
+    return res.status(500).json({ message: t(reqLang(req), "internalServerError") });
   }
 });
 
@@ -3591,10 +3601,10 @@ clientRouter.get("/payments", async (req, res) => {
 });
 
 // ——— Тикеты (доступны только при включённой тикет-системе в настройках)
-async function ensureTicketsEnabled(res: import("express").Response): Promise<boolean> {
+async function ensureTicketsEnabled(req: import("express").Request, res: import("express").Response): Promise<boolean> {
   const config = await getPublicConfig();
   if (!config?.ticketsEnabled) {
-    res.status(404).json({ message: "Тикет-система отключена" });
+    res.status(404).json({ message: t(reqLang(req), "ticketSystemDisabled") });
     return false;
   }
   return true;
@@ -3602,10 +3612,10 @@ async function ensureTicketsEnabled(res: import("express").Response): Promise<bo
 
 const createTicketSchema = z.object({ subject: z.string().min(1).max(500), message: z.string().min(1).max(10000) });
 clientRouter.post("/tickets", async (req, res) => {
-  if (!(await ensureTicketsEnabled(res))) return;
+  if (!(await ensureTicketsEnabled(req, res))) return;
   const clientId = (req as unknown as { client: { id: string } }).client.id;
   const body = createTicketSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   const ticket = await prisma.ticket.create({
     data: {
       clientId,
@@ -3634,7 +3644,7 @@ clientRouter.post("/tickets", async (req, res) => {
 });
 
 clientRouter.get("/tickets/unread-count", async (req, res) => {
-  if (!(await ensureTicketsEnabled(res))) return;
+  if (!(await ensureTicketsEnabled(req, res))) return;
   const clientId = (req as unknown as { client: { id: string } }).client.id;
   const count = await prisma.ticketMessage.count({
     where: {
@@ -3647,7 +3657,7 @@ clientRouter.get("/tickets/unread-count", async (req, res) => {
 });
 
 clientRouter.get("/tickets", async (req, res) => {
-  if (!(await ensureTicketsEnabled(res))) return;
+  if (!(await ensureTicketsEnabled(req, res))) return;
   const clientId = (req as unknown as { client: { id: string } }).client.id;
   const list = await prisma.ticket.findMany({
     where: { clientId },
@@ -3660,13 +3670,13 @@ clientRouter.get("/tickets", async (req, res) => {
 });
 
 clientRouter.get("/tickets/:id", async (req, res) => {
-  if (!(await ensureTicketsEnabled(res))) return;
+  if (!(await ensureTicketsEnabled(req, res))) return;
   const clientId = (req as unknown as { client: { id: string } }).client.id;
   const ticket = await prisma.ticket.findFirst({
     where: { id: req.params.id, clientId },
     include: { messages: { orderBy: { createdAt: "asc" } } },
   });
-  if (!ticket) return res.status(404).json({ message: "Тикет не найден" });
+  if (!ticket) return res.status(404).json({ message: t(reqLang(req), "ticketNotFound") });
 
   // Mark support messages as read
   await prisma.ticketMessage.updateMany({
@@ -3686,12 +3696,12 @@ clientRouter.get("/tickets/:id", async (req, res) => {
 
 const replyTicketSchema = z.object({ content: z.string().min(1).max(10000) });
 clientRouter.post("/tickets/:id/messages", async (req, res) => {
-  if (!(await ensureTicketsEnabled(res))) return;
+  if (!(await ensureTicketsEnabled(req, res))) return;
   const clientId = (req as unknown as { client: { id: string } }).client.id;
   const body = replyTicketSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   const ticket = await prisma.ticket.findFirst({ where: { id: req.params.id, clientId } });
-  if (!ticket) return res.status(404).json({ message: "Тикет не найден" });
+  if (!ticket) return res.status(404).json({ message: t(reqLang(req), "ticketNotFound") });
   const msg = await prisma.ticketMessage.create({
     data: { ticketId: ticket.id, authorType: "client", content: body.data.content.trim() },
   });
@@ -3789,16 +3799,16 @@ publicConfigRouter.post("/link-telegram-from-bot", async (req, res) => {
   const config = await getSystemConfig();
   const botToken = (config.telegramBotToken ?? "").trim();
   const headerToken = typeof req.headers["x-telegram-bot-token"] === "string" ? req.headers["x-telegram-bot-token"].trim() : "";
-  if (!botToken || headerToken !== botToken) return res.status(401).json({ message: "Unauthorized" });
+  if (!botToken || headerToken !== botToken) return res.status(401).json({ message: t(reqLang(req), "unauthorized") });
   const body = linkTelegramFromBotSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(reqLang(req), "invalidInput"), errors: body.error.flatten() });
   const { code, telegramId, telegramUsername } = body.data;
   const tid = String(telegramId);
   const pending = await prisma.pendingTelegramLink.findUnique({ where: { code: code.trim() } });
-  if (!pending) return res.status(400).json({ message: "Неверный или просроченный код" });
+  if (!pending) return res.status(400).json({ message: t(reqLang(req), "invalidOrExpiredCode") });
   if (new Date() > pending.expiresAt) {
     await prisma.pendingTelegramLink.deleteMany({ where: { id: pending.id } }).catch(() => {});
-    return res.status(400).json({ message: "Код истёк. Запросите новый в кабинете." });
+    return res.status(400).json({ message: t(reqLang(req), "codeExpiredRequestNew") });
   }
   const other = await prisma.client.findUnique({ where: { telegramId: tid } });
   if (other && other.id !== pending.clientId) {
@@ -3813,7 +3823,7 @@ publicConfigRouter.post("/link-telegram-from-bot", async (req, res) => {
     data: { telegramId: tid, telegramUsername: (telegramUsername ?? "").trim() || null },
   });
   await prisma.pendingTelegramLink.deleteMany({ where: { id: pending.id } }).catch(() => {});
-  return res.json({ message: "Telegram привязан" });
+  return res.json({ message: t(reqLang(req), "telegramLinked") });
 });
 
 /** Конфиг страницы подписки (приложения по платформам, тексты) — для кабинета /cabinet/subscribe */
@@ -3845,7 +3855,7 @@ function tariffToJson(t: { id: string; name: string; description: string | null;
   };
 }
 
-publicConfigRouter.get("/tariffs", async (_req, res) => {
+publicConfigRouter.get("/tariffs", async (req, res) => {
   try {
     const config = await getSystemConfig();
     const categoryEmojis = config.categoryEmojis ?? { ordinary: "📦", premium: "⭐" };
@@ -3876,12 +3886,12 @@ publicConfigRouter.get("/tariffs", async (_req, res) => {
     });
   } catch (e) {
     console.error("GET /public/tariffs error:", e);
-    return res.status(500).json({ message: "Ошибка загрузки тарифов" });
+    return res.status(500).json({ message: t(reqLang(req), "errorLoadingTariffs") });
   }
 });
 
 // GET /api/public/proxy-tariffs — публичный список тарифов прокси (для бота и кабинета)
-publicConfigRouter.get("/proxy-tariffs", async (_req, res) => {
+publicConfigRouter.get("/proxy-tariffs", async (req, res) => {
   try {
     const list = await prisma.proxyCategory.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -3906,12 +3916,12 @@ publicConfigRouter.get("/proxy-tariffs", async (_req, res) => {
     });
   } catch (e) {
     console.error("GET /public/proxy-tariffs error:", e);
-    return res.status(500).json({ message: "Ошибка загрузки тарифов прокси" });
+    return res.status(500).json({ message: t(reqLang(req), "errorLoadingProxyTariffs") });
   }
 });
 
 // GET /api/public/singbox-tariffs — публичный список тарифов Sing-box (для бота и кабинета)
-publicConfigRouter.get("/singbox-tariffs", async (_req, res) => {
+publicConfigRouter.get("/singbox-tariffs", async (req, res) => {
   try {
     const list = await prisma.singboxCategory.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -3935,7 +3945,7 @@ publicConfigRouter.get("/singbox-tariffs", async (_req, res) => {
     });
   } catch (e) {
     console.error("GET /public/singbox-tariffs error:", e);
-    return res.status(500).json({ message: "Ошибка загрузки тарифов Sing-box" });
+    return res.status(500).json({ message: t(reqLang(req), "errorLoadingSingboxTariffs") });
   }
 });
 

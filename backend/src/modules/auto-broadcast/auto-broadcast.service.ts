@@ -6,6 +6,7 @@
 import { prisma } from "../../db.js";
 import { getSystemConfig } from "../client/client.service.js";
 import { sendEmail } from "../mail/mail.service.js";
+import { t } from "../../i18n/index.js";
 
 const TELEGRAM_DELAY_MS = 60;
 const EMAIL_DELAY_MS = 200;
@@ -218,8 +219,8 @@ export async function runRule(ruleId: string): Promise<RunRuleResult> {
         fromName: config.smtpFromName ?? null,
       }
     : null;
-  const serviceName = config.serviceName || "Сервис";
-  const subject = rule.subject?.trim() || `Сообщение от ${serviceName}`;
+  const serviceName = config.serviceName || t("en", "defaultServiceName");
+  const subject = rule.subject?.trim() || t("en", "defaultBroadcastSubject", { serviceName });
   const htmlMessage = rule.message.trim().replace(/\n/g, "<br>\n");
   const htmlBody = `<!DOCTYPE html><html><body style="font-family: sans-serif;">${htmlMessage}</body></html>`;
 

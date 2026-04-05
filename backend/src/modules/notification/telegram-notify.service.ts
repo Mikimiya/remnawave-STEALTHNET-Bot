@@ -1,11 +1,12 @@
 /**
- * Уведомления пользователя в Telegram (пополнение баланса, оплата тарифа).
- * Вызывается из webhook'ов после успешной обработки платежа.
+ * User notifications via Telegram (balance top-up, tariff payment).
+ * Called from webhooks after successful payment processing.
  */
 
 import { prisma } from "../../db.js";
 import { getSystemConfig } from "../client/client.service.js";
 import { createClientNotification } from "./client-notification.service.js";
+import { t } from "../../i18n/index.js";
 
 type AdminNotificationEventType = "balance_topup" | "tariff_payment" | "new_client" | "new_ticket";
 
@@ -51,7 +52,7 @@ async function sendTelegramToUser(telegramId: string, text: string): Promise<voi
 async function sendTelegramToAdminsForEvent(eventType: AdminNotificationEventType, text: string): Promise<void> {
   const config = await getSystemConfig();
   const groupId = config.notificationTelegramGroupId?.trim();
-  // Если указана группа — шлём только в группу; иначе — только админам в личку
+  // If a group is specified — send only to the group; otherwise — to admins in DMs
   if (groupId) {
     await sendTelegramToUser(groupId, text).catch((e) => {
       console.warn("[Telegram notify] send to group failed", e);
@@ -100,70 +101,73 @@ function formatMoney(amount: number, currency: string): string {
 }
 
 /**
- * Отправить уведомление о пополнении баланса.
+ * Send balance top-up notification.
  */
 export async function notifyBalanceToppedUp(clientId: string, amount: number, currency: string): Promise<void> {
   const client = await prisma.client.findUnique({
     where: { id: clientId },
-    select: { telegramId: true, email: true, telegramUsername: true, id: true },
+    select: { telegramId: true, email: true, telegramUsername: true, id: true, preferredLang: true },
   });
   if (!client) return;
-  const textForClient = client.telegramId ? `✅ <b>Баланс пополнен</b> на ${formatMoney(amount, currency)}.` : null;
-  if (client.telegramId && textForClient) {
+  const lang = client.preferredLang;
+  const amountStr = formatMoney(amount, currency);
+  if (client.telegramId) {
+    const textForClient = t(lang, "notifyBalanceTopup", { amount: amountStr });
     await sendTelegramToUser(client.telegramId, textForClient);
   }
   // In-app notification
   await createClientNotification({
     clientId,
     type: "balance_topup",
-    title: "💰 余额充值成功",
-    body: `您的余额已充值 ${formatMoney(amount, currency)}。`,
+    title: t(lang, "inAppBalanceTopupTitle"),
+    body: t(lang, "inAppBalanceTopupBody", { amount: amountStr }),
     metadata: { amount, currency },
   }).catch(() => {});
   const clientLabel =
     client.email?.trim() ||
     (client.telegramUsername ? `@${client.telegramUsername}` : client.id);
-  const textForAdmins =
-    `💰 <b>Пополнение баланса</b>\n\n` +
-    `Клиент: ${escapeHtml(clientLabel)}\n` +
-    `Сумма: ${formatMoney(amount, currency)}`;
+  const textForAdmins = t(lang, "adminNotifyBalanceTopup", {
+    client: escapeHtml(clientLabel),
+    amount: formatMoney(amount, currency),
+  });
   await sendTelegramToAdminsForEvent("balance_topup", textForAdmins);
 }
 
 /**
- * Отправить уведомление об оплате и активации тарифа.
+ * Send tariff payment and activation notification.
  */
 export async function notifyTariffActivated(clientId: string, paymentId: string): Promise<void> {
   const client = await prisma.client.findUnique({
     where: { id: clientId },
-    select: { telegramId: true, email: true, telegramUsername: true, id: true },
+    select: { telegramId: true, email: true, telegramUsername: true, id: true, preferredLang: true },
   });
   if (!client) return;
+  const lang = client.preferredLang;
 
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     select: { tariff: { select: { name: true } } },
   });
-  const tariffName = payment?.tariff?.name?.trim() || "Тариф";
+  const tariffName = payment?.tariff?.name?.trim() || t(lang, "notifyTariffDefault");
   if (client.telegramId) {
-    const textClient = `✅ <b>Тариф «${escapeHtml(tariffName)}»</b> оплачен и активирован.\n\nМожете подключаться к VPN.`;
+    const textClient = t(lang, "notifyTariffActivated", { name: escapeHtml(tariffName) });
     await sendTelegramToUser(client.telegramId, textClient);
   }
   // In-app notification
   await createClientNotification({
     clientId,
     type: "payment_success",
-    title: "✅ 套餐已激活",
-    body: `套餐「${tariffName}」已付款并激活，您现在可以连接 VPN。`,
+    title: t(lang, "inAppTariffActivatedTitle"),
+    body: t(lang, "inAppTariffActivatedBody", { name: tariffName }),
     metadata: { tariffName, paymentId },
   }).catch(() => {});
   const clientLabel =
     client.email?.trim() ||
     (client.telegramUsername ? `@${client.telegramUsername}` : client.id);
-  const textAdmins =
-    `📦 <b>Оплата тарифа</b>\n\n` +
-    `Клиент: ${escapeHtml(clientLabel)}\n` +
-    `Тариф: «${escapeHtml(tariffName)}»`;
+  const textAdmins = t(lang, "adminNotifyTariffPayment", {
+    client: escapeHtml(clientLabel),
+    name: escapeHtml(tariffName),
+  });
   await sendTelegramToAdminsForEvent("tariff_payment", textAdmins);
 }
 
@@ -191,17 +195,18 @@ export async function notifyAdminsAboutNewTicket(params: {
   const baseUrl = (config.publicAppUrl || "").replace(/\/+$/, "");
   const link =
     baseUrl && ticket.id
-      ? `\n\nАдминка: ${escapeHtml(`${baseUrl}/admin/tickets`)}`
+      ? `\n\n${t(null, "adminLabel")}: ${escapeHtml(`${baseUrl}/admin/tickets`)}`
       : "";
   const preview =
     params.firstMessage.length > 200
       ? `${params.firstMessage.slice(0, 197)}...`
       : params.firstMessage;
-  const text =
-    `🆕 <b>Новый тикет</b>\n\n` +
-    `Тема: <b>${escapeHtml(ticket.subject)}</b>\n` +
-    `Клиент: ${escapeHtml(clientLabel)}\n\n` +
-    `${escapeHtml(preview)}${link}`;
+  const text = t(null, "adminNotifyNewTicket", {
+    subject: escapeHtml(ticket.subject),
+    client: escapeHtml(clientLabel),
+    preview: escapeHtml(preview),
+    link,
+  });
   await sendTelegramToAdminsForEvent("new_ticket", text);
 }
 
@@ -228,15 +233,16 @@ export async function notifyAdminsAboutClientTicketMessage(params: {
   const baseUrl = (config.publicAppUrl || "").replace(/\/+$/, "");
   const link =
     baseUrl && ticket.id
-      ? `\n\nАдминка: ${escapeHtml(`${baseUrl}/admin/tickets`)}`
+      ? `\n\n${t(null, "adminLabel")}: ${escapeHtml(`${baseUrl}/admin/tickets`)}`
       : "";
   const preview =
     params.content.length > 200 ? `${params.content.slice(0, 197)}...` : params.content;
-  const text =
-    `💬 <b>Новое сообщение в тикете</b>\n\n` +
-    `Тема: <b>${escapeHtml(ticket.subject)}</b>\n` +
-    `Клиент: ${escapeHtml(clientLabel)}\n\n` +
-    `${escapeHtml(preview)}${link}`;
+  const text = t(null, "adminNotifyTicketMessage", {
+    subject: escapeHtml(ticket.subject),
+    client: escapeHtml(clientLabel),
+    preview: escapeHtml(preview),
+    link,
+  });
   await sendTelegramToAdminsForEvent("new_ticket", text);
 }
 
@@ -263,15 +269,16 @@ export async function notifyAdminsAboutSupportReply(params: {
   const baseUrl = (config.publicAppUrl || "").replace(/\/+$/, "");
   const link =
     baseUrl && ticket.id
-      ? `\n\nАдминка: ${escapeHtml(`${baseUrl}/admin/tickets`)}`
+      ? `\n\n${t(null, "adminLabel")}: ${escapeHtml(`${baseUrl}/admin/tickets`)}`
       : "";
   const preview =
     params.content.length > 200 ? `${params.content.slice(0, 197)}...` : params.content;
-  const text =
-    `✅ <b>Ответ поддержки в тикете</b>\n\n` +
-    `Тема: <b>${escapeHtml(ticket.subject)}</b>\n` +
-    `Клиент: ${escapeHtml(clientLabel)}\n\n` +
-    `${escapeHtml(preview)}${link}`;
+  const text = t(null, "adminNotifySupportReply", {
+    subject: escapeHtml(ticket.subject),
+    client: escapeHtml(clientLabel),
+    preview: escapeHtml(preview),
+    link,
+  });
   await sendTelegramToAdminsForEvent("new_ticket", text);
 }
 
@@ -292,14 +299,15 @@ export async function notifyAdminsAboutTicketStatusChange(params: {
   const baseUrl = (config.publicAppUrl || "").replace(/\/+$/, "");
   const link =
     baseUrl && params.ticketId
-      ? `\n\nАдминка: ${escapeHtml(`${baseUrl}/admin/tickets`)}`
+      ? `\n\n${t(null, "adminLabel")}: ${escapeHtml(`${baseUrl}/admin/tickets`)}`
       : "";
-  const statusLabel = params.status === "closed" ? "закрыт" : "открыт";
-  const text =
-    `ℹ️ <b>Статус тикета изменён</b>\n\n` +
-    `Тема: <b>${escapeHtml(params.subject)}</b>\n` +
-    `Клиент: ${escapeHtml(clientLabel)}\n` +
-    `Новый статус: <b>${escapeHtml(statusLabel)}</b>${link}`;
+  const statusLabel = params.status === "closed" ? t(null, "ticketStatusClosed") : t(null, "ticketStatusOpen");
+  const text = t(null, "adminNotifyTicketStatusChanged", {
+    subject: escapeHtml(params.subject),
+    client: escapeHtml(clientLabel),
+    status: escapeHtml(statusLabel),
+    link,
+  });
   await sendTelegramToAdminsForEvent("new_ticket", text);
 }
 
@@ -316,13 +324,14 @@ export async function notifyAdminsAboutNewClient(clientId: string): Promise<void
     (client.telegramUsername ? `@${client.telegramUsername}` : client.id);
   const link =
     baseUrl && client.id
-      ? `\n\nКлиенты: ${escapeHtml(`${baseUrl}/admin/clients`)}`
+      ? `\n\n${t(null, "clientsLabel")}: ${escapeHtml(`${baseUrl}/admin/clients`)}`
       : "";
   const createdAt = client.createdAt.toISOString().slice(0, 19).replace("T", " ");
-  const text =
-    `👤 <b>Новый клиент</b>\n\n` +
-    `Клиент: ${escapeHtml(clientLabel)}\n` +
-    `Создан: ${escapeHtml(createdAt)}${link}`;
+  const text = t(null, "adminNotifyNewClient", {
+    client: escapeHtml(clientLabel),
+    createdAt: escapeHtml(createdAt),
+    link,
+  });
   await sendTelegramToAdminsForEvent("new_client", text);
 }
 
@@ -335,11 +344,12 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * Отправить уведомление о создании прокси-слотов (после оплаты).
+ * Send proxy slot creation notification (after payment).
  */
 export async function notifyProxySlotsCreated(clientId: string, slotIds: string[], tariffName?: string): Promise<void> {
-  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { telegramId: true } });
+  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { telegramId: true, preferredLang: true } });
   if (!client?.telegramId || slotIds.length === 0) return;
+  const lang = client.preferredLang;
 
   const slots = await prisma.proxySlot.findMany({
     where: { id: { in: slotIds } },
@@ -347,24 +357,25 @@ export async function notifyProxySlotsCreated(clientId: string, slotIds: string[
     orderBy: { createdAt: "asc" },
   });
 
-  const name = tariffName?.trim() || "Прокси";
-  let text = `✅ <b>Прокси «${escapeHtml(name)}»</b> оплачены.\n\n`;
+  const name = tariffName?.trim() || t(lang, "notifyTariffDefault");
+  let text = t(lang, "notifyProxyPaid", { name: escapeHtml(name) });
   for (const s of slots) {
     const host = s.node.publicHost ?? "host";
     text += `• SOCKS5: <code>socks5://${escapeHtml(s.login)}:${escapeHtml(s.password)}@${escapeHtml(host)}:${s.node.socksPort}</code>\n`;
     text += `• HTTP: <code>http://${escapeHtml(s.login)}:${escapeHtml(s.password)}@${escapeHtml(host)}:${s.node.httpPort}</code>\n\n`;
   }
-  text += "Скопируйте строку в настройки прокси вашего приложения.";
+  text += t(lang, "notifyProxyCopyHint");
 
   await sendTelegramToUser(client.telegramId, text);
 }
 
 /**
- * Отправить уведомление о создании Sing-box слотов (после оплаты).
+ * Send Sing-box slot creation notification (after payment).
  */
 export async function notifySingboxSlotsCreated(clientId: string, slotIds: string[], tariffName?: string): Promise<void> {
-  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { telegramId: true } });
+  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { telegramId: true, preferredLang: true } });
   if (!client?.telegramId || slotIds.length === 0) return;
+  const lang = client.preferredLang;
 
   const slots = await prisma.singboxSlot.findMany({
     where: { id: { in: slotIds } },
@@ -378,7 +389,7 @@ export async function notifySingboxSlotsCreated(clientId: string, slotIds: strin
 
   const { buildSingboxSlotSubscriptionLink } = await import("../singbox/singbox-link.js");
   const name = tariffName?.trim() || "Sing-box";
-  let text = `✅ <b>Доступы «${escapeHtml(name)}»</b> оплачены.\n\n`;
+  let text = t(lang, "notifySingboxPaid", { name: escapeHtml(name) });
   for (let i = 0; i < slots.length; i++) {
     const s = slots[i]!;
     const link = buildSingboxSlotSubscriptionLink(
@@ -388,7 +399,7 @@ export async function notifySingboxSlotsCreated(clientId: string, slotIds: strin
     );
     text += `• <code>${escapeHtml(link)}</code>\n\n`;
   }
-  text += "Скопируйте ссылку в приложение (v2rayN, Nekoray, Shadowrocket и др.).";
+  text += t(lang, "notifySingboxCopyHint");
 
   await sendTelegramToUser(client.telegramId, text);
 }

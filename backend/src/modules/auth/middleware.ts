@@ -2,6 +2,12 @@ import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "./auth.service.js";
 import { env } from "../../config/index.js";
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
+
+function hdrLang(req: Request): string {
+  const h = req.headers["accept-language"];
+  return h ? h.slice(0, 2) : "en";
+}
 
 const AUTH_HEADER = "authorization";
 const BEARER = "Bearer ";
@@ -55,12 +61,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const token = typeof raw === "string" && raw.startsWith(BEARER) ? raw.slice(BEARER.length) : null;
 
   if (!token) {
-    return res.status(401).json({ message: "Missing or invalid Authorization header" });
+    return res.status(401).json({ message: t(hdrLang(req), "missingOrInvalidAuthHeader") });
   }
 
   const payload = verifyToken(token, env.JWT_SECRET);
   if (!payload || payload.type !== "access") {
-    return res.status(401).json({ message: "Invalid or expired token" });
+    return res.status(401).json({ message: t(hdrLang(req), "invalidOrExpiredToken") });
   }
 
   try {
@@ -69,7 +75,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       select: { id: true, email: true, role: true, allowedSections: true },
     });
     if (!admin) {
-      return res.status(401).json({ message: "User not found" });
+      return res.status(401).json({ message: t(hdrLang(req), "userNotFound") });
     }
     const ext = req as Request & ReqAdmin;
     ext.adminId = admin.id;
@@ -80,7 +86,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   } catch (e) {
     console.error("requireAuth prisma error:", e);
     return res.status(503).json({
-      message: "Database error. Check DATABASE_URL and run: npx prisma db push",
+      message: t(hdrLang(req), "dbErrorCheckUrl"),
     });
   }
 }
@@ -93,10 +99,10 @@ export function requireAdminSection(req: Request, res: Response, next: NextFunct
   if (!section) return next();
   if (ext.adminRole === "ADMIN") return next();
   if (section === "admins") {
-    return res.status(403).json({ message: "Access denied. Only full admin can manage managers." });
+    return res.status(403).json({ message: t(hdrLang(req), "accessDeniedAdminOnly") });
   }
   if (ext.adminAllowedSections.includes(section)) return next();
-  return res.status(403).json({ message: "Access denied to this section." });
+  return res.status(403).json({ message: t(hdrLang(req), "accessDeniedToSection") });
 }
 
 /** Если токен есть и валиден — добавляет adminId в req, иначе не блокирует (для опционального auth). */

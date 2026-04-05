@@ -20,6 +20,7 @@ import {
   remnaEnableUser,
   remnaResetUserTraffic,
 } from "../remna/remna.client.js";
+import { t } from "../../i18n/index.js";
 
 async function getClientRemnaUuid(clientId: string): Promise<string | null> {
   const c = await prisma.client.findUnique({
@@ -269,7 +270,7 @@ botAdminRouter.get("/clients/:id", async (req, res) => {
       _count: { select: { referrals: true } },
     },
   });
-  if (!client) return res.status(404).json({ message: "Клиент не найден" });
+  if (!client) return res.status(404).json({ message: t(adminLang(req), "clientNotFound") });
   return res.json(client);
 });
 
@@ -285,7 +286,7 @@ botAdminRouter.patch("/clients/:id/block", async (req, res) => {
     return res.status(400).json({ message: "Invalid input" });
   }
   const client = await prisma.client.findUnique({ where: { id: parsed.data.id } });
-  if (!client) return res.status(404).json({ message: "Клиент не найден" });
+  if (!client) return res.status(404).json({ message: t(adminLang(req), "clientNotFound") });
   await prisma.client.update({
     where: { id: parsed.data.id },
     data: {
@@ -306,7 +307,7 @@ botAdminRouter.patch("/clients/:id/balance", async (req, res) => {
   const body = balanceSchema.safeParse(req.body);
   if (!parsed.success || !body.success) return res.status(400).json({ message: "Invalid input" });
   const client = await prisma.client.findUnique({ where: { id: parsed.data.id } });
-  if (!client) return res.status(404).json({ message: "Клиент не найден" });
+  if (!client) return res.status(404).json({ message: t(adminLang(req), "clientNotFound") });
   const updated = await prisma.client.update({
     where: { id: parsed.data.id },
     data: { balance: { increment: body.data.amount } },
@@ -322,7 +323,7 @@ botAdminRouter.post("/clients/:id/remna/revoke-subscription", async (req, res) =
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaRevokeUserSubscription(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   return res.json(result.data ?? { ok: true });
@@ -335,7 +336,7 @@ botAdminRouter.post("/clients/:id/remna/disable", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaDisableUser(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   return res.json(result.data ?? { ok: true });
@@ -348,7 +349,7 @@ botAdminRouter.post("/clients/:id/remna/enable", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaEnableUser(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   return res.json(result.data ?? { ok: true });
@@ -361,7 +362,7 @@ botAdminRouter.post("/clients/:id/remna/reset-traffic", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaResetUserTraffic(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   return res.json(result.data ?? { ok: true });
@@ -394,7 +395,7 @@ botAdminRouter.get("/clients/:id/remna", async (req, res) => {
   const parsed = clientIdParam.safeParse(req.params);
   if (!parsed.success) return res.status(400).json({ message: "Invalid client id" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const result = await remnaGetUser(remnaUuid);
   if (result.error) return res.status(result.status >= 400 ? result.status : 500).json({ message: result.error });
   const activeInternalSquads = getRemnaUserSquads(result.data);
@@ -412,7 +413,7 @@ botAdminRouter.post("/clients/:id/remna/squads/add", async (req, res) => {
   const body = squadActionSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const userRes = await remnaGetUser(remnaUuid);
   if (userRes.error) return res.status(userRes.status >= 400 ? userRes.status : 500).json({ message: userRes.error });
   const currentSquads = getRemnaUserSquads(userRes.data);
@@ -431,7 +432,7 @@ botAdminRouter.post("/clients/:id/remna/squads/remove", async (req, res) => {
   const body = squadActionSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input" });
   const remnaUuid = await getClientRemnaUuid(parsed.data.id);
-  if (!remnaUuid) return res.status(400).json({ message: "Клиент не привязан к Remna" });
+  if (!remnaUuid) return res.status(400).json({ message: t(adminLang(req), "clientNotLinkedToRemna") });
   const userRes = await remnaGetUser(remnaUuid);
   if (userRes.error) return res.status(userRes.status >= 400 ? userRes.status : 500).json({ message: userRes.error });
   const currentSquads = getRemnaUserSquads(userRes.data).filter((u) => u !== body.data.squadUuid);
@@ -538,18 +539,18 @@ botAdminRouter.post("/broadcast", async (req, res) => {
   if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
   const { message, channel, photoFileId } = body.data;
   if (!message.trim() && !photoFileId) {
-    return res.status(400).json({ message: "Укажите текст сообщения или приложите фото." });
+    return res.status(400).json({ message: t(adminLang(req), "specifyMessageOrPhoto") });
   }
   let attachment: { buffer: Buffer; mimetype: string; originalname: string } | undefined;
   if (photoFileId) {
     const config = await getSystemConfig();
     const botToken = (config.telegramBotToken ?? "").trim();
     if (!botToken) {
-      return res.status(500).json({ message: "Токен бота не настроен." });
+      return res.status(500).json({ message: t(adminLang(req), "botTokenNotConfigured") });
     }
     const file = await downloadTelegramFile(botToken, photoFileId);
     if (!file) {
-      return res.status(400).json({ message: "Не удалось скачать фото из Telegram." });
+      return res.status(400).json({ message: t(adminLang(req), "failedToDownloadPhoto") });
     }
     // Всегда как картинка в сообщении (sendPhoto), а не как документ
     const mimetype = file.mimeType.startsWith("image/") ? file.mimeType : "image/jpeg";
@@ -563,5 +564,10 @@ botAdminRouter.post("/broadcast", async (req, res) => {
   });
   return res.json(result);
 });
+
+function adminLang(req: import("express").Request): string {
+  const h = req.headers["accept-language"];
+  return h ? h.slice(0, 2) : "en";
+}
 
 export { botAdminRouter };

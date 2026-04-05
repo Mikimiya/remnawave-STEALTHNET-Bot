@@ -13,6 +13,12 @@ import {
   verifyAdmin2FAPendingToken,
 } from "./auth.service.js";
 import { requireAuth } from "./middleware.js";
+import { t } from "../../i18n/index.js";
+
+function adminLang(req: import("express").Request): string {
+  const h = req.headers["accept-language"];
+  return h ? h.slice(0, 2) : "en";
+}
 
 export const authRouter = Router();
 
@@ -87,19 +93,19 @@ authRouter.post("/login", async (req, res) => {
   }
 });
 
-const twoFaLoginSchema = z.object({ tempToken: z.string().min(1), code: z.string().length(6, "Код 6 цифр").regex(/^\d+$/) });
+const twoFaLoginSchema = z.object({ tempToken: z.string().min(1), code: z.string().length(6).regex(/^\d+$/) });
 authRouter.post("/2fa-login", async (req, res) => {
   const body = twoFaLoginSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Введите 6-значный код", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "enter6DigitCode"), errors: body.error.flatten() });
   const payload = verifyAdmin2FAPendingToken(body.data.tempToken, env.JWT_SECRET);
-  if (!payload) return res.status(401).json({ message: "Сессия истекла. Войдите снова." });
+  if (!payload) return res.status(401).json({ message: t(adminLang(req), "sessionExpiredLoginAgain") });
   const admin = await prisma.admin.findUnique({
     where: { id: payload.adminId },
     select: { id: true, email: true, mustChangePassword: true, role: true, allowedSections: true, totpSecret: true, totpEnabled: true },
   });
-  if (!admin?.totpEnabled || !admin.totpSecret) return res.status(401).json({ message: "2FA не включена. Войдите снова." });
+  if (!admin?.totpEnabled || !admin.totpSecret) return res.status(401).json({ message: t(adminLang(req), "twoFANotEnabledLoginAgain") });
   const result = await verify({ secret: admin.totpSecret, token: body.data.code });
-  if (!result.valid) return res.status(401).json({ message: "Неверный код" });
+  if (!result.valid) return res.status(401).json({ message: t(adminLang(req), "invalidCode") });
   const accessToken = signAccessToken({ adminId: admin.id, email: admin.email }, env.JWT_SECRET, env.JWT_ACCESS_EXPIRES_IN);
   const refreshToken = signRefreshToken({ adminId: admin.id, email: admin.email }, env.JWT_SECRET, env.JWT_REFRESH_EXPIRES_IN);
   const expiresAt = new Date();
@@ -114,12 +120,12 @@ authRouter.post("/2fa-login", async (req, res) => {
   });
 });
 
-const twoFaCodeSchema = z.object({ code: z.string().length(6, "Код 6 цифр").regex(/^\d+$/) });
+const twoFaCodeSchema = z.object({ code: z.string().length(6).regex(/^\d+$/) });
 authRouter.post("/2fa/setup", requireAuth, async (req, res) => {
   const adminId = (req as unknown as { adminId?: string }).adminId!;
   const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { id: true, email: true, totpEnabled: true } });
   if (!admin) return res.status(401).json({ message: "Unauthorized" });
-  if (admin.totpEnabled) return res.status(400).json({ message: "2FA уже включена" });
+  if (admin.totpEnabled) return res.status(400).json({ message: t(adminLang(req), "twoFAAlreadyEnabled") });
   const secret = generateSecret();
   const otpauthUrl = generateURI({ issuer: "STEALTHNET Admin", label: admin.email, secret });
   await prisma.admin.update({ where: { id: adminId }, data: { totpSecret: secret, totpEnabled: false } });
@@ -128,24 +134,24 @@ authRouter.post("/2fa/setup", requireAuth, async (req, res) => {
 authRouter.post("/2fa/confirm", requireAuth, async (req, res) => {
   const adminId = (req as unknown as { adminId?: string }).adminId!;
   const body = twoFaCodeSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Введите 6-значный код", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "enter6DigitCode"), errors: body.error.flatten() });
   const row = await prisma.admin.findUnique({ where: { id: adminId }, select: { totpSecret: true, totpEnabled: true } });
-  if (!row?.totpSecret || row.totpEnabled) return res.status(400).json({ message: "Сначала запустите настройку 2FA или 2FA уже включена" });
+  if (!row?.totpSecret || row.totpEnabled) return res.status(400).json({ message: t(adminLang(req), "startTwoFASetupFirst") });
   const result = await verify({ secret: row.totpSecret, token: body.data.code });
-  if (!result.valid) return res.status(400).json({ message: "Неверный код" });
+  if (!result.valid) return res.status(400).json({ message: t(adminLang(req), "invalidCode") });
   await prisma.admin.update({ where: { id: adminId }, data: { totpEnabled: true } });
-  return res.json({ message: "Двухфакторная аутентификация включена" });
+  return res.json({ message: t(adminLang(req), "twoFAEnabled") });
 });
 authRouter.post("/2fa/disable", requireAuth, async (req, res) => {
   const adminId = (req as unknown as { adminId?: string }).adminId!;
   const body = twoFaCodeSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ message: "Введите 6-значный код", errors: body.error.flatten() });
+  if (!body.success) return res.status(400).json({ message: t(adminLang(req), "enter6DigitCode"), errors: body.error.flatten() });
   const row = await prisma.admin.findUnique({ where: { id: adminId }, select: { totpSecret: true, totpEnabled: true } });
-  if (!row?.totpEnabled || !row.totpSecret) return res.status(400).json({ message: "2FA не включена" });
+  if (!row?.totpEnabled || !row.totpSecret) return res.status(400).json({ message: t(adminLang(req), "twoFANotEnabled") });
   const result = await verify({ secret: row.totpSecret, token: body.data.code });
-  if (!result.valid) return res.status(401).json({ message: "Неверный код" });
+  if (!result.valid) return res.status(401).json({ message: t(adminLang(req), "invalidCode") });
   await prisma.admin.update({ where: { id: adminId }, data: { totpSecret: null, totpEnabled: false } });
-  return res.json({ message: "Двухфакторная аутентификация отключена" });
+  return res.json({ message: t(adminLang(req), "twoFADisabled") });
 });
 
 const refreshSchema = z.object({ refreshToken: z.string().min(1) });
