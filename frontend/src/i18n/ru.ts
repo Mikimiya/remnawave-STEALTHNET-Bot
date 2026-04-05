@@ -961,6 +961,7 @@ const ru = {
     enable: "Включить",
     disable: "Выключить",
     restart: "Перезапустить",
+    refresh: "Обновить",
     search: "Поиск",
     all: "Все",
     actions: "Действия",

@@ -961,6 +961,7 @@ const zh: typeof import("./ru").default = {
     enable: "启用",
     disable: "禁用",
     restart: "重启",
+    refresh: "刷新",
     search: "搜索",
     all: "全部",
     actions: "操作",

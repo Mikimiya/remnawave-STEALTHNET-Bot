@@ -961,6 +961,7 @@ const en: typeof import("./ru").default = {
     enable: "Enable",
     disable: "Disable",
     restart: "Restart",
+    refresh: "Refresh",
     search: "Search",
     all: "All",
     actions: "Actions",
