@@ -247,4 +247,124 @@ export const zh: Record<LocaleKeys, string> = {
   cannotModifyFullAdmin: "无法修改完全管理员",
   notFound: "未找到",
   validationError: "验证错误",
+
+  // ── Zod schema messages ───────────────────────────────────────────
+  zodCode6Digits: "验证码必须为6位数字",
+  zodCurrentPasswordRequired: "请输入当前密码",
+  zodMinChars6: "最少6个字符",
+  zodMinChars8: "最少8个字符",
+  zodBroadcastMessageRequired: "消息内容为必填项",
+  zodNodeNameRequired: "请填写节点名称",
+
+  // ── Promo code validation ─────────────────────────────────────────
+  promoNotFoundOrInactive: "促销码未找到或已停用",
+  promoExpired: "促销码已过期",
+  promoUsageLimitReached: "促销码使用次数已达上限",
+  promoAlreadyUsedByYou: "您已使用过此促销码",
+
+  // ── AI chat fallbacks ─────────────────────────────────────────────
+  aiNotConfigured: "抱歉，AI助手尚未配置。请联系客服或在管理面板中配置 Groq API Key。",
+  aiNoResponse: "无法获取回复。",
+
+  // ── YooKassa service ──────────────────────────────────────────────
+  yookassaDefaultDescription: "订阅付款",
+  yookassaNetworkError: "服务器无法连接 YooKassa (api.yookassa.ru)。请检查服务器的网络连接、防火墙和DNS。",
+
+  // ── Tariff activation service ─────────────────────────────────────
+  serviceUnavailable: "服务暂时不可用",
+  vpnUserCreationFailed: "VPN 用户创建错误",
+  paymentNotFound: "支付记录未找到",
+  clientNotFoundShort: "客户未找到",
+  tariffNotFoundShort: "套餐未找到",
+  tariffNotLinkedToPayment: "套餐未关联到此支付",
+
+  // ── Singbox ───────────────────────────────────────────────────────
+  singboxInstructionsNoUrl: "复制上方内容。请在设置中填写面板URL或手动替换 {{STEALTHNET_API_URL}}。保存为 docker-compose.yml 后执行：docker compose up -d --build",
+  singboxInstructionsWithUrl: "复制上方内容。面板URL已自动填入。保存为 docker-compose.yml 后执行：docker compose up -d --build",
+  singboxCategoryNotFound: "分类未找到",
+  singboxTariffNotFoundOrDisabled: "Sing-box 套餐未找到或已停用",
+  singboxNoAvailableNodes: "无可用 Sing-box 节点，请稍后再试。",
+  singboxNoFreeSlots: "节点无空闲位置",
+  singboxTariffNotLinkedToPayment: "Sing-box 套餐未关联到此支付",
+
+  // ── Proxy ─────────────────────────────────────────────────────────
+  proxyInstructionsNoUrl: "复制上方内容。请在设置中填写面板URL（设置→应用URL）或手动替换 {{STEALTHNET_API_URL}}。保存为 docker-compose.yml 后执行：docker compose up -d --build",
+  proxyInstructionsWithUrl: "复制上方内容。面板URL已从设置自动填入。保存为 docker-compose.yml 后执行：docker compose up -d --build",
+  proxyCategoryNotFound: "分类未找到",
+  proxyTariffNotFoundOrDisabled: "代理套餐未找到或已停用",
+  proxyNoAvailableNodes: "无可用代理节点，请稍后再试。",
+  proxyNoFreeSlots: "节点无空闲位置",
+  proxyTariffNotLinkedToPayment: "代理套餐未关联到此支付",
+
+  // ── Admin analytics ───────────────────────────────────────────────
+  providerBalance: "余额",
+
+  // ── Extra options service ─────────────────────────────────────────
+  remnaApiNotConfigured: "Remna API 未配置",
+  paymentNotFoundGeneric: "支付记录未找到",
+  paymentNotOptionPurchase: "该支付不是购买附加选项",
+  clientNotLinkedToVpn: "客户未关联 VPN（无 remnawaveUuid）。请先订阅。",
+  unknownOptionType: "未知选项类型",
+
+  // ── Payment gateway network errors ────────────────────────────────
+  heleketNetworkError: "无法连接 Heleket。请检查网络连接和设置。",
+  cryptopayNetworkError: "无法连接 Crypto Pay。请检查网络连接和设置。",
+
+  // ── Contest service ───────────────────────────────────────────────
+  contestNotFoundService: "竞赛未找到",
+  drawAlreadyDone: "抽奖已完成",
+  winnersAlreadyRecorded: "获奖者已记录",
+  notEnoughParticipants: "参与者不足（至少需要3人）",
+
+  // ── Broadcast service ─────────────────────────────────────────────
+  defaultServiceNameFallback: "服务",
+  broadcastSmtpNotConfigured: "邮件：SMTP 未配置（设置 → 支付 / 邮件）",
+  broadcastDefaultSubject: "来自 {name} 的消息",
+
+  // ── Backup ────────────────────────────────────────────────────────
+  databaseUrlNotSet: "DATABASE_URL 未设置",
+  invalidDatabaseUrl: "DATABASE_URL 格式无效",
+  backupCreationError: "备份创建错误。请确保容器中已安装 postgresql-client。",
+  backupListError: "读取备份列表错误",
+  specifyBackupPath: "请指定 path 参数（备份的相对路径）",
+  backupNotFound: "备份未找到",
+  confirmRestore: "请确认恢复：指定 confirm: RESTORE",
+  backupNotFoundOnServer: "服务器上未找到备份",
+  selectBackupFile: "请选择备份文件（.sql）或指定已保存备份的 path",
+  databaseRestoredFromBackup: "数据库已从备份恢复。",
+  noOutput: "无输出",
+  psqlNotStarted: "psql 未启动：{msg}。请安装 postgresql-client。",
+  psqlExitCode: "psql 退出代码 {code}{signal}。{output}",
+
+  // ── Mail templates ────────────────────────────────────────────────
+  mailGreeting: "您好！",
+  mailVerifyLinkValid24h: "链接有效期为24小时。",
+  mailVerifyIgnore: "如果您未注册，请忽略此邮件。",
+  mailLinkEmailValid24h: "链接有效期为24小时。",
+  mailLinkEmailIgnore: "如果您未请求绑定邮箱，请忽略此邮件。",
+  mailResetLinkValid1h: "链接有效期为1小时，且只能使用一次。",
+  mailResetIgnore: "如果这不是您的操作，请忽略此邮件——您的密码不会更改。",
+
+  // ── Broadcast (telegram) ──────────────────────────────────────────
+  broadcastTelegramTokenMissing: "Telegram：未设置机器人令牌（设置 → 邮件和 Telegram）",
+
+  // ── Analytics ─────────────────────────────────────────────────────
+  analyticsNoLabel: "（无标签）",
+
+  // ── Crypto Pay ────────────────────────────────────────────────────
+  cryptopayNotJson: "Crypto Pay：非 JSON（{status}）",
+  cryptopayMissingInvoice: "Crypto Pay：响应中没有 invoice_id 或支付 URL",
+
+  // ── Heleket (extra) ────────────────────────────────────────────────
+  heleketNotJson: "Heleket：非 JSON（{status}）",
+  heleketMissingUuid: "Heleket：响应中没有 uuid 或 url",
+
+  // ── Platega ───────────────────────────────────────────────────────
+  plategaInvalidCredentials: "Platega：无效的 Merchant ID 或密钥",
+  plategaNoPaymentUrl: "Platega 未返回支付链接",
+  plategaPaymentDescription: "订单 {orderId} 的付款",
+
+  // ── Sync service ──────────────────────────────────────────────────
+  remnaApiNotConfiguredFull: "Remna API 未配置（REMNA_API_URL, REMNA_ADMIN_TOKEN）",
+  remnaApiNotConfiguredShort: "Remna API 未配置",
 };

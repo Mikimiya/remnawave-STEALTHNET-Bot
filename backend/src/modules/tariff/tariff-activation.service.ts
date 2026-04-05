@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
 import {
   remnaCreateUser,
   remnaUpdateUser,
@@ -84,7 +85,7 @@ export async function activateTariffForClient(
   },
   tariff: { durationDays: number; trafficLimitBytes: bigint | null; deviceLimit: number | null; internalSquadUuids: string[]; trafficResetStrategy?: string },
 ): Promise<ActivationResult> {
-  if (!isRemnaConfigured()) return { ok: false, error: "Сервис временно недоступен", status: 503 };
+  if (!isRemnaConfigured()) return { ok: false, error: t("en", "serviceUnavailable"), status: 503 };
 
   const trafficLimitBytes = tariff.trafficLimitBytes != null ? Number(tariff.trafficLimitBytes) : 0;
   const hwidDeviceLimit = tariff.deviceLimit ?? null;
@@ -153,7 +154,7 @@ export async function activateTariffForClient(
       });
       existingUuid = extractRemnaUuid(createRes.data);
     }
-    if (!existingUuid) return { ok: false, error: "Ошибка создания пользователя VPN", status: 502 };
+    if (!existingUuid) return { ok: false, error: t("en", "vpnUserCreationFailed"), status: 502 };
 
     const currentSquads = existingUuid ? extractCurrentSquads((await remnaGetUser(existingUuid)).data) : [];
     const activeInternalSquads = resolveSquads(tariff.internalSquadUuids, currentSquads);
@@ -179,7 +180,7 @@ export async function activateTariffByPaymentId(paymentId: string): Promise<Acti
     select: { tariffId: true, clientId: true, metadata: true },
   });
   if (!payment) {
-    return { ok: false, error: "Платёж не найден", status: 404 };
+    return { ok: false, error: t("en", "paymentNotFound"), status: 404 };
   }
 
   const client = await prisma.client.findUnique({
@@ -187,13 +188,13 @@ export async function activateTariffByPaymentId(paymentId: string): Promise<Acti
     select: { id: true, remnawaveUuid: true, email: true, telegramId: true, telegramUsername: true },
   });
   if (!client) {
-    return { ok: false, error: "Клиент не найден", status: 404 };
+    return { ok: false, error: t("en", "clientNotFoundShort"), status: 404 };
   }
 
   if (payment.tariffId) {
     const tariff = await prisma.tariff.findUnique({ where: { id: payment.tariffId } });
     if (!tariff) {
-      return { ok: false, error: "Тариф не найден", status: 404 };
+      return { ok: false, error: t("en", "tariffNotFoundShort"), status: 404 };
     }
     return activateTariffForClient(client, tariff);
   }
@@ -203,7 +204,7 @@ export async function activateTariffByPaymentId(paymentId: string): Promise<Acti
     return activateTariffForClient(client, customBuild);
   }
 
-  return { ok: false, error: "Тариф не привязан к платежу", status: 400 };
+  return { ok: false, error: t("en", "tariffNotLinkedToPayment"), status: 400 };
 }
 
 function parseCustomBuildMetadata(metadata: string | null): { durationDays: number; trafficLimitBytes: bigint | null; deviceLimit: number | null; internalSquadUuids: string[]; trafficResetStrategy?: string } | null {

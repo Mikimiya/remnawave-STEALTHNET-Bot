@@ -247,4 +247,124 @@ export const ru: Record<LocaleKeys, string> = {
   cannotModifyFullAdmin: "Нельзя изменить полного администратора",
   notFound: "Не найдено",
   validationError: "Ошибка валидации",
+
+  // ── Zod schema messages ───────────────────────────────────────────
+  zodCode6Digits: "Код 6 цифр",
+  zodCurrentPasswordRequired: "Введите текущий пароль",
+  zodMinChars6: "Минимум 6 символов",
+  zodMinChars8: "Пароль не менее 8 символов",
+  zodBroadcastMessageRequired: "Текст сообщения обязателен",
+  zodNodeNameRequired: "Укажите название ноды",
+
+  // ── Promo code validation ─────────────────────────────────────────
+  promoNotFoundOrInactive: "Промокод не найден или неактивен",
+  promoExpired: "Срок действия промокода истёк",
+  promoUsageLimitReached: "Лимит использований промокода исчерпан",
+  promoAlreadyUsedByYou: "Вы уже использовали этот промокод",
+
+  // ── AI chat fallbacks ─────────────────────────────────────────────
+  aiNotConfigured: "Извините, AI-ассистент пока не настроен. Пожалуйста, обратитесь в поддержку или настройте Groq API Key в админ-панели.",
+  aiNoResponse: "Не удалось получить ответ.",
+
+  // ── YooKassa service ──────────────────────────────────────────────
+  yookassaDefaultDescription: "Оплата подписки",
+  yookassaNetworkError: "Сервер не может подключиться к ЮKassa (api.yookassa.ru). Проверьте доступ в интернет, firewall и DNS на сервере.",
+
+  // ── Tariff activation service ─────────────────────────────────────
+  serviceUnavailable: "Сервис временно недоступен",
+  vpnUserCreationFailed: "Ошибка создания пользователя VPN",
+  paymentNotFound: "Платёж не найден",
+  clientNotFoundShort: "Клиент не найден",
+  tariffNotFoundShort: "Тариф не найден",
+  tariffNotLinkedToPayment: "Тариф не привязан к платежу",
+
+  // ── Singbox ───────────────────────────────────────────────────────
+  singboxInstructionsNoUrl: "Скопируйте блок выше. Укажите URL панели в настройках или замените {{STEALTHNET_API_URL}} вручную. Сохраните как docker-compose.yml и выполните: docker compose up -d --build",
+  singboxInstructionsWithUrl: "Скопируйте блок выше. URL панели подставлен. Сохраните как docker-compose.yml и выполните: docker compose up -d --build",
+  singboxCategoryNotFound: "Категория не найдена",
+  singboxTariffNotFoundOrDisabled: "Тариф Sing-box не найден или отключён",
+  singboxNoAvailableNodes: "Нет доступных Sing-box нод. Попробуйте позже.",
+  singboxNoFreeSlots: "Нет свободных мест на нодах",
+  singboxTariffNotLinkedToPayment: "Sing-box тариф не привязан к платежу",
+
+  // ── Proxy ─────────────────────────────────────────────────────────
+  proxyInstructionsNoUrl: "Скопируйте блок выше. Укажите URL панели в настройках (Настройки → URL приложения) или замените {{STEALTHNET_API_URL}} вручную. Сохраните как docker-compose.yml на сервере и выполните: docker compose up -d --build",
+  proxyInstructionsWithUrl: "Скопируйте блок выше. URL панели уже подставлен из настроек. Сохраните как docker-compose.yml на сервере и выполните: docker compose up -d --build",
+  proxyCategoryNotFound: "Категория не найдена",
+  proxyTariffNotFoundOrDisabled: "Прокси-тариф не найден или отключён",
+  proxyNoAvailableNodes: "Нет доступных прокси-нод. Попробуйте позже.",
+  proxyNoFreeSlots: "Нет свободных мест на нодах",
+  proxyTariffNotLinkedToPayment: "Прокси-тариф не привязан к платежу",
+
+  // ── Admin analytics ───────────────────────────────────────────────
+  providerBalance: "Баланс",
+
+  // ── Extra options service ─────────────────────────────────────────
+  remnaApiNotConfigured: "Remna API не настроен",
+  paymentNotFoundGeneric: "Платёж не найден",
+  paymentNotOptionPurchase: "Платёж не является покупкой опции",
+  clientNotLinkedToVpn: "Клиент не привязан к VPN (нет remnawaveUuid). Сначала оформите подписку.",
+  unknownOptionType: "Неизвестный тип опции",
+
+  // ── Payment gateway network errors ────────────────────────────────
+  heleketNetworkError: "Нет связи с Heleket. Проверьте интернет и настройки.",
+  cryptopayNetworkError: "Нет связи с Crypto Pay. Проверьте интернет и настройки.",
+
+  // ── Contest service ───────────────────────────────────────────────
+  contestNotFoundService: "Конкурс не найден",
+  drawAlreadyDone: "Розыгрыш уже проведён",
+  winnersAlreadyRecorded: "Победители уже записаны",
+  notEnoughParticipants: "Недостаточно участников (нужно минимум 3)",
+
+  // ── Broadcast service ─────────────────────────────────────────────
+  defaultServiceNameFallback: "Сервис",
+  broadcastSmtpNotConfigured: "Email: не настроен SMTP (Настройки → Платежи / Почта)",
+  broadcastDefaultSubject: "Сообщение от {name}",
+
+  // ── Backup ────────────────────────────────────────────────────────
+  databaseUrlNotSet: "DATABASE_URL не задан",
+  invalidDatabaseUrl: "Неверный формат DATABASE_URL",
+  backupCreationError: "Ошибка создания бэкапа. Убедитесь, что в контейнере установлен postgresql-client.",
+  backupListError: "Ошибка чтения списка бэкапов",
+  specifyBackupPath: "Укажите параметр path (относительный путь к бэкапу)",
+  backupNotFound: "Бэкап не найден",
+  confirmRestore: "Подтвердите восстановление: укажите confirm: RESTORE",
+  backupNotFoundOnServer: "Бэкап на сервере не найден",
+  selectBackupFile: "Выберите файл бэкапа (.sql) или укажите path к сохранённому бэкапу",
+  databaseRestoredFromBackup: "База данных восстановлена из бэкапа.",
+  noOutput: "Нет вывода",
+  psqlNotStarted: "psql не запущен: {msg}. Установите postgresql-client.",
+  psqlExitCode: "psql завершился с кодом {code}{signal}. {output}",
+
+  // ── Mail templates ────────────────────────────────────────────────
+  mailGreeting: "Здравствуйте!",
+  mailVerifyLinkValid24h: "Ссылка действительна 24 часа.",
+  mailVerifyIgnore: "Если вы не регистрировались, проигнорируйте это письмо.",
+  mailLinkEmailValid24h: "Ссылка действительна 24 часа.",
+  mailLinkEmailIgnore: "Если вы не запрашивали привязку, проигнорируйте это письмо.",
+  mailResetLinkValid1h: "Ссылка действует 1 час и может быть использована только один раз.",
+  mailResetIgnore: "Если это были не вы, просто проигнорируйте письмо — пароль не изменится.",
+
+  // ── Broadcast (telegram) ──────────────────────────────────────────
+  broadcastTelegramTokenMissing: "Telegram: не задан токен бота (Настройки → Почта и Telegram)",
+
+  // ── Analytics ─────────────────────────────────────────────────────
+  analyticsNoLabel: "(без метки)",
+
+  // ── Crypto Pay ────────────────────────────────────────────────────
+  cryptopayNotJson: "Crypto Pay: не JSON ({status})",
+  cryptopayMissingInvoice: "Crypto Pay: нет invoice_id или pay URL в ответе",
+
+  // ── Heleket (extra) ────────────────────────────────────────────────
+  heleketNotJson: "Heleket: не JSON ({status})",
+  heleketMissingUuid: "Heleket: в ответе нет uuid или url",
+
+  // ── Platega ───────────────────────────────────────────────────────
+  plategaInvalidCredentials: "Platega: неверный Merchant ID или секрет",
+  plategaNoPaymentUrl: "Platega не вернул ссылку на оплату",
+  plategaPaymentDescription: "Оплата заказа {orderId}",
+
+  // ── Sync service ──────────────────────────────────────────────────
+  remnaApiNotConfiguredFull: "Remna API не настроен (REMNA_API_URL, REMNA_ADMIN_TOKEN)",
+  remnaApiNotConfiguredShort: "Remna API не настроен",
 };

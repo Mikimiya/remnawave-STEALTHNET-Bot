@@ -5,6 +5,7 @@
  */
 
 import { createHash } from "crypto";
+import { t } from "../../i18n/index.js";
 
 const HELEKET_BASE = "https://api.heleket.com/v1";
 
@@ -55,7 +56,7 @@ export async function createHeleketInvoice(params: CreateHeleketInvoiceParams): 
   const { config, amount, currency, orderId, urlCallback, urlSuccess, urlReturn, additionalData, lifetime = 3600, toCurrency, network } = params;
   const merchantId = config.merchantId?.trim();
   const apiKey = config.apiKey?.trim();
-  if (!merchantId || !apiKey) return { ok: false, error: "Heleket не настроен" };
+  if (!merchantId || !apiKey) return { ok: false, error: t("en", "heleketNotConfigured") };
 
   const body: Record<string, unknown> = {
     amount: String(amount),
@@ -102,7 +103,7 @@ export async function createHeleketInvoice(params: CreateHeleketInvoiceParams): 
     try {
       data = (await res.json()) as typeof data;
     } catch {
-      return { ok: false, error: `Heleket: не JSON (${res.status})`, status: res.status };
+      return { ok: false, error: t("en", "heleketNotJson", { status: String(res.status) }), status: res.status };
     }
 
     if (data.state !== 0 || !data.result) {
@@ -112,7 +113,7 @@ export async function createHeleketInvoice(params: CreateHeleketInvoiceParams): 
 
     const url = data.result.url;
     if (!data.result.uuid || !url) {
-      return { ok: false, error: "Heleket: в ответе нет uuid или url" };
+      return { ok: false, error: t("en", "heleketMissingUuid") };
     }
 
     return {
@@ -126,7 +127,7 @@ export async function createHeleketInvoice(params: CreateHeleketInvoiceParams): 
     clearTimeout(timeoutId);
     const message = e instanceof Error ? e.message : String(e);
     if (message.includes("fetch") || message.includes("ECONNREFUSED") || message.includes("ENOTFOUND") || message.includes("ETIMEDOUT") || (e instanceof Error && e.name === "AbortError")) {
-      return { ok: false, error: "Нет связи с Heleket. Проверьте интернет и настройки." };
+      return { ok: false, error: t("en", "heleketNetworkError") };
     }
     return { ok: false, error: message };
   }

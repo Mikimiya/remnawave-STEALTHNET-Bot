@@ -6,12 +6,17 @@ import { randomBytes } from "crypto";
 import express, { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
 import { requireAuth, requireAdminSection } from "../auth/middleware.js";
 import { getSystemConfig } from "../client/client.service.js";
 
 export const proxyAdminRouter = Router();
 proxyAdminRouter.use(requireAuth);
 proxyAdminRouter.use(requireAdminSection);
+
+function adminLang(req: express.Request): string {
+  return (req.headers["accept-language"] ?? "en").toString().slice(0, 2);
+}
 
 function asyncRoute(
   fn: (req: express.Request, res: express.Response) => Promise<void | express.Response>
@@ -27,7 +32,7 @@ function generateNodeToken(): string {
 }
 
 const createNodeSchema = z.object({
-  name: z.string().min(1, "Укажите название ноды").max(200).transform((s) => s.trim()),
+  name: z.string().min(1, "Specify node name").max(200).transform((s) => s.trim()),
   socksPort: z.number().int().min(1).max(65535).optional(),
   httpPort: z.number().int().min(1).max(65535).optional(),
 });
@@ -121,8 +126,8 @@ services:
     },
     dockerCompose,
     instructions: apiUrl === "{{STEALTHNET_API_URL}}"
-      ? "Скопируйте блок выше. Укажите URL панели в настройках (Настройки → URL приложения) или замените {{STEALTHNET_API_URL}} вручную. Сохраните как docker-compose.yml на сервере и выполните: docker compose up -d --build"
-      : "Скопируйте блок выше. URL панели уже подставлен из настроек. Сохраните как docker-compose.yml на сервере и выполните: docker compose up -d --build",
+      ? t(adminLang(req), "proxyInstructionsNoUrl")
+      : t(adminLang(req), "proxyInstructionsWithUrl"),
   });
 }));
 
@@ -333,7 +338,7 @@ proxyAdminRouter.post("/tariffs", asyncRoute(async (req, res) => {
   const body = createProxyTariffSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
   const cat = await prisma.proxyCategory.findUnique({ where: { id: body.data.categoryId } });
-  if (!cat) return res.status(400).json({ message: "Категория не найдена" });
+  if (!cat) return res.status(400).json({ message: t(adminLang(req), "proxyCategoryNotFound") });
   const trafficBytes = body.data.trafficLimitBytes != null
     ? BigInt(typeof body.data.trafficLimitBytes === "string" ? body.data.trafficLimitBytes : body.data.trafficLimitBytes)
     : null;

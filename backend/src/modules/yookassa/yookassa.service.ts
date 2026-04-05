@@ -3,6 +3,8 @@
  * Документация: https://yookassa.ru/developers/api#create_payment
  */
 
+import { t } from "../../i18n/index.js";
+
 const YOOKASSA_API = "https://api.yookassa.ru/v3";
 
 export type CreatePaymentParams = {
@@ -43,7 +45,7 @@ export async function createYookassaPayment(params: CreatePaymentParams): Promis
     },
     items: [
       {
-        description: description.slice(0, 128) || "Оплата подписки",
+        description: description.slice(0, 128) || t("en", "yookassaDefaultDescription"),
         quantity: "1.00",
         amount: { value: valueStr, currency: currencyUpper },
         vat_code: 1, // Без НДС
@@ -127,7 +129,7 @@ export async function createYookassaPayment(params: CreatePaymentParams): Promis
       return {
         ok: false,
         error:
-          "Сервер не может подключиться к ЮKassa (api.yookassa.ru). Проверьте доступ в интернет, firewall и DNS на сервере.",
+          t("en", "yookassaNetworkError"),
       };
     }
     return { ok: false, error: message };

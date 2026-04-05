@@ -679,7 +679,7 @@ clientAuthRouter.post("/telegram-miniapp", async (req, res) => {
   return res.status(201).json({ token, client: toClientShape(client) });
 });
 
-const twoFaLoginSchema = z.object({ tempToken: z.string().min(1), code: z.string().length(6, "Код 6 цифр").regex(/^\d+$/) });
+const twoFaLoginSchema = z.object({ tempToken: z.string().min(1), code: z.string().length(6, "Code must be 6 digits").regex(/^\d+$/) });
 clientAuthRouter.post("/2fa-login", async (req, res) => {
   const body = twoFaLoginSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: t(reqLang(req), "enter6DigitCode"), errors: body.error.flatten() });
@@ -982,7 +982,7 @@ clientRouter.get("/yoomoney/callback", async (req, res) => {
 clientRouter.use(requireClientAuth);
 
 // ——— 2FA (TOTP) ———
-const twoFaConfirmSchema = z.object({ code: z.string().length(6, "Код должен быть 6 цифр").regex(/^\d+$/) });
+const twoFaConfirmSchema = z.object({ code: z.string().length(6, "Code must be 6 digits").regex(/^\d+$/) });
 clientRouter.post("/2fa/setup", async (req, res) => {
   const client = (req as unknown as { client: { id: string; email: string | null } }).client;
   const current = await prisma.client.findUnique({ where: { id: client.id }, select: { totpEnabled: true } });
@@ -1028,8 +1028,8 @@ clientRouter.post("/2fa/disable", async (req, res) => {
 
 // ——— Change Password ———
 const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, "Введите текущий пароль"),
-  newPassword: z.string().min(6, "Минимум 6 символов"),
+  currentPassword: z.string().min(1, "Enter current password"),
+  newPassword: z.string().min(6, "Minimum 6 characters"),
 });
 
 clientRouter.post("/change-password", requireClientAuth, async (req, res) => {
@@ -1064,7 +1064,7 @@ clientRouter.post("/change-password", requireClientAuth, async (req, res) => {
 });
 
 const setPasswordSchema = z.object({
-  newPassword: z.string().min(6, "Минимум 6 символов"),
+  newPassword: z.string().min(6, "Minimum 6 characters"),
 });
 
 clientRouter.post("/set-password", requireClientAuth, async (req, res) => {
@@ -1367,7 +1367,7 @@ clientRouter.post("/trial", async (req, res) => {
       data: { remnawaveUuid: existingUuid, trialUsed: true },
     });
     const updated = await prisma.client.findUnique({ where: { id: client.id }, select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, createdAt: true } });
-    createClientNotification({ clientId: client.id, type: "trial_activated", title: "🎁 试用已激活", body: `您的 ${trialDays} 天免费试用已成功激活。` }).catch(() => {});
+    createClientNotification({ clientId: client.id, type: "trial_activated", title: t(reqLang(req), "inAppTrialActivatedTitle"), body: t(reqLang(req), "inAppTrialActivatedBody", { days: String(trialDays) }) }).catch(() => {});
     return res.json({ message: t(reqLang(req), "trialActivated"), client: updated ? toClientShape(updated) : null });
   }
 
@@ -1483,20 +1483,20 @@ clientRouter.post("/promo/activate", async (req, res) => {
 type PromoCodeRow = NonNullable<Awaited<ReturnType<typeof prisma.promoCode.findUnique>>>;
 type ValidateResult = { ok: true; promo: PromoCodeRow } | { ok: false; error: string; status: number };
 
-async function validatePromoCode(code: string, clientId: string): Promise<ValidateResult> {
+async function validatePromoCode(code: string, clientId: string, lang: string): Promise<ValidateResult> {
   const promo = await prisma.promoCode.findUnique({ where: { code: code.trim() } });
-  if (!promo || !promo.isActive) return { ok: false, error: "Промокод не найден или неактивен", status: 404 };
-  if (promo.expiresAt && promo.expiresAt < new Date()) return { ok: false, error: "Срок действия промокода истёк", status: 400 };
+  if (!promo || !promo.isActive) return { ok: false, error: t(lang, "promoNotFoundOrInactive"), status: 404 };
+  if (promo.expiresAt && promo.expiresAt < new Date()) return { ok: false, error: t(lang, "promoExpired"), status: 400 };
 
   if (promo.maxUses > 0) {
     const totalUsages = await prisma.promoCodeUsage.count({ where: { promoCodeId: promo.id } });
-    if (totalUsages >= promo.maxUses) return { ok: false, error: "Лимит использований промокода исчерпан", status: 400 };
+    if (totalUsages >= promo.maxUses) return { ok: false, error: t(lang, "promoUsageLimitReached"), status: 400 };
   }
 
   const clientUsages = await prisma.promoCodeUsage.count({
     where: { promoCodeId: promo.id, clientId },
   });
-  if (clientUsages >= promo.maxUsesPerClient) return { ok: false, error: "Вы уже использовали этот промокод", status: 400 };
+  if (clientUsages >= promo.maxUsesPerClient) return { ok: false, error: t(lang, "promoAlreadyUsedByYou"), status: 400 };
 
   return { ok: true, promo };
 }
@@ -1507,7 +1507,7 @@ clientRouter.post("/promo-code/check", async (req, res) => {
   const { code } = req.body as { code?: string };
   if (!code?.trim()) return res.status(400).json({ message: t(reqLang(req), "promoCodeNotSpecified") });
 
-  const result = await validatePromoCode(code, client.id);
+  const result = await validatePromoCode(code, client.id, reqLang(req));
   if (!result.ok) return res.status(result.status).json({ message: result.error });
 
   const promo = result.promo;
@@ -1532,7 +1532,7 @@ clientRouter.post("/promo-code/activate", async (req, res) => {
   const { code } = req.body as { code?: string };
   if (!code?.trim()) return res.status(400).json({ message: t(reqLang(req), "promoCodeNotSpecified") });
 
-  const result = await validatePromoCode(code, client.id);
+  const result = await validatePromoCode(code, client.id, reqLang(req));
   if (!result.ok) return res.status(result.status).json({ message: result.error });
 
   const promo = result.promo;
@@ -1901,7 +1901,7 @@ clientRouter.post("/payments/platega", async (req, res) => {
   // Применяем промокод на скидку (не для опций по умолчанию, можно разрешить — тогда скидка с опции)
   let promoCodeRecord: { id: string } | null = null;
   if (promoCodeStr?.trim() && !extraOption) {
-    const result = await validatePromoCode(promoCodeStr.trim(), clientId);
+    const result = await validatePromoCode(promoCodeStr.trim(), clientId, reqLang(req));
     if (!result.ok) return res.status(result.status).json({ message: result.error });
     const promo = result.promo;
     if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
@@ -2102,7 +2102,7 @@ clientRouter.post("/payments/balance", async (req, res) => {
   // Промокод на скидку
   let promoCodeRecord: { id: string } | null = null;
   if (promoCodeStr?.trim()) {
-    const result = await validatePromoCode(promoCodeStr.trim(), clientRaw.id);
+    const result = await validatePromoCode(promoCodeStr.trim(), clientRaw.id, reqLang(req));
     if (!result.ok) return res.status(result.status).json({ message: result.error });
     const promo = result.promo;
     if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
@@ -2232,7 +2232,7 @@ clientRouter.post("/custom-build/pay-balance", async (req, res) => {
   let finalPrice = amount;
   let promoCodeRecord: { id: string } | null = null;
   if (parsed.data.promoCode?.trim()) {
-    const result = await validatePromoCode(parsed.data.promoCode.trim(), clientRaw.id);
+    const result = await validatePromoCode(parsed.data.promoCode.trim(), clientRaw.id, reqLang(req));
     if (!result.ok) return res.status(result.status).json({ message: result.error });
     const promo = result.promo;
     if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
@@ -2596,7 +2596,7 @@ clientRouter.post("/yoomoney/create-form-payment", async (req, res) => {
       tariffIdToStore = tariffIdBody;
       amountRounded = Math.round((amountBody ?? tariff.price) * 100) / 100;
       if (promoCodeStr?.trim()) {
-        const result = await validatePromoCode(promoCodeStr.trim(), clientId);
+        const result = await validatePromoCode(promoCodeStr.trim(), clientId, reqLang(req));
         if (result.ok && result.promo.type === "DISCOUNT") {
           const promo = result.promo;
           yoomoneyOriginalAmount = amountRounded;
@@ -3421,7 +3421,7 @@ clientRouter.post("/ai/chat", async (req, res) => {
     if (!apiKey) {
       // Заглушка, если API ключ не настроен
       return res.json({
-        reply: "Извините, AI-ассистент пока не настроен. Пожалуйста, обратитесь в поддержку или настройте Groq API Key в админ-панели."
+        reply: t(reqLang(req), "aiNotConfigured")
       });
     }
 
@@ -3552,7 +3552,7 @@ clientRouter.post("/ai/chat", async (req, res) => {
 
         if (groqRes.ok) {
           const data = await groqRes.json() as any;
-          const reply = data.choices?.[0]?.message?.content || "Не удалось получить ответ.";
+          const reply = data.choices?.[0]?.message?.content || t(reqLang(req), "aiNoResponse");
           return res.json({ reply });
         }
 

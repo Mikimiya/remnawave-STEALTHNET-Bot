@@ -6,6 +6,7 @@
 import { randomBytes } from "crypto";
 import { randomUUID } from "crypto";
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
 
 export type CreateSingboxSlotsResult =
   | { ok: true; slotsCreated: number; slotIds: string[] }
@@ -25,17 +26,17 @@ export async function createSingboxSlotsByPaymentId(paymentId: string): Promise<
     select: { singboxTariffId: true, clientId: true },
   });
   if (!payment?.singboxTariffId) {
-    return { ok: false, error: "Sing-box тариф не привязан к платежу", status: 400 };
+    return { ok: false, error: t("en", "singboxTariffNotLinkedToPayment"), status: 400 };
   }
 
   const tariff = await prisma.singboxTariff.findUnique({ where: { id: payment.singboxTariffId } });
   if (!tariff || !tariff.enabled) {
-    return { ok: false, error: "Тариф Sing-box не найден или отключён", status: 404 };
+    return { ok: false, error: t("en", "singboxTariffNotFoundOrDisabled"), status: 404 };
   }
 
   const client = await prisma.client.findUnique({ where: { id: payment.clientId } });
   if (!client) {
-    return { ok: false, error: "Клиент не найден", status: 404 };
+    return { ok: false, error: t("en", "clientNotFoundShort"), status: 404 };
   }
 
   const nodes = await prisma.singboxNode.findMany({
@@ -44,7 +45,7 @@ export async function createSingboxSlotsByPaymentId(paymentId: string): Promise<
     orderBy: { updatedAt: "asc" },
   });
   if (nodes.length === 0) {
-    return { ok: false, error: "Нет доступных Sing-box нод. Попробуйте позже.", status: 503 };
+    return { ok: false, error: t("en", "singboxNoAvailableNodes"), status: 503 };
   }
 
   const now = new Date();
@@ -81,7 +82,7 @@ export async function createSingboxSlotsByPaymentId(paymentId: string): Promise<
   }
 
   if (slots.length === 0) {
-    return { ok: false, error: "Нет свободных мест на нодах", status: 503 };
+    return { ok: false, error: t("en", "singboxNoFreeSlots"), status: 503 };
   }
 
   const created = await prisma.$transaction(

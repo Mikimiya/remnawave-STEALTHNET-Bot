@@ -3,6 +3,8 @@
  * https://docs.platega.io/
  */
 
+import { t } from "../../i18n/index.js";
+
 const PLATEGA_API_BASE = "https://app.platega.io";
 
 export type PlategaConfig = {
@@ -35,7 +37,7 @@ export async function createPlategaTransaction(
   const body: Record<string, unknown> = {
     paymentMethod: Number(paymentMethod) || 2,
     paymentDetails: { amount: Number(amount), currency: currency.toUpperCase() },
-    description: description || `Оплата заказа ${orderId}`,
+    description: description || t("en", "plategaPaymentDescription", { orderId }),
     return: returnUrl,
     failedUrl,
     payload: orderId, // orderId передаём через payload — единственное кастомное поле в API Platega
@@ -63,7 +65,7 @@ export async function createPlategaTransaction(
     }
 
     if (res.status === 401) {
-      return { error: "Platega: неверный Merchant ID или секрет" };
+      return { error: t("en", "plategaInvalidCredentials") };
     }
     if (res.status !== 200) {
       const msg = (data.message as string) || (data.error as string) || text?.slice(0, 200);
@@ -74,7 +76,7 @@ export async function createPlategaTransaction(
     const transactionId = (data.transactionId as string) || (data.id as string);
 
     if (!paymentUrl) {
-      return { error: "Platega не вернул ссылку на оплату" };
+      return { error: t("en", "plategaNoPaymentUrl") };
     }
 
     return { paymentUrl, transactionId: transactionId || "" };

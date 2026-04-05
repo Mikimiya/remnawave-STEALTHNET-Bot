@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
 import { remnaGetUser, remnaUpdateUser, isRemnaConfigured } from "../remna/remna.client.js";
 
 export type ApplyExtraOptionResult = { ok: true } | { ok: false; error: string; status: number };
@@ -67,23 +68,23 @@ function getRemnaSquads(data: unknown): string[] {
  * получить клиента и remnawaveUuid, обновить пользователя в Remna (добавить трафик/устройства/сквад).
  */
 export async function applyExtraOptionByPaymentId(paymentId: string): Promise<ApplyExtraOptionResult> {
-  if (!isRemnaConfigured()) return { ok: false, error: "Remna API не настроен", status: 503 };
+  if (!isRemnaConfigured()) return { ok: false, error: t("en", "remnaApiNotConfigured"), status: 503 };
 
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     select: { clientId: true, metadata: true },
   });
-  if (!payment) return { ok: false, error: "Платёж не найден", status: 404 };
+  if (!payment) return { ok: false, error: t("en", "paymentNotFoundGeneric"), status: 404 };
 
   const option = parseMetadataExtraOption(payment.metadata);
-  if (!option) return { ok: false, error: "Платёж не является покупкой опции", status: 400 };
+  if (!option) return { ok: false, error: t("en", "paymentNotOptionPurchase"), status: 400 };
 
   const client = await prisma.client.findUnique({
     where: { id: payment.clientId },
     select: { remnawaveUuid: true },
   });
   if (!client?.remnawaveUuid) {
-    return { ok: false, error: "Клиент не привязан к VPN (нет remnawaveUuid). Сначала оформите подписку.", status: 400 };
+    return { ok: false, error: t("en", "clientNotLinkedToVpn"), status: 400 };
   }
 
   const userRes = await remnaGetUser(client.remnawaveUuid);
@@ -143,5 +144,5 @@ export async function applyExtraOptionByPaymentId(paymentId: string): Promise<Ap
     return { ok: true };
   }
 
-  return { ok: false, error: "Неизвестный тип опции", status: 400 };
+  return { ok: false, error: t("en", "unknownOptionType"), status: 400 };
 }

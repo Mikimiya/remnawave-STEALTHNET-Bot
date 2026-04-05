@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
 import { getSystemConfig } from "../client/client.service.js";
 import { sendEmail } from "../mail/mail.service.js";
 import { createBulkNotifications } from "../notification/client-notification.service.js";
@@ -144,7 +145,7 @@ export async function runBroadcast(options: {
   if (doTelegram) {
     const botToken = config.telegramBotToken?.trim();
     if (!botToken) {
-      result.errors.push("Telegram: не задан токен бота (Настройки → Почта и Telegram)");
+      result.errors.push(t("en", "broadcastTelegramTokenMissing"));
       result.ok = false;
     } else {
       const clients = await prisma.client.findMany({
@@ -194,15 +195,15 @@ export async function runBroadcast(options: {
       fromName: config.smtpFromName ?? null,
     };
     if (!smtpConfig.host || !smtpConfig.fromEmail) {
-      result.errors.push("Email: не настроен SMTP (Настройки → Платежи / Почта)");
+      result.errors.push(t("en", "broadcastSmtpNotConfigured"));
       result.ok = false;
     } else {
       const clients = await prisma.client.findMany({
         where: { email: { not: null } },
         select: { id: true, email: true },
       });
-      const serviceName = config.serviceName || "Сервис";
-      const subj = subject.trim() || `Сообщение от ${serviceName}`;
+      const serviceName = config.serviceName || t("en", "defaultServiceNameFallback");
+      const subj = subject.trim() || t("en", "broadcastDefaultSubject", { name: serviceName });
       const html = message.trim().replace(/\n/g, "<br>\n");
       const htmlBody = `<!DOCTYPE html><html><body style="font-family: sans-serif;">${html}</body></html>`;
       const emailAttachments = attachment

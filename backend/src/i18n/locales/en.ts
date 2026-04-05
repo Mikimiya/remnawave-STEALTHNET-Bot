@@ -245,6 +245,126 @@ export const en = {
   cannotModifyFullAdmin: "Cannot modify full admin",
   notFound: "Not found",
   validationError: "Validation error",
+
+  // ── Zod schema messages (static, no req context) ──────────────────
+  zodCode6Digits: "Code must be 6 digits",
+  zodCurrentPasswordRequired: "Enter current password",
+  zodMinChars6: "Minimum 6 characters",
+  zodMinChars8: "Minimum 8 characters",
+  zodBroadcastMessageRequired: "Message text is required",
+  zodNodeNameRequired: "Specify node name",
+
+  // ── Promo code validation ─────────────────────────────────────────
+  promoNotFoundOrInactive: "Promo code not found or inactive",
+  promoExpired: "Promo code has expired",
+  promoUsageLimitReached: "Promo code usage limit reached",
+  promoAlreadyUsedByYou: "You have already used this promo code",
+
+  // ── AI chat fallbacks ─────────────────────────────────────────────
+  aiNotConfigured: "Sorry, the AI assistant is not configured yet. Please contact support or set up the Groq API Key in the admin panel.",
+  aiNoResponse: "Failed to get a response.",
+
+  // ── YooKassa service ──────────────────────────────────────────────
+  yookassaDefaultDescription: "Subscription payment",
+  yookassaNetworkError: "Server cannot connect to YooKassa (api.yookassa.ru). Check internet access, firewall and DNS on the server.",
+
+  // ── Tariff activation service ─────────────────────────────────────
+  serviceUnavailable: "Service temporarily unavailable",
+  vpnUserCreationFailed: "VPN user creation error",
+  paymentNotFound: "Payment not found",
+  clientNotFoundShort: "Client not found",
+  tariffNotFoundShort: "Tariff not found",
+  tariffNotLinkedToPayment: "Tariff is not linked to payment",
+
+  // ── Singbox ───────────────────────────────────────────────────────
+  singboxInstructionsNoUrl: "Copy the block above. Set the panel URL in settings or replace {{STEALTHNET_API_URL}} manually. Save as docker-compose.yml and run: docker compose up -d --build",
+  singboxInstructionsWithUrl: "Copy the block above. Panel URL is set. Save as docker-compose.yml and run: docker compose up -d --build",
+  singboxCategoryNotFound: "Category not found",
+  singboxTariffNotFoundOrDisabled: "Sing-box tariff not found or disabled",
+  singboxNoAvailableNodes: "No available Sing-box nodes. Please try later.",
+  singboxNoFreeSlots: "No free slots on nodes",
+  singboxTariffNotLinkedToPayment: "Sing-box tariff is not linked to payment",
+
+  // ── Proxy ─────────────────────────────────────────────────────────
+  proxyInstructionsNoUrl: "Copy the block above. Set the panel URL in settings (Settings → App URL) or replace {{STEALTHNET_API_URL}} manually. Save as docker-compose.yml on the server and run: docker compose up -d --build",
+  proxyInstructionsWithUrl: "Copy the block above. Panel URL is already set from settings. Save as docker-compose.yml on the server and run: docker compose up -d --build",
+  proxyCategoryNotFound: "Category not found",
+  proxyTariffNotFoundOrDisabled: "Proxy tariff not found or disabled",
+  proxyNoAvailableNodes: "No available proxy nodes. Please try later.",
+  proxyNoFreeSlots: "No free slots on nodes",
+  proxyTariffNotLinkedToPayment: "Proxy tariff is not linked to payment",
+
+  // ── Admin analytics ───────────────────────────────────────────────
+  providerBalance: "Balance",
+
+  // ── Extra options service ─────────────────────────────────────────
+  remnaApiNotConfigured: "Remna API is not configured",
+  paymentNotFoundGeneric: "Payment not found",
+  paymentNotOptionPurchase: "Payment is not an option purchase",
+  clientNotLinkedToVpn: "Client is not linked to VPN (no remnawaveUuid). Subscribe first.",
+  unknownOptionType: "Unknown option type",
+
+  // ── Payment gateway network errors ────────────────────────────────
+  heleketNetworkError: "Cannot connect to Heleket. Check internet and settings.",
+  cryptopayNetworkError: "Cannot connect to Crypto Pay. Check internet and settings.",
+
+  // ── Contest service ───────────────────────────────────────────────
+  contestNotFoundService: "Contest not found",
+  drawAlreadyDone: "Draw has already been completed",
+  winnersAlreadyRecorded: "Winners already recorded",
+  notEnoughParticipants: "Not enough participants (minimum 3 required)",
+
+  // ── Broadcast service ─────────────────────────────────────────────
+  defaultServiceNameFallback: "Service",
+  broadcastSmtpNotConfigured: "Email: SMTP is not configured (Settings → Payments / Mail)",
+  broadcastDefaultSubject: "Message from {name}",
+
+  // ── Backup ────────────────────────────────────────────────────────
+  databaseUrlNotSet: "DATABASE_URL is not set",
+  invalidDatabaseUrl: "Invalid DATABASE_URL format",
+  backupCreationError: "Backup creation error. Ensure postgresql-client is installed in the container.",
+  backupListError: "Error reading backup list",
+  specifyBackupPath: "Specify path parameter (relative path to backup)",
+  backupNotFound: "Backup not found",
+  confirmRestore: "Confirm restore: specify confirm: RESTORE",
+  backupNotFoundOnServer: "Backup not found on server",
+  selectBackupFile: "Select a backup file (.sql) or specify path to saved backup",
+  databaseRestoredFromBackup: "Database restored from backup.",
+  noOutput: "No output",
+  psqlNotStarted: "psql not started: {msg}. Install postgresql-client.",
+  psqlExitCode: "psql exited with code {code}{signal}. {output}",
+
+  // ── Mail templates ────────────────────────────────────────────────
+  mailGreeting: "Hello!",
+  mailVerifyLinkValid24h: "The link is valid for 24 hours.",
+  mailVerifyIgnore: "If you did not register, please ignore this email.",
+  mailLinkEmailValid24h: "The link is valid for 24 hours.",
+  mailLinkEmailIgnore: "If you did not request email linking, please ignore this email.",
+  mailResetLinkValid1h: "The link is valid for 1 hour and can only be used once.",
+  mailResetIgnore: "If this was not you, just ignore this email — your password will not change.",
+
+  // ── Broadcast (telegram) ──────────────────────────────────────────
+  broadcastTelegramTokenMissing: "Telegram: bot token is not set (Settings → Mail & Telegram)",
+
+  // ── Analytics ─────────────────────────────────────────────────────
+  analyticsNoLabel: "(no label)",
+
+  // ── Crypto Pay ────────────────────────────────────────────────────
+  cryptopayNotJson: "Crypto Pay: not JSON ({status})",
+  cryptopayMissingInvoice: "Crypto Pay: no invoice_id or pay URL in response",
+
+  // ── Heleket (extra) ────────────────────────────────────────────────
+  heleketNotJson: "Heleket: not JSON ({status})",
+  heleketMissingUuid: "Heleket: no uuid or url in response",
+
+  // ── Platega ───────────────────────────────────────────────────────
+  plategaInvalidCredentials: "Platega: invalid Merchant ID or secret",
+  plategaNoPaymentUrl: "Platega did not return a payment URL",
+  plategaPaymentDescription: "Payment for order {orderId}",
+
+  // ── Sync service ──────────────────────────────────────────────────
+  remnaApiNotConfiguredFull: "Remna API is not configured (REMNA_API_URL, REMNA_ADMIN_TOKEN)",
+  remnaApiNotConfiguredShort: "Remna API is not configured",
 } as const;
 
 export type LocaleKeys = keyof typeof en;

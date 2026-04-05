@@ -775,7 +775,7 @@ adminRouter.patch("/clients/:id", async (req, res) => {
 });
 
 const setClientPasswordSchema = z.object({
-  newPassword: z.string().min(8, "Пароль не менее 8 символов"),
+  newPassword: z.string().min(8, "Minimum 8 characters"),
 });
 
 adminRouter.patch("/clients/:id/password", async (req, res) => {
@@ -2029,7 +2029,7 @@ adminRouter.post("/sync/create-remna-for-missing", async (_req, res) => {
 const broadcastSchema = z.object({
   channel: z.enum(["telegram", "email", "both"]),
   subject: z.string().max(500).optional(),
-  message: z.string().min(1, "Текст сообщения обязателен").max(4096),
+  message: z.string().min(1, "Message text is required").max(4096),
 });
 
 const broadcastUpload = multer({
@@ -2445,7 +2445,7 @@ function fillDaySeries(map: Record<string, number>, from: Date, to: Date): { dat
   return out;
 }
 
-adminRouter.get("/analytics", async (_req, res) => {
+adminRouter.get("/analytics", async (req, res) => {
   const now = new Date();
   const day1Ago = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const day7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -2517,7 +2517,7 @@ adminRouter.get("/analytics", async (_req, res) => {
   // ─── Аналитика по источникам трафика (UTM) ───
   const bySourceKey: Record<string, { registrations: number; trials: number; payments: number; revenue: number }> = {};
   function keyFor(source: string | null, campaign: string | null) {
-    const s = source?.trim() || "(без метки)";
+    const s = source?.trim() || t(adminLang(req), "analyticsNoLabel");
     const c = campaign?.trim() || "";
     return `${s}\t${c}`;
   }
@@ -2571,7 +2571,7 @@ adminRouter.get("/analytics", async (_req, res) => {
 
   // ─── Доход по провайдерам ───
   const providerSeries = Object.entries(revenueByProvider).map(([provider, amount]) => ({
-    provider: provider === "balance" ? "Баланс" : provider === "platega" ? "Platega" : provider === "cryptopay" ? "Crypto Pay" : provider === "heleket" ? "Heleket" : provider === "epay" ? "ePay" : provider,
+    provider: provider === "balance" ? t(adminLang(req), "providerBalance") : provider === "platega" ? "Platega" : provider === "cryptopay" ? "Crypto Pay" : provider === "heleket" ? "Heleket" : provider === "epay" ? "ePay" : provider,
     amount,
   }));
 

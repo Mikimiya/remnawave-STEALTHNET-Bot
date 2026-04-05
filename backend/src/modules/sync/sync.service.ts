@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
 import {
   isRemnaConfigured,
   remnaGetUsers,
@@ -52,7 +53,7 @@ export async function syncFromRemna(): Promise<{
   const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
 
   if (!isRemnaConfigured()) {
-    result.errors.push("Remna API не настроен (REMNA_API_URL, REMNA_ADMIN_TOKEN)");
+    result.errors.push(t("en", "remnaApiNotConfiguredFull"));
     return { ok: false, ...result };
   }
 
@@ -193,7 +194,7 @@ export async function syncToRemna(): Promise<{
   const result = { updated: 0, unlinked: 0, errors: [] as string[] };
 
   if (!isRemnaConfigured()) {
-    result.errors.push("Remna API не настроен");
+    result.errors.push(t("en", "remnaApiNotConfiguredShort"));
     return { ok: false, ...result };
   }
 
@@ -251,7 +252,7 @@ export async function createRemnaUsersForClientsWithoutUuid(): Promise<{
   const result = { created: 0, linked: 0, errors: [] as string[] };
 
   if (!isRemnaConfigured()) {
-    result.errors.push("Remna API не настроен");
+    result.errors.push(t("en", "remnaApiNotConfiguredShort"));
     return { ok: false, ...result };
   }
 

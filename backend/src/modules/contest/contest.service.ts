@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
 
 export type ContestConditions = {
   minTariffDays?: number;
@@ -134,9 +135,9 @@ export async function runDraw(contestId: string): Promise<{ ok: boolean; error?:
     where: { id: contestId },
     include: { winners: true },
   });
-  if (!contest) return { ok: false, error: "Конкурс не найден" };
-  if (contest.status === "drawn") return { ok: false, error: "Розыгрыш уже проведён" };
-  if (contest.winners.length > 0) return { ok: false, error: "Победители уже записаны" };
+  if (!contest) return { ok: false, error: t("en", "contestNotFoundService") };
+  if (contest.status === "drawn") return { ok: false, error: t("en", "drawAlreadyDone") };
+  if (contest.winners.length > 0) return { ok: false, error: t("en", "winnersAlreadyRecorded") };
 
   const conditions = parseConditions(contest.conditionsJson);
   const participants = await getEligibleParticipants(contest.startAt, contest.endAt, conditions);
@@ -146,7 +147,7 @@ export async function runDraw(contestId: string): Promise<{ ok: boolean; error?:
       where: { id: contestId },
       data: { status: "ended" },
     });
-    return { ok: false, error: "Недостаточно участников (нужно минимум 3)" };
+    return { ok: false, error: t("en", "notEnoughParticipants") };
   }
 
   const prizes = [

@@ -4,6 +4,7 @@
  */
 
 import { createHmac, createHash } from "crypto";
+import { t } from "../../i18n/index.js";
 
 const MAINNET_BASE = "https://pay.crypt.bot/api";
 const TESTNET_BASE = "https://testnet-pay.crypt.bot/api";
@@ -91,7 +92,7 @@ export async function createCryptopayInvoice(params: CreateCryptopayInvoiceParam
     try {
       data = (await res.json()) as typeof data;
     } catch {
-      return { ok: false, error: `Crypto Pay: не JSON (${res.status})`, status: res.status };
+      return { ok: false, error: t("en", "cryptopayNotJson", { status: String(res.status) }), status: res.status };
     }
 
     if (!data.ok || !data.result) {
@@ -101,7 +102,7 @@ export async function createCryptopayInvoice(params: CreateCryptopayInvoiceParam
 
     const payUrl = data.result.bot_invoice_url ?? data.result.mini_app_invoice_url ?? data.result.web_app_invoice_url;
     if (!data.result.invoice_id || !payUrl) {
-      return { ok: false, error: "Crypto Pay: нет invoice_id или pay URL в ответе" };
+      return { ok: false, error: t("en", "cryptopayMissingInvoice") };
     }
 
     return {
@@ -115,7 +116,7 @@ export async function createCryptopayInvoice(params: CreateCryptopayInvoiceParam
     clearTimeout(timeoutId);
     const message = e instanceof Error ? e.message : String(e);
     if (message.includes("fetch") || message.includes("ECONNREFUSED") || message.includes("ENOTFOUND") || message.includes("ETIMEDOUT") || (e instanceof Error && e.name === "AbortError")) {
-      return { ok: false, error: "Нет связи с Crypto Pay. Проверьте интернет и настройки." };
+      return { ok: false, error: t("en", "cryptopayNetworkError") };
     }
     return { ok: false, error: message };
   }

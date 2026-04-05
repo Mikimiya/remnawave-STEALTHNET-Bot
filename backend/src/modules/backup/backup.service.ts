@@ -9,6 +9,7 @@ import { mkdtemp, writeFile, readFile, rm, readdir, stat } from "node:fs/promise
 import { createReadStream } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { t } from "../../i18n/index.js";
 
 const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(process.cwd(), "backups");
 
@@ -189,10 +190,10 @@ function runPsql(db: DbConnection, sql: string): Promise<void> {
     let stdout = "";
     proc.stdout?.on("data", (chunk) => { stdout += chunk.toString(); });
     proc.stderr?.on("data", (chunk) => { stderr += chunk.toString(); });
-    proc.on("error", (err) => reject(new Error(`psql не запущен: ${err.message}. Установите postgresql-client.`)));
+    proc.on("error", (err) => reject(new Error(t("en", "psqlNotStarted", { msg: err.message }))));
     proc.on("close", (code, signal) => {
       if (code !== 0) {
-        const out = [stderr, stdout].filter(Boolean).join("\n").trim() || "Нет вывода";
+        const out = [stderr, stdout].filter(Boolean).join("\n").trim() || t("en", "noOutput");
         reject(new Error(`psql: ${out}`));
       } else resolve();
     });
@@ -227,11 +228,11 @@ export async function runPgRestore(db: DbConnection, sqlBuffer: Buffer): Promise
       let stdout = "";
       proc.stdout?.on("data", (chunk) => { stdout += chunk.toString(); });
       proc.stderr?.on("data", (chunk) => { stderr += chunk.toString(); });
-      proc.on("error", (err) => reject(new Error(`psql не запущен: ${err.message}. Установите postgresql-client.`)));
+      proc.on("error", (err) => reject(new Error(t("en", "psqlNotStarted", { msg: err.message }))));
       proc.on("close", (code, signal) => {
         if (code !== 0) {
-          const out = [stderr, stdout].filter(Boolean).join("\n").trim() || "Нет вывода";
-          reject(new Error(`psql завершился с кодом ${code}${signal ? ` (${signal})` : ""}. ${out}`));
+          const out = [stderr, stdout].filter(Boolean).join("\n").trim() || t("en", "noOutput");
+          reject(new Error(t("en", "psqlExitCode", { code: String(code), signal: signal ? ` (${signal})` : "", output: out })));
         } else resolve();
       });
     });

@@ -5,6 +5,7 @@
 
 import { randomBytes } from "crypto";
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
 
 export type CreateProxySlotsResult =
   | { ok: true; slotsCreated: number; slotIds: string[] }
@@ -28,17 +29,17 @@ export async function createProxySlotsByPaymentId(paymentId: string): Promise<Cr
     select: { proxyTariffId: true, clientId: true },
   });
   if (!payment?.proxyTariffId) {
-    return { ok: false, error: "Прокси-тариф не привязан к платежу", status: 400 };
+    return { ok: false, error: t("en", "proxyTariffNotLinkedToPayment"), status: 400 };
   }
 
   const tariff = await prisma.proxyTariff.findUnique({ where: { id: payment.proxyTariffId } });
   if (!tariff || !tariff.enabled) {
-    return { ok: false, error: "Прокси-тариф не найден или отключён", status: 404 };
+    return { ok: false, error: t("en", "proxyTariffNotFoundOrDisabled"), status: 404 };
   }
 
   const client = await prisma.client.findUnique({ where: { id: payment.clientId } });
   if (!client) {
-    return { ok: false, error: "Клиент не найден", status: 404 };
+    return { ok: false, error: t("en", "clientNotFoundShort"), status: 404 };
   }
 
   const assignedNodeIds = await prisma.proxyTariffNode.findMany({
@@ -57,7 +58,7 @@ export async function createProxySlotsByPaymentId(paymentId: string): Promise<Cr
     orderBy: { updatedAt: "asc" },
   });
   if (nodes.length === 0) {
-    return { ok: false, error: "Нет доступных прокси-нод. Попробуйте позже.", status: 503 };
+    return { ok: false, error: t("en", "proxyNoAvailableNodes"), status: 503 };
   }
 
   const now = new Date();
@@ -86,7 +87,7 @@ export async function createProxySlotsByPaymentId(paymentId: string): Promise<Cr
   }
 
   if (slots.length === 0) {
-    return { ok: false, error: "Нет свободных мест на нодах", status: 503 };
+    return { ok: false, error: t("en", "proxyNoFreeSlots"), status: 503 };
   }
 
   const created = await prisma.$transaction(

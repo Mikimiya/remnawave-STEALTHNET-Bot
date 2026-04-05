@@ -6,10 +6,15 @@ import { randomBytes } from "crypto";
 import express, { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../db.js";
+import { t } from "../../i18n/index.js";
 import { requireAuth, requireAdminSection } from "../auth/middleware.js";
 import { getSystemConfig } from "../client/client.service.js";
 
 const PROTOCOLS = ["VLESS", "SHADOWSOCKS", "TROJAN", "HYSTERIA2"] as const;
+
+function adminLang(req: express.Request): string {
+  return (req.headers["accept-language"] ?? "en").toString().slice(0, 2);
+}
 
 export const singboxAdminRouter = Router();
 singboxAdminRouter.use(requireAuth);
@@ -126,8 +131,8 @@ services:
     },
     dockerCompose,
     instructions: apiUrl === "{{STEALTHNET_API_URL}}"
-      ? "Скопируйте блок выше. Укажите URL панели в настройках или замените {{STEALTHNET_API_URL}} вручную. Сохраните как docker-compose.yml и выполните: docker compose up -d --build"
-      : "Скопируйте блок выше. URL панели подставлен. Сохраните как docker-compose.yml и выполните: docker compose up -d --build",
+      ? t(adminLang(req), "singboxInstructionsNoUrl")
+      : t(adminLang(req), "singboxInstructionsWithUrl"),
   });
 }));
 
@@ -343,7 +348,7 @@ singboxAdminRouter.post("/tariffs", asyncRoute(async (req, res) => {
   const body = createTariffSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid input", errors: body.error.flatten() });
   const cat = await prisma.singboxCategory.findUnique({ where: { id: body.data.categoryId } });
-  if (!cat) return res.status(400).json({ message: "Категория не найдена" });
+  if (!cat) return res.status(400).json({ message: t(adminLang(req), "singboxCategoryNotFound") });
   const trafficBytes = body.data.trafficLimitBytes != null
     ? BigInt(typeof body.data.trafficLimitBytes === "string" ? body.data.trafficLimitBytes : body.data.trafficLimitBytes)
     : null;
@@ -396,7 +401,7 @@ singboxAdminRouter.patch("/tariffs/:id", asyncRoute(async (req, res) => {
   if (!existing) return res.status(404).json({ message: "Tariff not found" });
   if (body.data.categoryId) {
     const cat = await prisma.singboxCategory.findUnique({ where: { id: body.data.categoryId } });
-    if (!cat) return res.status(400).json({ message: "Категория не найдена" });
+    if (!cat) return res.status(400).json({ message: t(adminLang(req), "singboxCategoryNotFound") });
   }
   const trafficBytes = body.data.trafficLimitBytes !== undefined
     ? (body.data.trafficLimitBytes == null
