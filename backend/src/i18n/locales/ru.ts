@@ -261,6 +261,9 @@ export const ru: Record<LocaleKeys, string> = {
   promoExpired: "Срок действия промокода истёк",
   promoUsageLimitReached: "Лимит использований промокода исчерпан",
   promoAlreadyUsedByYou: "Вы уже использовали этот промокод",
+  promoNotForThisCategory: "Этот промокод не применим к данной категории",
+  promoNotForThisSubGroup: "Этот промокод не применим к данной подгруппе",
+  promoNotForThisTariff: "Этот промокод не применим к данному тарифу",
 
   // ── AI chat fallbacks ─────────────────────────────────────────────
   aiNotConfigured: "Извините, AI-ассистент пока не настроен. Пожалуйста, обратитесь в поддержку или настройте Groq API Key в админ-панели.",

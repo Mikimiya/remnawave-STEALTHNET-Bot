@@ -2,8 +2,17 @@
  * Inline-клавиатуры с цветными кнопками (Telegram Bot API: style — primary, success, danger).
  * Эмодзи в тексте кнопок (Unicode).
  * i18n: все видимые строки резолвятся через L(lang, key).
+ *
+ * NOTE: style & icon_custom_emoji_id require the bot owner to have Telegram Premium.
+ * Set env ENABLE_COLORED_BUTTONS=true to enable; default is false (safe for all bots).
  */
 import { L } from "./locales/index.js";
+
+/** Whether to include `style` and `icon_custom_emoji_id` in inline keyboard buttons.
+ *  Requires the bot owner to have Telegram Premium subscription.
+ *  Set ENABLE_COLORED_BUTTONS=true in .env to enable. */
+const COLORED_BUTTONS_ENABLED =
+  (process.env.ENABLE_COLORED_BUTTONS ?? "").toLowerCase() === "true";
 
 type ButtonStyle = "primary" | "success" | "danger";
 
@@ -22,8 +31,10 @@ export type BotButtonConfig = { id: string; visible: boolean; label: string; ord
 
 function btn(text: string, data: string, style?: ButtonStyle | null, iconCustomEmojiId?: string): InlineButton {
   const b: InlineButton = { text, callback_data: data };
-  if (style) b.style = style;
-  if (iconCustomEmojiId) b.icon_custom_emoji_id = iconCustomEmojiId;
+  if (COLORED_BUTTONS_ENABLED) {
+    if (style) b.style = style;
+    if (iconCustomEmojiId) b.icon_custom_emoji_id = iconCustomEmojiId;
+  }
   return b;
 }
 

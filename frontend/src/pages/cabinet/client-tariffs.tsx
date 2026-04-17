@@ -49,7 +49,7 @@ function formatPricePerGB(price: number, trafficLimitBytes: number | null, curre
   if (gb <= 0) return null;
   let resetPeriods = 1;
   if (durationDays && durationDays > 0 && trafficResetStrategy) {
-    if (trafficResetStrategy === "MONTH") resetPeriods = Math.max(1, Math.floor(durationDays / 30));
+    if (trafficResetStrategy === "MONTH" || trafficResetStrategy === "MONTH_ROLLING") resetPeriods = Math.max(1, Math.floor(durationDays / 30));
     else if (trafficResetStrategy === "WEEK") resetPeriods = Math.max(1, Math.floor(durationDays / 7));
     else if (trafficResetStrategy === "DAY") resetPeriods = Math.max(1, durationDays);
   }
@@ -62,6 +62,7 @@ const RESET_STRATEGY_I18N: Record<string, string> = {
   DAY: "tariffs.resetDay",
   WEEK: "tariffs.resetWeek",
   MONTH: "tariffs.resetMonth",
+  MONTH_ROLLING: "tariffs.resetMonthRolling",
 };
 
 function getEpayMethodPresentation(methodType: string) {
@@ -177,7 +178,8 @@ export function ClientTariffsPage() {
     setPromoError(null);
     setPromoResult(null);
     try {
-      const res = await api.clientCheckPromoCode(token, promoInput.trim());
+      const tariffId = payModal?.tariff?.id;
+      const res = await api.clientCheckPromoCode(token, promoInput.trim(), tariffId);
       if (res.type === "DISCOUNT") {
         setPromoResult(res);
       } else {
@@ -747,9 +749,9 @@ export function ClientTariffsPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.2 }}
-            className="flex flex-col w-full rounded-[2.5rem] border border-white/10 dark:border-white/5 bg-slate-50/60 dark:bg-slate-950/60 backdrop-blur-[32px] shadow-2xl relative"
+            className="flex flex-col w-full rounded-[2rem] border border-border/40 bg-card/30 backdrop-blur-2xl relative"
           >
-            <div className="flex items-center gap-3 px-4 py-4 border-b border-border/50 bg-background/30 backdrop-blur-md rounded-t-[2.5rem]">
+            <div className="flex items-center gap-3 px-4 py-4 border-b border-border/50 bg-background/30 backdrop-blur-md rounded-t-[2rem]">
               <Button
                 variant="ghost"
                 size="icon"
@@ -826,7 +828,7 @@ export function ClientTariffsPage() {
 
             {/* Trial banner */}
             {showTrial && (
-              <Card className="rounded-3xl border border-green-500/30 bg-green-500/5 backdrop-blur-xl shadow-lg">
+              <Card className="rounded-[2rem] border border-green-500/30 bg-green-500/5 backdrop-blur-xl">
                 <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-6">
                   <div className="flex items-center gap-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-500/20 text-green-500 shrink-0">
@@ -866,7 +868,7 @@ export function ClientTariffsPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
               </div>
             ) : tariffs.length === 0 ? (
-              <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl">
+              <Card className="rounded-[2rem] border border-border/40 bg-card/30 backdrop-blur-2xl">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-4">
                   <Package className="h-12 w-12 opacity-20" />
                   <p className="text-base font-medium">{t("tariffs.noTariffs")}</p>
@@ -886,8 +888,8 @@ export function ClientTariffsPage() {
                         className={cn(
                           "shrink-0 px-4 py-2 rounded-full text-sm font-semibold border transition-all duration-200",
                           selectedCatIndex === idx
-                            ? "bg-primary text-primary-foreground border-primary shadow-md"
-                            : "bg-card/40 border-border/50 text-muted-foreground"
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                            : "bg-card/30 border-border/40 text-muted-foreground"
                         )}
                       >
                         {cat.name}
@@ -928,8 +930,8 @@ export function ClientTariffsPage() {
                                 className={cn(
                                   "shrink-0 px-4 py-2 rounded-xl text-[12px] font-bold border transition-all duration-200 whitespace-nowrap",
                                   selectedSgIdx === sgIdx
-                                    ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/25"
-                                    : "bg-card/40 border-border/50 text-muted-foreground"
+                                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                    : "bg-card/30 border-border/40 text-muted-foreground"
                                 )}
                               >
                                 {sg.name}
@@ -955,10 +957,10 @@ export function ClientTariffsPage() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.25, delay: tidx * 0.06 }}
                           className={cn(
-                            "relative rounded-3xl overflow-hidden flex flex-col",
+                            "relative rounded-[2rem] overflow-hidden flex flex-col",
                             isPopular
-                              ? "shadow-2xl shadow-primary/30 ring-2 ring-primary/60"
-                              : "border border-border/50 shadow-md bg-card/50 backdrop-blur-sm"
+                              ? "shadow-lg ring-1 ring-primary/40"
+                              : "border border-border/40 shadow-sm bg-card/30 backdrop-blur-2xl"
                           )}
                         >
                           {isPopular && (
@@ -988,7 +990,7 @@ export function ClientTariffsPage() {
                                 <p className={cn(
                                   "font-black tabular-nums leading-none",
                                   isPopular ? "text-primary-foreground" : "text-foreground"
-                                )} style={{ fontSize: 40 }}>
+                                )} style={{ fontSize: 32 }}>
                                   {formatMoney(tariffItem.price, tariffItem.currency)}
                                 </p>
                                 {pricePerGB && (
@@ -1104,7 +1106,7 @@ export function ClientTariffsPage() {
                           <Layers className="h-4 w-4 text-primary" />
                           <span>{t("tariffs.subGroup")}</span>
                         </div>
-                        <div className="rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm p-1 flex gap-1 flex-wrap">
+                        <div className="rounded-xl border border-border/40 bg-card/30 backdrop-blur-sm p-1 flex gap-1 flex-wrap">
                           {subGroups.map((sg, sgIdx) => (
                             <button
                               key={sg.id}
@@ -1113,7 +1115,7 @@ export function ClientTariffsPage() {
                               className={cn(
                                 "px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200",
                                 selectedSgIdx === sgIdx
-                                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                                  ? "bg-primary text-primary-foreground shadow-sm"
                                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                               )}
                             >
@@ -1140,8 +1142,8 @@ export function ClientTariffsPage() {
                             className={cn(
                               "relative rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1",
                               isPopular
-                                ? "shadow-xl shadow-primary/20 ring-2 ring-primary/50 hover:-translate-y-2"
-                                : "border border-border/50 shadow-md hover:shadow-lg bg-card/50 backdrop-blur-xl"
+                                ? "shadow-lg ring-1 ring-primary/40 hover:-translate-y-1.5"
+                                : "border border-border/40 shadow-sm hover:shadow-md bg-card/30 backdrop-blur-2xl"
                             )}
                           >
                             {isPopular && (
@@ -1170,7 +1172,7 @@ export function ClientTariffsPage() {
                                 <p className={cn(
                                   "font-black tabular-nums leading-none",
                                   isPopular ? "text-primary-foreground" : "text-foreground"
-                                )} style={{ fontSize: 44 }}>
+                                )} style={{ fontSize: 36 }}>
                                   {formatMoney(tariffItem.price, tariffItem.currency)}
                                 </p>
                                 {pricePerGB && (
@@ -1267,7 +1269,7 @@ export function ClientTariffsPage() {
           }}
         >
           <DialogContent
-            className="w-full max-w-md mx-auto sm:rounded-3xl p-5 sm:p-6 border border-border/50 bg-card/60 backdrop-blur-3xl shadow-2xl"
+            className="w-full max-w-md mx-auto sm:rounded-2xl p-5 sm:p-6 border border-border/40 bg-card/30 backdrop-blur-2xl"
             showCloseButton={!payLoading}
             onOpenAutoFocus={(e) => e.preventDefault()}
           >

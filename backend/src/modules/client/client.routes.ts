@@ -25,7 +25,6 @@ import {
   notifyAdminsAboutNewTicket,
 } from "../notification/telegram-notify.service.js";
 import { requireClientAuth } from "./client.middleware.js";
-import { createClientNotification } from "../notification/client-notification.service.js";
 import { remnaCreateUser, remnaUpdateUser, isRemnaConfigured, remnaGetUser, remnaGetUserByUsername, remnaGetUserByEmail, remnaGetUserByTelegramId, extractRemnaUuid, remnaUsernameFromClient, remnaGetUserHwidDevices, remnaDeleteUserHwidDevice } from "../remna/remna.client.js";
 import { sendVerificationEmail, sendLinkEmailVerification, sendPasswordResetEmail, isSmtpConfigured } from "../mail/mail.service.js";
 import { createPlategaTransaction, isPlategaConfigured } from "../platega/platega.service.js";
@@ -1367,7 +1366,6 @@ clientRouter.post("/trial", async (req, res) => {
       data: { remnawaveUuid: existingUuid, trialUsed: true },
     });
     const updated = await prisma.client.findUnique({ where: { id: client.id }, select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, createdAt: true } });
-    createClientNotification({ clientId: client.id, type: "trial_activated", title: t(reqLang(req), "inAppTrialActivatedTitle"), body: t(reqLang(req), "inAppTrialActivatedBody", { days: String(trialDays) }) }).catch(() => {});
     return res.json({ message: t(reqLang(req), "trialActivated"), client: updated ? toClientShape(updated) : null });
   }
 
@@ -1377,7 +1375,6 @@ clientRouter.post("/trial", async (req, res) => {
   });
   const updated = await prisma.client.findUnique({ where: { id: client.id }, select: { id: true, email: true, telegramId: true, telegramUsername: true, preferredLang: true, preferredCurrency: true, balance: true, referralCode: true, remnawaveUuid: true, trialUsed: true, isBlocked: true, createdAt: true } });
   const lang = reqLang(req);
-  createClientNotification({ clientId: client.id, type: "trial_activated", title: t(lang, "inAppTrialActivatedTitle"), body: t(lang, "inAppTrialActivatedBody", { days: String(trialDays) }) }).catch(() => {});
   return res.json({ message: t(lang, "trialActivated"), client: updated ? toClientShape(updated) : null });
 });
 
@@ -1483,7 +1480,7 @@ clientRouter.post("/promo/activate", async (req, res) => {
 type PromoCodeRow = NonNullable<Awaited<ReturnType<typeof prisma.promoCode.findUnique>>>;
 type ValidateResult = { ok: true; promo: PromoCodeRow } | { ok: false; error: string; status: number };
 
-async function validatePromoCode(code: string, clientId: string, lang: string): Promise<ValidateResult> {
+async function validatePromoCode(code: string, clientId: string, lang: string, tariffContext?: { tariffId?: string; categoryId?: string; subGroupId?: string | null }): Promise<ValidateResult> {
   const promo = await prisma.promoCode.findUnique({ where: { code: code.trim() } });
   if (!promo || !promo.isActive) return { ok: false, error: t(lang, "promoNotFoundOrInactive"), status: 404 };
   if (promo.expiresAt && promo.expiresAt < new Date()) return { ok: false, error: t(lang, "promoExpired"), status: 400 };
@@ -1498,31 +1495,66 @@ async function validatePromoCode(code: string, clientId: string, lang: string): 
   });
   if (clientUsages >= promo.maxUsesPerClient) return { ok: false, error: t(lang, "promoAlreadyUsedByYou"), status: 400 };
 
+  // Проверка ограничений по категории / подгруппе / тарифу
+  if (tariffContext) {
+    if (promo.allowedCategoryIds.length > 0 && tariffContext.categoryId) {
+      if (!promo.allowedCategoryIds.includes(tariffContext.categoryId)) {
+        return { ok: false, error: t(lang, "promoNotForThisCategory"), status: 400 };
+      }
+    }
+    if (promo.allowedSubGroupIds.length > 0 && tariffContext.subGroupId) {
+      if (!promo.allowedSubGroupIds.includes(tariffContext.subGroupId)) {
+        return { ok: false, error: t(lang, "promoNotForThisSubGroup"), status: 400 };
+      }
+    }
+    if (promo.allowedTariffIds.length > 0 && tariffContext.tariffId) {
+      if (!promo.allowedTariffIds.includes(tariffContext.tariffId)) {
+        return { ok: false, error: t(lang, "promoNotForThisTariff"), status: 400 };
+      }
+    }
+  }
+
   return { ok: true, promo };
 }
 
 /** Проверить промокод (для скидки — возвращает данные скидки; для FREE_DAYS — информацию) */
 clientRouter.post("/promo-code/check", async (req, res) => {
   const client = (req as unknown as { client: { id: string } }).client;
-  const { code } = req.body as { code?: string };
+  const { code, tariffId } = req.body as { code?: string; tariffId?: string };
   if (!code?.trim()) return res.status(400).json({ message: t(reqLang(req), "promoCodeNotSpecified") });
 
-  const result = await validatePromoCode(code, client.id, reqLang(req));
+  // Если передан tariffId, подтягиваем контекст категории/подгруппы
+  let tariffContext: { tariffId?: string; categoryId?: string; subGroupId?: string | null } | undefined;
+  if (tariffId) {
+    const tariff = await prisma.tariff.findUnique({ where: { id: tariffId }, select: { id: true, categoryId: true, subGroupId: true } });
+    if (tariff) {
+      tariffContext = { tariffId: tariff.id, categoryId: tariff.categoryId, subGroupId: tariff.subGroupId };
+    }
+  }
+
+  const result = await validatePromoCode(code, client.id, reqLang(req), tariffContext);
   if (!result.ok) return res.status(result.status).json({ message: result.error });
 
   const promo = result.promo;
+  const restrictions = {
+    allowedCategoryIds: promo.allowedCategoryIds,
+    allowedSubGroupIds: promo.allowedSubGroupIds,
+    allowedTariffIds: promo.allowedTariffIds,
+  };
   if (promo.type === "DISCOUNT") {
     return res.json({
       type: "DISCOUNT",
       discountPercent: promo.discountPercent,
       discountFixed: promo.discountFixed,
       name: promo.name,
+      restrictions,
     });
   }
   return res.json({
     type: "FREE_DAYS",
     durationDays: promo.durationDays,
     name: promo.name,
+    restrictions,
   });
 });
 
@@ -1901,7 +1933,13 @@ clientRouter.post("/payments/platega", async (req, res) => {
   // Применяем промокод на скидку (не для опций по умолчанию, можно разрешить — тогда скидка с опции)
   let promoCodeRecord: { id: string } | null = null;
   if (promoCodeStr?.trim() && !extraOption) {
-    const result = await validatePromoCode(promoCodeStr.trim(), clientId, reqLang(req));
+    // Подготавливаем контекст тарифа для проверки ограничений промокода
+    let tariffCtx: { tariffId?: string; categoryId?: string; subGroupId?: string | null } | undefined;
+    if (tariffIdToStore) {
+      const tariffForCtx = await prisma.tariff.findUnique({ where: { id: tariffIdToStore }, select: { id: true, categoryId: true, subGroupId: true } });
+      if (tariffForCtx) tariffCtx = { tariffId: tariffForCtx.id, categoryId: tariffForCtx.categoryId, subGroupId: tariffForCtx.subGroupId };
+    }
+    const result = await validatePromoCode(promoCodeStr.trim(), clientId, reqLang(req), tariffCtx);
     if (!result.ok) return res.status(result.status).json({ message: result.error });
     const promo = result.promo;
     if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
@@ -3949,44 +3987,6 @@ publicConfigRouter.get("/singbox-tariffs", async (req, res) => {
   }
 });
 
-// ——————————————— Notification center (in-app) ———————————————
-
-import {
-  getClientNotifications,
-  getUnreadCount,
-  markNotificationsRead,
-  markAllNotificationsRead,
-} from "../notification/client-notification.service.js";
-
-/** GET /api/client/notifications?cursor=xxx&limit=30 */
-clientRouter.get("/notifications", async (req, res) => {
-  const client = (req as any).client as { id: string };
-  const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
-  const limit = Math.min(parseInt(String(req.query.limit ?? "30"), 10) || 30, 100);
-
-  const result = await getClientNotifications(client.id, { cursor, limit });
-  return res.json(result);
-});
-
-/** GET /api/client/notifications/unread-count */
-clientRouter.get("/notifications/unread-count", async (req, res) => {
-  const client = (req as any).client as { id: string };
-  const count = await getUnreadCount(client.id);
-  return res.json({ count });
-});
-
-/** POST /api/client/notifications/read  body: { ids: string[] } | { all: true } */
-clientRouter.post("/notifications/read", async (req, res) => {
-  const client = (req as any).client as { id: string };
-  const body = req.body as { ids?: string[]; all?: boolean };
-  if (body.all) {
-    await markAllNotificationsRead(client.id);
-  } else if (Array.isArray(body.ids) && body.ids.length > 0) {
-    await markNotificationsRead(client.id, body.ids.slice(0, 200));
-  }
-  return res.json({ ok: true });
-});
-
 // ——————————————— Traffic usage logs (charts) ———————————————
 
 import { getTrafficLogs } from "../notification/traffic-log.service.js";
@@ -3999,4 +3999,93 @@ clientRouter.get("/traffic-log", async (req, res) => {
 
   const logs = await getTrafficLogs(client.id, { days, source });
   return res.json({ logs });
+});
+
+/** GET /api/client/traffic-summary — месячная сводка трафика */
+clientRouter.get("/traffic-summary", async (req, res) => {
+  const client = (req as any).client as { id: string };
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const logs = await prisma.trafficLog.findMany({
+    where: {
+      clientId: client.id,
+      date: { gte: startOfMonth },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  let totalUsed = BigInt(0);
+  let totalUpload = BigInt(0);
+  let totalDownload = BigInt(0);
+  const bySource: Record<string, { used: bigint; upload: bigint; download: bigint }> = {};
+
+  for (const log of logs) {
+    totalUsed += log.usedBytes;
+    totalUpload += log.uploadBytes;
+    totalDownload += log.downloadBytes;
+    const s = log.source;
+    if (!bySource[s]) bySource[s] = { used: BigInt(0), upload: BigInt(0), download: BigInt(0) };
+    bySource[s].used += log.usedBytes;
+    bySource[s].upload += log.uploadBytes;
+    bySource[s].download += log.downloadBytes;
+  }
+
+  return res.json({
+    month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+    totalUsedBytes: totalUsed.toString(),
+    totalUploadBytes: totalUpload.toString(),
+    totalDownloadBytes: totalDownload.toString(),
+    bySource: Object.fromEntries(
+      Object.entries(bySource).map(([k, v]) => [k, {
+        usedBytes: v.used.toString(),
+        uploadBytes: v.upload.toString(),
+        downloadBytes: v.download.toString(),
+      }])
+    ),
+    daysLogged: logs.length,
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ──── Публичные объявления и активности ──────────────────────
+// ═══════════════════════════════════════════════════════════════
+
+/** GET /api/public/announcements — опубликованные объявления */
+publicConfigRouter.get("/announcements", async (_req, res) => {
+  const items = await prisma.announcement.findMany({
+    where: { published: true },
+    orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
+    select: { id: true, title: true, content: true, pinned: true, publishedAt: true, createdAt: true },
+  });
+  return res.json(items);
+});
+
+/** GET /api/public/announcements/:id */
+publicConfigRouter.get("/announcements/:id", async (req, res) => {
+  const item = await prisma.announcement.findFirst({
+    where: { id: req.params.id, published: true },
+    select: { id: true, title: true, content: true, pinned: true, publishedAt: true, createdAt: true },
+  });
+  if (!item) return res.status(404).json({ message: "Not found" });
+  return res.json(item);
+});
+
+/** GET /api/public/activities — опубликованные активности */
+publicConfigRouter.get("/activities", async (_req, res) => {
+  const items = await prisma.activity.findMany({
+    where: { published: true },
+    orderBy: { startAt: "desc" },
+    select: { id: true, title: true, summary: true, coverImage: true, startAt: true, endAt: true, showOnDashboard: true, published: true, createdAt: true },
+  });
+  return res.json(items);
+});
+
+/** GET /api/public/activities/:id — детали активности */
+publicConfigRouter.get("/activities/:id", async (req, res) => {
+  const item = await prisma.activity.findFirst({
+    where: { id: req.params.id, published: true },
+  });
+  if (!item) return res.status(404).json({ message: "Not found" });
+  return res.json(item);
 });

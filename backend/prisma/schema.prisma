@@ -303,6 +303,10 @@ model PromoCode {
   trafficLimitBytes BigInt?   @map("traffic_limit_bytes")
   deviceLimit       Int?      @map("device_limit")
   durationDays      Int?      @map("duration_days")
+  // Ограничения по категории / подгруппе / тарифу (пустой массив = без ограничений)
+  allowedCategoryIds String[] @default([]) @map("allowed_category_ids")
+  allowedSubGroupIds String[] @default([]) @map("allowed_sub_group_ids")
+  allowedTariffIds   String[] @default([]) @map("allowed_tariff_ids")
   // Общие:
   maxUses           Int       @default(0) @map("max_uses") // 0 = без лимита
   maxUsesPerClient  Int       @default(1) @map("max_uses_per_client")
@@ -373,7 +377,7 @@ model Tariff {
   internalSquadUuids String[] @map("internal_squad_uuids")
   trafficLimitBytes  BigInt?  @map("traffic_limit_bytes")
   deviceLimit        Int?     @map("device_limit")
-  trafficResetStrategy String @default("NO_RESET") @map("traffic_reset_strategy") // NO_RESET | DAY | WEEK | MONTH
+  trafficResetStrategy String @default("NO_RESET") @map("traffic_reset_strategy") // NO_RESET | DAY | WEEK | MONTH | MONTH_ROLLING
   price              Float    @default(0)
   currency           String   @default("usd") @map("currency")
   sortOrder          Int      @default(0) @map("sort_order")
@@ -687,4 +691,37 @@ model TrafficLog {
   @@unique([clientId, date, source])
   @@index([clientId, date])
   @@map("traffic_logs")
+}
+
+// ——— Публичные объявления (Markdown) ———
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String    @db.VarChar(500)
+  content     String    @db.Text                   // Markdown
+  pinned      Boolean   @default(false)
+  published   Boolean   @default(false)
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([published, pinned])
+  @@map("announcements")
+}
+
+// ——— Активности / промо-акции ———
+model Activity {
+  id          String    @id @default(cuid())
+  title       String    @db.VarChar(500)
+  summary     String?   @db.VarChar(1000)          // Краткое описание для списка
+  content     String    @db.Text                   // Markdown (детальное описание)
+  coverImage  String?   @map("cover_image") @db.Text // URL или data-url обложки
+  startAt     DateTime  @map("start_at")
+  endAt       DateTime? @map("end_at")
+  showOnDashboard Boolean @default(false) @map("show_on_dashboard") // Показывать на «витрине» как баннер
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([published, startAt])
+  @@map("activities")
 }

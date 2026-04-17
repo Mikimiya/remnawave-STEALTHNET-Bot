@@ -261,6 +261,9 @@ export const zh: Record<LocaleKeys, string> = {
   promoExpired: "促销码已过期",
   promoUsageLimitReached: "促销码使用次数已达上限",
   promoAlreadyUsedByYou: "您已使用过此促销码",
+  promoNotForThisCategory: "此促销码不适用于该分类",
+  promoNotForThisSubGroup: "此促销码不适用于该子分组",
+  promoNotForThisTariff: "此促销码不适用于该套餐",
 
   // ── AI chat fallbacks ─────────────────────────────────────────────
   aiNotConfigured: "抱歉，AI助手尚未配置。请联系客服或在管理面板中配置 Groq API Key。",

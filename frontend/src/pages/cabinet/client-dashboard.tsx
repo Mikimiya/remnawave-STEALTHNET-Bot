@@ -1,15 +1,9 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  
   Package,
-  Wallet,
-  Wifi,
   Calendar,
-  Monitor,
-  Timer,
-  Link2,
   ArrowRight,
   PlusCircle,
   RotateCcw,
@@ -17,20 +11,43 @@ import {
   Check,
   Gift,
   Loader2,
-  Users,
-  
   AlertCircle,
+  Shield,
+  ChevronRight,
+  Megaphone,
+  X,
 } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { useCabinetMiniapp } from "@/pages/cabinet/cabinet-layout";
 import { api } from "@/lib/api";
 import { formatDays } from "@/i18n";
-import type { ClientPayment, ClientReferralStats } from "@/lib/api";
+import type { ClientPayment, ClientReferralStats, AnnouncementRecord } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { useTranslation } from "react-i18next";
 import { formatMoney, translateBackendMessage } from "@/lib/utils";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+/** Strip markdown syntax for plain-text preview */
+function stripMarkdown(md: string): string {
+  return md
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/_(.+?)_/g, "$1")
+    .replace(/~~(.+?)~~/g, "$1")
+    .replace(/`(.+?)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/^[-*+]\s+/gm, "")
+    .replace(/^\d+\.\s+/gm, "")
+    .replace(/^>\s+/gm, "")
+    .replace(/\n{2,}/g, " ")
+    .replace(/\n/g, " ")
+    .trim();
+}
 
 function getLocale(lang?: string): string {
   const l = (lang || "zh").slice(0, 2);
@@ -40,7 +57,7 @@ function getLocale(lang?: string): string {
 }
 
 function formatDate(s: string | null, lang?: string) {
-  if (!s) return "—";
+  if (!s) return "â€”";
   try {
     return new Date(s).toLocaleDateString(getLocale(lang), {
       day: "numeric",
@@ -54,9 +71,9 @@ function formatDate(s: string | null, lang?: string) {
 
 function formatBytes(bytes: number, lang?: string) {
   const l = (lang || "zh").slice(0, 2);
-  const gbLabel = l === "ru" ? "ГБ" : "GB";
-  const mbLabel = l === "ru" ? "МБ" : "MB";
-  const kbLabel = l === "ru" ? "КБ" : "KB";
+  const gbLabel = l === "ru" ? "Ð“Ð‘" : "GB";
+  const mbLabel = l === "ru" ? "ÐœÐ‘" : "MB";
+  const kbLabel = l === "ru" ? "ÐšÐ‘" : "KB";
   if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(1) + " " + gbLabel;
   if (bytes >= 1024 ** 2) return (bytes / 1024 ** 2).toFixed(1) + " " + mbLabel;
   return (bytes / 1024).toFixed(0) + " " + kbLabel;
@@ -110,6 +127,7 @@ const RESET_STRATEGY_I18N: Record<string, string> = {
   DAY: "tariffs.resetDay",
   WEEK: "tariffs.resetWeek",
   MONTH: "tariffs.resetMonth",
+  MONTH_ROLLING: "tariffs.resetMonthRolling",
 };
 
 export function ClientDashboardPage() {
@@ -131,6 +149,10 @@ export function ClientDashboardPage() {
   const [trialError, setTrialError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [_referralStats, setReferralStats] = useState<ClientReferralStats | null>(null);
+  const [pinnedAnnouncements, setPinnedAnnouncements] = useState<AnnouncementRecord[]>([]);
+  const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("dismissed_announcements") || "[]")); } catch { return new Set(); }
+  });
 
   const token = state.token;
   const isMiniapp = useCabinetMiniapp();
@@ -197,6 +219,24 @@ export function ClientDashboardPage() {
     api.getClientReferralStats(token).then(setReferralStats).catch(() => {});
   }, [token, isMiniapp]);
 
+  useEffect(() => {
+    api.getPublicAnnouncements()
+      .then((items) => setPinnedAnnouncements(items.filter((a) => a.pinned)))
+      .catch(() => {});
+  }, []);
+
+  const dismissAnnouncement = (id: string) => {
+    setDismissedAnnouncements((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem("dismissed_announcements", JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const visiblePinned = pinnedAnnouncements.filter((a) => !dismissedAnnouncements.has(a.id));
+  const [announcementModal, setAnnouncementModal] = useState<AnnouncementRecord | null>(null);
+
   async function activateTrial() {
     if (!token) return;
     setTrialError(null);
@@ -252,583 +292,801 @@ export function ClientDashboardPage() {
   const expireDate = subParsed.expireAt ? (() => { try { const d = new Date(subParsed.expireAt); return Number.isNaN(d.getTime()) ? null : d; } catch { return null; } })() : null;
   const daysLeft = expireDate && expireDate > new Date()
     ? (() => {
-        // 按自然日计算剩余天数：将到期日和当前时间都归零到当天 00:00，再算天数差
+        // æŒ‰è‡ªç„¶æ—¥è®¡ç®—å‰©ä½™å¤©æ•°ï¼šå°†åˆ°æœŸæ—¥å’Œå½“å‰æ—¶é—´éƒ½å½’é›¶åˆ°å½“å¤© 00:00ï¼Œå†ç®—å¤©æ•°å·®
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const expireStart = new Date(expireDate.getFullYear(), expireDate.getMonth(), expireDate.getDate());
         const diffDays = Math.round((expireStart.getTime() - todayStart.getTime()) / (24 * 60 * 60 * 1000));
-        // 如果到期日和今天是同一天但还没过期，显示 0 天（即"今天到期"）
+        // å¦‚æžœåˆ°æœŸæ—¥å’Œä»Šå¤©æ˜¯åŒä¸€å¤©ä½†è¿˜æ²¡è¿‡æœŸï¼Œæ˜¾ç¤º 0 å¤©ï¼ˆå³"ä»Šå¤©åˆ°æœŸ"ï¼‰
         return Math.max(0, diffDays);
       })()
     : null;
 
-  // Компонент-состояние отсутствия подписки
+  // ÐšÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚-ÑÐ¾ÑÑ‚Ð¾ÑÐ½Ð¸Ðµ Ð¾Ñ‚ÑÑƒÑ‚ÑÑ‚Ð²Ð¸Ñ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸
   const NoSubscriptionState = () => (
-    <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
-      <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-        <Package className="h-8 w-8 text-primary/70" />
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold text-foreground">{t("dashboard.noSubscription")}</h3>
-        <p className="text-[14px] text-muted-foreground max-w-xs mt-2 mx-auto leading-relaxed">
+    <div className="flex flex-col items-center justify-center py-16 text-center space-y-8">
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="relative"
+      >
+        <div className="h-24 w-24 rounded-full bg-gradient-to-br from-primary/30 via-primary/10 to-transparent flex items-center justify-center ring-1 ring-primary/20 ring-offset-4 ring-offset-background">
+          <Package className="h-10 w-10 text-primary" />
+        </div>
+      </motion.div>
+      <div className="space-y-3 max-w-md mx-auto">
+        <h3 className="text-2xl font-black text-foreground tracking-tight">{t("dashboard.noSubscription")}</h3>
+        <p className="text-base text-muted-foreground leading-relaxed">
           {t("dashboard.noSubscriptionDesc")}
         </p>
       </div>
-      <Link to="/cabinet/tariffs" className="inline-flex h-11 mt-2 items-center justify-center rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm transition-transform duration-300 hover:scale-105 hover:bg-primary/90">
-        <span className="inline-flex items-center leading-none">{t("dashboard.choosePlan")}</span>
+      <Link to="/cabinet/tariffs" className="group inline-flex h-14 items-center justify-center gap-3 rounded-full bg-primary px-10 text-base font-bold text-primary-foreground shadow-[0_0_30px_rgba(var(--primary),0.3)] transition-all duration-500 hover:shadow-[0_0_50px_rgba(var(--primary),0.5)] hover:scale-105 active:scale-95">
+        <span>{t("dashboard.choosePlan")}</span>
+        <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
       </Link>
     </div>
   );
 
   if (isMiniapp) {
     return (
+      <>
       <div className="w-full min-w-0 overflow-hidden space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {(paymentMessage === "success" || paymentMessage === "success_topup" || paymentMessage === "success_tariff") && (
-          <div className="rounded-xl bg-green-500/15 backdrop-blur-md border border-green-500/30 px-4 py-3 text-sm font-medium text-green-700 dark:text-green-400 shadow-sm">
-            {paymentMessage === "success_topup"
-              ? t("dashboard.paymentSuccessTopup")
-              : paymentMessage === "success_tariff"
-                ? t("dashboard.paymentSuccessTariff")
-                : t("dashboard.paymentSuccess")}
-          </div>
-        )}
-        {paymentMessage === "failed" && (
-          <div className="rounded-xl bg-destructive/15 backdrop-blur-md border border-destructive/30 px-4 py-3 text-sm font-medium text-destructive shadow-sm">
-            {t("dashboard.paymentFailed")}
-          </div>
-        )}
+        {/* Payment status toasts */}
+        <AnimatePresence>
+          {(paymentMessage === "success" || paymentMessage === "success_topup" || paymentMessage === "success_tariff") && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 text-[13px] font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-2.5"
+            >
+              <Check className="h-4 w-4 shrink-0" />
+              {paymentMessage === "success_topup"
+                ? t("dashboard.paymentSuccessTopup")
+                : paymentMessage === "success_tariff"
+                  ? t("dashboard.paymentSuccessTariff")
+                  : t("dashboard.paymentSuccess")}
+            </motion.div>
+          )}
+          {paymentMessage === "failed" && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="rounded-2xl bg-destructive/10 border border-destructive/20 px-4 py-3 text-[13px] font-medium text-destructive flex items-center gap-2.5"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {t("dashboard.paymentFailed")}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* 1. Mobile subscription status hero */}
+        {/* Pinned announcements */}
+        <AnimatePresence>
+          {visiblePinned.map((ann) => {
+            const plain = stripMarkdown(ann.content);
+            return (
+              <motion.div
+                key={ann.id}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8, height: 0 }}
+                className="rounded-[1.75rem] border border-amber-500/20 bg-amber-500/5 backdrop-blur-2xl p-4 relative overflow-hidden"
+              >
+                <button
+                  onClick={(e) => { e.stopPropagation(); dismissAnnouncement(ann.id); }}
+                  className="absolute top-3 right-3 text-muted-foreground/30 hover:text-foreground transition-colors z-10"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <div
+                  className="flex items-start gap-3 pr-6 cursor-pointer"
+                  onClick={() => setAnnouncementModal(ann)}
+                >
+                  <div className="h-8 w-8 shrink-0 rounded-xl bg-amber-500/10 flex items-center justify-center mt-0.5">
+                    <Megaphone className="h-3.5 w-3.5 text-amber-500" />
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-[13px] font-bold text-foreground leading-tight">{ann.title}</p>
+                    <p className="text-[12px] text-muted-foreground/50 leading-relaxed line-clamp-2">{plain.slice(0, 150)}{plain.length > 150 ? "…" : ""}</p>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-1">
+                      <span>{t("dashboard.readMore")}</span>
+                      <ChevronRight className="h-3 w-3" />
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+
+        {/* Loading */}
         {loading ? (
-          <section className="rounded-[2rem] border border-border/50 bg-card/45 px-4 py-10 shadow-sm backdrop-blur-xl">
-            <div className="flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
-            </div>
-          </section>
+          <div className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl flex items-center justify-center py-20">
+            <Loader2 className="h-7 w-7 animate-spin text-primary/30" />
+          </div>
         ) : subscriptionError || !hasActiveSubscription ? (
-          <section className="rounded-[2rem] border border-border/50 bg-card/45 p-4 shadow-sm backdrop-blur-xl">
-            <NoSubscriptionState />
-          </section>
+          /* â•â•â• No subscription â•â•â• */
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-6 relative overflow-hidden"
+          >
+            <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-primary/8 blur-[80px] pointer-events-none" />
+            <div className="relative z-10">
+              <NoSubscriptionState />
+              {showTrial && (
+                <div className="mt-6 space-y-3">
+                  <p className="text-[13px] text-muted-foreground/25 text-center leading-relaxed">
+                    {t("dashboard.trialDesc", { days: formatDays(trialDays, lang) })}
+                  </p>
+                  <Button className="w-full gap-2.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/15 h-12 rounded-2xl active:scale-[0.98] transition-all duration-300" onClick={activateTrial} disabled={trialLoading}>
+                    {trialLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Gift className="h-4 w-4 shrink-0" />}
+                    <span className="font-bold text-[14px]">{t("dashboard.activateTrial")}</span>
+                  </Button>
+                  {trialError && <p className="text-sm text-destructive text-center">{trialError}</p>}
+                </div>
+              )}
+            </div>
+          </motion.div>
         ) : (
-          <section className="min-w-0 space-y-3">
-            <div className="rounded-[1.85rem] border border-border/50 bg-card/45 p-5 shadow-sm backdrop-blur-xl relative overflow-hidden">
-              {/* Decorative glow */}
-              <div className="absolute -top-12 -right-12 h-28 w-28 rounded-full bg-primary/15 blur-[50px] pointer-events-none" />
+          /* â•â•â• Active subscription â•â•â• */
+          <>
+            {/* Hero subscription card */}
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl relative overflow-hidden"
+            >
+              {/* Ambient glow */}
+              <div className="absolute -top-20 -right-20 h-44 w-44 rounded-full bg-primary/8 blur-[80px] pointer-events-none" />
+              <div className="absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-primary/5 blur-[60px] pointer-events-none" />
 
-              <div className="relative z-10">
-                {/* Header: icon + name + active badge */}
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <Package className="h-5 w-5" />
+              <div className="relative z-10 p-5 pb-0">
+                {/* Plan name + active badge */}
+                <div className="flex items-center justify-between gap-3 mb-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Package className="h-4.5 w-4.5 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[17px] font-bold tracking-tight text-foreground truncate leading-tight">
+                        {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                      </p>
+                      {isTrial ? (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-0.5 flex items-center gap-1">
+                          <AlertCircle className="h-2.5 w-2.5" />
+                          {t("dashboard.trialLimitedNodesShort")}
+                        </p>
+                      ) : tariffCategoryName ? (
+                        <p className="text-[11px] text-muted-foreground/40 mt-0.5 font-medium">{tariffCategoryName}</p>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="text-[18px] font-bold tracking-tight text-foreground leading-snug truncate"
-                      title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
-                    >
-                      {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
-                    </p>
-                    {isTrial ? (
-                      <div className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                        <AlertCircle className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{t("dashboard.trialLimitedNodesShort")}</span>
-                      </div>
-                    ) : tariffCategoryName ? (
-                      <p className="text-[12px] text-muted-foreground truncate mt-0.5">{tariffCategoryName}</p>
-                    ) : null}
-                  </div>
-                  <span className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-emerald-500/10 border border-emerald-500/15 px-3 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
                     {t("dashboard.active")}
                   </span>
                 </div>
 
-                {/* Info grid: 2x2 compact layout */}
-                <div className="mt-4 grid grid-cols-2 gap-2.5">
-                  {daysLeft != null && (
-                    <div className="flex items-center gap-2.5 rounded-xl bg-background/40 px-3 py-2.5">
-                      <Timer className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <span className="text-[12px] font-semibold text-foreground truncate">
-                        {t("dashboard.daysLeft_many", { count: daysLeft })}
+                {/* Giant stat numbers */}
+                <div className="grid grid-cols-3 gap-4 mb-5">
+                  {/* Days */}
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/35">
+                      {t("dashboard.validUntil")}
+                    </p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-black tabular-nums tracking-tighter text-foreground leading-none">
+                        {daysLeft != null ? daysLeft : "â€”"}
+                      </span>
+                      <span className="text-xs font-bold text-muted-foreground/25">
+                        {lang.startsWith("zh") ? "å¤©" : lang.startsWith("ru") ? "Ð´Ð½" : "d"}
                       </span>
                     </div>
-                  )}
-                  <div className="flex items-center gap-2.5 rounded-xl bg-background/40 px-3 py-2.5">
-                    <Monitor className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span className="text-[12px] font-semibold text-foreground">
-                      {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "∞"} {t("dashboard.devices")}
-                    </span>
                   </div>
-                  {subParsed.expireAt && (
-                    <div className="flex items-center gap-2.5 rounded-xl bg-background/40 px-3 py-2.5">
-                      <Calendar className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <span className="text-[12px] font-semibold text-foreground truncate">
-                        {formatDate(subParsed.expireAt, lang)}
-                      </span>
-                    </div>
-                  )}
-                  {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
-                    <div className="flex items-center gap-2.5 rounded-xl bg-background/40 px-3 py-2.5">
-                      <RotateCcw className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <span className="text-[12px] font-semibold text-foreground truncate">
-                        {t(RESET_STRATEGY_I18N[trafficResetStrategy])}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Traffic section */}
-                <div className="mt-4 rounded-[1.2rem] bg-background/35 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Wifi className="h-4 w-4 text-primary" />
+                  {/* Traffic */}
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/35">
+                      {t("dashboard.traffic")}
+                    </p>
+                    {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0 ? (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-black tabular-nums tracking-tighter text-foreground leading-none">
+                          {trafficPercent ?? 0}
+                        </span>
+                        <span className="text-xs font-bold text-muted-foreground/25">%</span>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground leading-none">
-                          {t("dashboard.traffic")}
-                        </p>
-                        <p className="mt-1 text-[14px] font-bold text-foreground truncate">
-                          {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
-                            ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
-                            : t("dashboard.unlimited")}
-                        </p>
-                      </div>
-                    </div>
-
-                    {trafficPercent != null && (
-                      <span className="shrink-0 text-xl font-bold text-primary tabular-nums">
-                        {trafficPercent}%
-                      </span>
+                    ) : (
+                      <span className="text-3xl font-black text-foreground tracking-tighter leading-none">âˆž</span>
                     )}
                   </div>
+                  {/* Devices */}
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/35">
+                      {t("dashboard.devices")}
+                    </p>
+                    <span className="text-3xl font-black tabular-nums tracking-tighter text-foreground leading-none">
+                      {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "âˆž"}
+                    </span>
+                  </div>
+                </div>
 
-                  {trafficPercent != null && (
-                    <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-muted/30">
+                {/* Traffic progress bar */}
+                {trafficPercent != null && (
+                  <div className="mb-5">
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/30 font-medium mb-1.5">
+                      <span>{formatBytes(subParsed.trafficUsed ?? 0, lang)}</span>
+                      <span>{formatBytes(subParsed.trafficLimitBytes!, lang)}</span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-muted/10 overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${trafficPercent}%` }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                        className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70"
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className="h-full rounded-full bg-primary/60"
                       />
                     </div>
+                  </div>
+                )}
+
+                {/* Expire date + reset strategy tags */}
+                <div className="flex items-center gap-2 flex-wrap mb-5">
+                  {subParsed.expireAt && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/20 bg-background/5 px-2.5 py-1 text-[10px] font-medium text-muted-foreground/40">
+                      <Calendar className="h-3 w-3" />
+                      {formatDate(subParsed.expireAt, lang)}
+                    </span>
+                  )}
+                  {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-primary/5 px-2.5 py-1 text-[10px] font-semibold text-primary/60">
+                      <RotateCcw className="h-3 w-3" />
+                      {t(RESET_STRATEGY_I18N[trafficResetStrategy])}
+                    </span>
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* Subscription URL — separate card */}
-            {vpnUrl && (
-              <div className="rounded-[1.85rem] border border-border/50 bg-card/45 p-5 shadow-sm backdrop-blur-xl">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <Link2 className="h-4 w-4 shrink-0 text-primary" />
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground leading-none">
-                    {t("dashboard.subscriptionAddress")}
-                  </p>
-                </div>
-                <code className="block w-full truncate rounded-xl bg-background/50 border border-border/50 px-3.5 py-3 text-[12px] font-mono text-foreground/80" title={vpnUrl}>
-                  {vpnUrl}
-                </code>
-                <div className="flex items-center gap-2.5 mt-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1 h-11 rounded-xl bg-background/50 hover:bg-background/80 transition-transform hover:scale-[1.02] gap-2 text-[13px] font-medium"
-                    onClick={() => {
-                      copySubUrl();
-                      window.Telegram?.WebApp?.showPopup?.({ title: t("dashboard.copied"), message: t("subscribe.linkCopied") });
-                    }}
-                  >
-                    {subUrlCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                    <span>{subUrlCopied ? t("dashboard.copied") : t("dashboard.copySubAddress")}</span>
-                  </Button>
-                  <Link to="/cabinet/subscribe" className="inline-flex flex-1 h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
-                    <Link2 className="h-4 w-4 shrink-0" />
+              {/* Bottom gradient divider */}
+              <div className="h-px bg-gradient-to-r from-transparent via-border/30 to-transparent" />
+            </motion.div>
+
+            {/* VPN / Connection card */}
+            {vpnUrl ? (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.06 }}
+                className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-5 relative overflow-hidden"
+              >
+                <div className="absolute -bottom-16 -right-16 h-36 w-36 rounded-full bg-primary/6 blur-[70px] pointer-events-none" />
+                <div className="relative z-10 space-y-3.5">
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 truncate rounded-xl bg-background/10 border border-border/20 px-3 py-2.5 text-[11px] font-mono text-foreground/30" title={vpnUrl}>
+                      {vpnUrl}
+                    </code>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="shrink-0 h-10 w-10 rounded-xl border border-border/20 bg-background/10 hover:bg-background/25"
+                      onClick={() => {
+                        copySubUrl();
+                        window.Telegram?.WebApp?.showPopup?.({ title: t("dashboard.copied"), message: t("subscribe.linkCopied") });
+                      }}
+                    >
+                      {subUrlCopied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-foreground/30" />}
+                    </Button>
+                  </div>
+                  <Link to="/cabinet/subscribe" className="group inline-flex w-full h-12 items-center justify-center gap-2.5 rounded-2xl bg-primary text-[13px] font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
+                    <Shield className="h-4 w-4 shrink-0" />
                     <span>{t("dashboard.connectVPN")}</span>
                   </Link>
                 </div>
-              </div>
+              </motion.div>
+            ) : showTrial ? (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.06 }}
+                className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-5 relative overflow-hidden"
+              >
+                <div className="absolute -top-12 -left-12 h-32 w-32 rounded-full bg-emerald-500/8 blur-[60px] pointer-events-none" />
+                <div className="relative z-10 space-y-3.5 text-center">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    <Gift className="h-5 w-5" />
+                  </div>
+                  <p className="text-[13px] text-muted-foreground/25 leading-relaxed">
+                    {t("dashboard.trialDesc", { days: formatDays(trialDays, lang) })}
+                  </p>
+                  <Button className="w-full gap-2.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/15 h-12 rounded-2xl active:scale-[0.98] transition-all duration-300" onClick={activateTrial} disabled={trialLoading}>
+                    {trialLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Gift className="h-4 w-4 shrink-0" />}
+                    <span className="font-bold text-[14px]">{t("dashboard.activateTrial")}</span>
+                  </Button>
+                  {trialError && <p className="text-sm text-destructive">{trialError}</p>}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.06 }}
+                className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-5 relative overflow-hidden"
+              >
+                <div className="absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-primary/6 blur-[60px] pointer-events-none" />
+                <div className="relative z-10 space-y-3.5">
+                  <div className="rounded-2xl bg-primary/5 border border-primary/10 p-3.5 text-[13px] text-primary/70 flex items-start gap-2.5">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-primary/60" />
+                    <p className="leading-relaxed">{t("dashboard.noLinkDesc")}</p>
+                  </div>
+                  <Link to="/cabinet/tariffs" className="group inline-flex w-full h-12 items-center justify-center gap-2 rounded-2xl bg-primary text-[13px] font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
+                    <span>{t("dashboard.choosePlan")}</span>
+                    <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
+              </motion.div>
             )}
-          </section>
+          </>
         )}
 
-        {/* 2. Как подключиться — ссылка и кнопка (только если нет подписки) */}
-        {!vpnUrl && (
-        <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl p-4 shadow-sm overflow-hidden transition-all duration-300">
-          <h2 className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-3">
-             <div className="p-1.5 bg-primary/20 rounded-lg">
-              <Wifi className="h-3.5 w-3.5 shrink-0 text-primary" />
+        {/* Balance card */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.12 }}
+          className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-5 relative overflow-hidden group"
+        >
+          <div className="absolute -top-16 -right-16 h-36 w-36 rounded-full bg-primary/6 blur-[80px] pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="relative z-10 flex items-center justify-between gap-4">
+            <div className="min-w-0 space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/35">{t("dashboard.myBalance")}</p>
+              <p className="text-3xl font-black tracking-tighter text-foreground truncate leading-none">{formatMoney(client.balance, client.preferredCurrency)}</p>
             </div>
-            {t("dashboard.connection")}
-          </h2>
-          {showTrial ? (
-            <div className="space-y-3 text-center">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10 text-green-600 mb-1">
-                 <Gift className="h-5 w-5" />
-              </div>
-              <p className="text-[13px] text-muted-foreground">
-                {t("dashboard.trialDesc", { days: formatDays(trialDays, lang) })}
-              </p>
-              <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white shadow-sm h-11 rounded-xl hover:scale-[1.02] transition-transform duration-300" onClick={activateTrial} disabled={trialLoading}>
-                {trialLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Gift className="h-4 w-4 shrink-0" />}
-                <span className="font-medium text-[14px]">{t("dashboard.activateTrial")}</span>
-              </Button>
-              {trialError && <p className="text-sm text-destructive break-words text-center">{trialError}</p>}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 text-[13px] text-primary flex gap-2.5 items-start">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <p className="leading-relaxed">{t("dashboard.noLinkDesc")}</p>
-              </div>
-              <Link to="/cabinet/tariffs" className="inline-flex w-full h-10 items-center justify-center rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
-                <span className="inline-flex items-center leading-none">{t("dashboard.choosePlan")}</span>
-              </Link>
-            </div>
-          )}
-        </section>
-        )}
-
-        {/* 3. Баланс */}
-        <section className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl px-4 py-4 shadow-sm overflow-hidden flex items-center justify-between gap-3 transition-all duration-300">
-          <div className="min-w-0">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 mb-0.5">{t("dashboard.myBalance")}</h2>
-            <p className="text-2xl font-bold tracking-tight text-foreground truncate">{formatMoney(client.balance, client.preferredCurrency)}</p>
+            <Link to="/cabinet/profile#topup" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-[13px] font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
+              <PlusCircle className="h-4 w-4 shrink-0" />
+              <span>{t("dashboard.topUp")}</span>
+            </Link>
           </div>
-          <Link to="/cabinet/profile#topup" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90">
-            <PlusCircle className="h-4 w-4 shrink-0" />
-            <span className="inline-flex items-center leading-none">{t("dashboard.topUp")}</span>
-          </Link>
-        </section>
+        </motion.div>
       </div>
+
+      {/* Announcement detail modal */}
+      {announcementModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setAnnouncementModal(null)}>
+          <div className="absolute inset-0 bg-black/70" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative z-10 w-full max-w-md max-h-[80vh] flex flex-col rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl"
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-700">
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 truncate">{announcementModal.title}</h2>
+              <button onClick={() => setAnnouncementModal(null)} className="shrink-0 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {announcementModal.publishedAt && (
+                <p className="text-xs text-zinc-400 mb-3">{new Date(announcementModal.publishedAt).toLocaleDateString()}</p>
+              )}
+              <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none prose-code:before:content-none prose-code:after:content-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{announcementModal.content}</ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
   // DESKTOP LAYOUT
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl mx-auto">
-      {/* Hero + CTA */}
+      {/* â•â•â• HERO SECTION â•â•â• */}
       <motion.section
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-3xl bg-card/40 backdrop-blur-2xl border border-border/50 p-8 sm:p-10 shadow-sm"
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="relative overflow-hidden rounded-3xl bg-card/25 backdrop-blur-2xl border border-border/40 p-8 sm:p-10"
       >
-        {/* Декоративное свечение */}
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
-        
+        {/* Decorative ambient glow */}
+        <div className="absolute top-0 right-0 -mr-24 -mt-24 w-72 h-72 rounded-full bg-primary/10 blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full bg-primary/6 blur-[80px] pointer-events-none" />
+
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
+          <div className="flex-1 space-y-3">
+            <motion.h1
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="text-3xl font-black tracking-tight sm:text-4xl text-foreground leading-[1.1]"
+            >
               {t("dashboard.welcome")}{client.email ? `, ${client.email.split("@")[0]}` : client.telegramUsername ? `, @${client.telegramUsername}` : ""}
-            </h1>
-            <p className="mt-3 text-[16px] text-muted-foreground max-w-xl leading-relaxed">
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.15 }}
+              className="text-[15px] text-muted-foreground/35 max-w-lg leading-relaxed"
+            >
               {hasActiveSubscription
                 ? t("dashboard.activeSubscriptionDesc")
                 : t("dashboard.noSubscriptionHeroDesc")}
-            </p>
-            
-            {(paymentMessage === "success" || paymentMessage === "success_topup" || paymentMessage === "success_tariff") && (
-              <div className="mt-4 inline-flex items-center gap-2 bg-green-500/15 border border-green-500/30 px-4 py-2 rounded-xl text-green-700 dark:text-green-400 font-medium text-sm">
-                <Check className="h-4 w-4" />
-                {paymentMessage === "success_topup" ? t("dashboard.balancePaid") : paymentMessage === "success_tariff" ? t("dashboard.planActivated") : t("dashboard.paymentSuccess")}
-              </div>
-            )}
-            {paymentMessage === "failed" && (
-              <div className="mt-4 inline-flex items-center gap-2 bg-destructive/15 border border-destructive/30 px-4 py-2 rounded-xl text-destructive font-medium text-sm">
-                <AlertCircle className="h-4 w-4" />
-                {t("dashboard.paymentFailed")}
-              </div>
-            )}
-            {trialError && <p className="mt-3 text-sm text-destructive font-medium">{trialError}</p>}
+            </motion.p>
+
+            <AnimatePresence>
+              {(paymentMessage === "success" || paymentMessage === "success_topup" || paymentMessage === "success_tariff") && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="inline-flex items-center gap-2.5 bg-emerald-500/10 border border-emerald-500/20 px-5 py-2.5 rounded-xl text-emerald-700 dark:text-emerald-400 font-medium text-sm"
+                >
+                  <Check className="h-4 w-4" />
+                  {paymentMessage === "success_topup" ? t("dashboard.balancePaid") : paymentMessage === "success_tariff" ? t("dashboard.planActivated") : t("dashboard.paymentSuccess")}
+                </motion.div>
+              )}
+              {paymentMessage === "failed" && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="inline-flex items-center gap-2.5 bg-destructive/10 border border-destructive/20 px-5 py-2.5 rounded-xl text-destructive font-medium text-sm"
+                >
+                  <AlertCircle className="h-4 w-4" />
+                  {t("dashboard.paymentFailed")}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {trialError && <p className="text-sm text-destructive font-medium">{trialError}</p>}
           </div>
 
-          <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0 min-w-[240px]">
+          {/* CTA Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0 min-w-[240px]"
+          >
             {showTrial ? (
-              <Button size="lg" className="w-full gap-2 shadow-sm bg-green-600 hover:bg-green-700 text-white rounded-xl h-14 hover:scale-105 transition-transform [&_svg]:self-center [&_span]:leading-none" onClick={activateTrial} disabled={trialLoading}>
-                {trialLoading ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" /> : <Gift className="h-5 w-5 shrink-0" />}
-                <span className="inline-flex items-center text-base font-medium leading-none">{t("dashboard.freeTrial")}</span>
+              <Button size="lg" className="w-full gap-2.5 shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-12 active:scale-[0.98] transition-all duration-300" onClick={activateTrial} disabled={trialLoading}>
+                {trialLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Gift className="h-4 w-4 shrink-0" />}
+                <span className="text-sm font-bold">{t("dashboard.freeTrial")}</span>
               </Button>
             ) : vpnUrl ? (
-              <Link to="/cabinet/subscribe" className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
-                <Link2 className="h-5 w-5 shrink-0" />
-                <span className="inline-flex items-center text-base font-medium leading-none">{t("dashboard.setupVPN")}</span>
+              <Link to="/cabinet/subscribe" className="group inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
+                <Shield className="h-4 w-4 shrink-0" />
+                <span className="text-sm font-bold">{t("dashboard.setupVPN")}</span>
               </Link>
             ) : (
-              <Link to="/cabinet/tariffs" className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
-                <Package className="h-5 w-5 shrink-0" />
-                <span className="inline-flex items-center text-base font-medium leading-none">{t("dashboard.choosePlan")}</span>
+              <Link to="/cabinet/tariffs" className="group inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
+                <Package className="h-4 w-4 shrink-0" />
+                <span className="text-sm font-bold">{t("dashboard.choosePlan")}</span>
               </Link>
             )}
-            <Link to="/cabinet/profile#topup" className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-border/50 bg-background/50 transition-transform hover:scale-105 hover:bg-background/80 [&_svg]:self-center [&_span]:leading-none">
-              <PlusCircle className="h-5 w-5 shrink-0 text-foreground/70" />
-              <span className="inline-flex items-center text-base font-medium leading-none">{t("dashboard.topUpBalance")}</span>
+            <Link to="/cabinet/profile#topup" className="group inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl border border-border/40 bg-background/15 backdrop-blur-sm transition-all duration-300 hover:bg-background/10 active:scale-[0.98]">
+              <PlusCircle className="h-4 w-4 shrink-0 text-foreground/50" />
+              <span className="text-sm font-semibold">{t("dashboard.topUpBalance")}</span>
             </Link>
-          </div>
+          </motion.div>
         </div>
       </motion.section>
 
-      {/* Bento grid — 12-col, 3 rows */}
-      <div className="grid gap-5 lg:grid-cols-12 auto-rows-auto">
+      {/* Pinned announcements */}
+      <AnimatePresence>
+        {visiblePinned.map((ann) => {
+          const plain = stripMarkdown(ann.content);
+          return (
+            <motion.div
+              key={ann.id}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8, height: 0 }}
+              className="rounded-3xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-2xl p-6 relative overflow-hidden"
+            >
+              <button
+                onClick={(e) => { e.stopPropagation(); dismissAnnouncement(ann.id); }}
+                className="absolute top-4 right-5 text-muted-foreground/30 hover:text-foreground transition-colors z-10"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div
+                className="flex items-start gap-4 pr-8 cursor-pointer"
+                onClick={() => setAnnouncementModal(ann)}
+              >
+                <div className="h-10 w-10 shrink-0 rounded-2xl bg-amber-500/10 flex items-center justify-center mt-0.5">
+                  <Megaphone className="h-4 w-4 text-amber-500" />
+                </div>
+                <div className="min-w-0 space-y-1.5">
+                  <p className="text-[15px] font-bold text-foreground leading-tight">{ann.title}</p>
+                  <p className="text-sm text-muted-foreground/40 leading-relaxed line-clamp-2">{plain.slice(0, 250)}{plain.length > 250 ? "…" : ""}</p>
+                  <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-amber-600 dark:text-amber-400 mt-1">
+                    <span>{t("dashboard.readMore")}</span>
+                    <ChevronRight className="h-3 w-3" />
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
 
-        {/* ═══ ROW 1: Subscription status hero — full width ═══ */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="lg:col-span-12"
-        >
-          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-sm transition-all duration-300 relative overflow-hidden group">
-            <div className="absolute -top-20 -left-20 h-48 w-48 rounded-full bg-primary/15 blur-[90px] pointer-events-none group-hover:bg-primary/25 transition-colors duration-700" />
-            <div className="absolute -bottom-16 -right-16 h-40 w-40 rounded-full bg-primary/10 blur-[70px] pointer-events-none" />
+      {/* â•â•â• CONTENT GRID â•â•â• */}
+      <div className="grid gap-6 lg:grid-cols-12">
 
-            <CardContent className="relative z-10 p-6 sm:p-8">
-              {loading ? (
-                <div className="flex justify-center py-10"><Loader2 className="h-10 w-10 animate-spin text-muted-foreground" /></div>
-              ) : subscriptionError || !hasActiveSubscription ? (
-                <NoSubscriptionState />
-              ) : (
-                <div className="flex flex-col gap-5">
-                  {/* Top row: title + active badge */}
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-primary/20 rounded-xl shadow-inner border border-primary/10">
-                        <Package className="h-6 w-6 text-primary" />
+        {loading ? (
+          <div className="lg:col-span-12 flex items-center justify-center py-24">
+            <Loader2 className="h-8 w-8 animate-spin text-primary/40" />
+          </div>
+        ) : subscriptionError || !hasActiveSubscription ? (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.06 }}
+            className="lg:col-span-12"
+          >
+            <div className="rounded-3xl border border-border/40 bg-card/20 backdrop-blur-2xl overflow-hidden p-8">
+              <NoSubscriptionState />
+            </div>
+          </motion.div>
+        ) : (
+          <>
+            {/* â•â•â• SUBSCRIPTION OVERVIEW â€” full width hero card â•â•â• */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.04 }}
+              className="lg:col-span-12"
+            >
+              <div className="relative rounded-3xl border border-border/40 bg-card/20 backdrop-blur-2xl overflow-hidden">
+                {/* Ambient decorations */}
+                <div className="absolute top-0 left-1/4 w-64 h-64 rounded-full bg-primary/6 blur-[120px] pointer-events-none" />
+                <div className="absolute bottom-0 right-1/4 w-48 h-48 rounded-full bg-primary/4 blur-[100px] pointer-events-none" />
+
+                <div className="relative z-10 p-8 sm:p-10">
+                  {/* Top row: Plan name + status badge */}
+                  <div className="flex items-center justify-between gap-4 mb-10">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="h-12 w-12 shrink-0 rounded-2xl bg-primary/10 flex items-center justify-center">
+                        <Package className="h-5 w-5 text-primary" />
                       </div>
-                      <h2 className="text-xl font-bold text-foreground">{t("dashboard.mySubscription")}</h2>
+                      <div className="min-w-0">
+                        <p className="text-2xl sm:text-3xl font-black text-foreground tracking-tight truncate leading-none" title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
+                          {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                        </p>
+                        {tariffCategoryName && (
+                          <p className="text-sm text-muted-foreground/40 mt-1 font-medium">{tariffCategoryName}</p>
+                        )}
+                      </div>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/20 shadow-sm">
-                      <span className="h-2 w-2 rounded-full bg-current animate-pulse" />
-                      {t("dashboard.active")}
-                    </span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {isTrial && (
+                        <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/8 px-3 py-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                          <AlertCircle className="h-3 w-3" />
+                          {t("dashboard.trialLimitedNodesShort")}
+                        </span>
+                      )}
+                      {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
+                        <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-primary/8 px-3 py-1.5 text-[11px] font-semibold text-primary/80">
+                          <RotateCcw className="h-3 w-3" />
+                          {t(RESET_STRATEGY_I18N[trafficResetStrategy])}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/15 px-4 py-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                        <span className="h-2 w-2 rounded-full bg-current animate-pulse" />
+                        {t("dashboard.active")}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Main metrics row: 4 items in a row */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
-                    {/* Plan — hero metric */}
-                    {((tariffDisplayName ?? subParsed.productName) || client?.trialUsed) && (
-                      <div className="relative rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border border-primary/20 p-5 overflow-hidden flex flex-col">
-                        <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-primary/20 blur-[40px] pointer-events-none" />
-                        <div className="relative flex items-center gap-2 mb-auto">
-                          <Package className="h-4 w-4 text-primary" />
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-primary/80 truncate">
-                            {tariffCategoryName || t("dashboard.plan")}
-                          </p>
-                        </div>
-                        <div className="relative mt-3">
-                          <p className="text-xl font-bold truncate text-foreground" title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
-                            {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
-                          </p>
-                          {isTrial && (
-                            <div className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                              <AlertCircle className="h-3 w-3 shrink-0" />
-                              <span className="truncate">{t("dashboard.trialLimitedNodesShort")}</span>
-                            </div>
-                          )}
-                          {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
-                            <div className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                              <RotateCcw className="h-3 w-3 shrink-0" />
-                              <span className="truncate">{t(RESET_STRATEGY_I18N[trafficResetStrategy])}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {/* Days left */}
+                  {/* Metric row â€” 3 or 4 giant stat blocks */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+                    {/* Days remaining */}
                     {daysLeft != null && (
-                      <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col">
-                        <div className="flex items-center gap-2 mb-auto">
-                          <Calendar className="h-4 w-4 text-primary" />
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.validUntil")}</p>
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40">
+                          {t("dashboard.validUntil")}
+                        </p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-5xl sm:text-6xl font-black text-foreground tabular-nums tracking-tighter leading-none">
+                            {daysLeft}
+                          </span>
+                          <span className="text-lg font-bold text-muted-foreground/30">
+                            {lang.startsWith("zh") ? "å¤©" : lang.startsWith("ru") ? "Ð´Ð½" : "d"}
+                          </span>
                         </div>
-                        <div className="mt-3">
-                          <p className="text-lg font-bold text-foreground">
-                            {t("dashboard.daysLeft_many", { count: daysLeft })}
+                        {subParsed.expireAt && (
+                          <p className="text-[11px] text-muted-foreground/30 font-medium">
+                            {formatDate(subParsed.expireAt, lang)}
                           </p>
-                          {subParsed.expireAt && (
-                            <p className="text-[12px] text-muted-foreground mt-1 font-medium">
-                              {formatDate(subParsed.expireAt, lang)}
-                            </p>
-                          )}
-                        </div>
+                        )}
                       </div>
                     )}
 
                     {/* Traffic */}
-                    <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col">
-                      <div className="flex items-center gap-2 mb-auto">
-                        <Wifi className="h-4 w-4 text-primary" />
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.traffic")}</p>
-                      </div>
-                      <div className="mt-3">
-                        <p className="text-lg font-bold text-foreground">
-                          {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0
-                            ? `${formatBytes(subParsed.trafficUsed ?? 0, lang)} / ${formatBytes(subParsed.trafficLimitBytes, lang)}`
-                            : t("dashboard.unlimited")}
-                        </p>
-                        {trafficPercent != null && (
-                          <div className="mt-2 h-2 w-full rounded-full bg-muted/30 overflow-hidden">
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40">
+                        {t("dashboard.traffic")}
+                      </p>
+                      {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0 ? (
+                        <>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-5xl sm:text-6xl font-black text-foreground tabular-nums tracking-tighter leading-none">
+                              {trafficPercent ?? 0}
+                            </span>
+                            <span className="text-lg font-bold text-muted-foreground/30">%</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground/30 font-medium">
+                            {formatBytes(subParsed.trafficUsed ?? 0, lang)} / {formatBytes(subParsed.trafficLimitBytes, lang)}
+                          </p>
+                          <div className="mt-1 h-1 w-full max-w-[160px] rounded-full bg-muted/10 overflow-hidden">
                             <motion.div
                               initial={{ width: 0 }}
-                              animate={{ width: `${trafficPercent}%` }}
-                              transition={{ duration: 0.8, ease: "easeOut" }}
-                              className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70"
+                              animate={{ width: `${trafficPercent ?? 0}%` }}
+                              transition={{ duration: 1.2, ease: "easeOut" }}
+                              className="h-full rounded-full bg-primary/60"
                             />
                           </div>
-                        )}
-                      </div>
+                        </>
+                      ) : (
+                        <span className="text-5xl sm:text-6xl font-black text-foreground tracking-tighter leading-none">âˆž</span>
+                      )}
                     </div>
 
                     {/* Devices */}
-                    <div className="rounded-2xl bg-background/40 border border-border/50 p-5 transition-colors hover:bg-background/60 shadow-sm flex flex-col">
-                      <div className="flex items-center gap-2 mb-auto">
-                        <Monitor className="h-4 w-4 text-primary" />
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.devices")}</p>
-                      </div>
-                      <p className="text-lg font-bold text-foreground mt-3">
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40">
+                        {t("dashboard.devices")}
+                      </p>
+                      <span className="text-5xl sm:text-6xl font-black text-foreground tabular-nums tracking-tighter leading-none">
                         {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0
                           ? subParsed.hwidDeviceLimit
-                          : "∞"}
-                      </p>
+                          : "âˆž"}
+                      </span>
+                    </div>
+
+                    {/* Quick action */}
+                    <div className="flex flex-col justify-center space-y-3">
+                      {vpnUrl ? (
+                        <Link to="/cabinet/subscribe" className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
+                          <Shield className="h-4 w-4 shrink-0" />
+                          <span>{t("dashboard.setupVPN")}</span>
+                        </Link>
+                      ) : (
+                        <Link to="/cabinet/tariffs" className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
+                          <Package className="h-4 w-4 shrink-0" />
+                          <span>{t("dashboard.choosePlan")}</span>
+                        </Link>
+                      )}
+                      <Link to="/cabinet/tariffs" className="group/link inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border/40 bg-background/5 text-[13px] font-medium text-muted-foreground/35 transition-all duration-300 hover:bg-background/15 hover:text-foreground/80">
+                        <span>{t("dashboard.changePlan")}</span>
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover/link:translate-x-0.5" />
+                      </Link>
                     </div>
                   </div>
-
-                  {/* Subscription URL */}
-                  {vpnUrl && (
-                    <div className="rounded-2xl bg-background/40 border border-border/50 p-4 transition-colors hover:bg-background/60 shadow-sm">
-                      <div className="flex items-center gap-2 mb-2.5">
-                        <Link2 className="h-4 w-4 text-primary" />
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.subscriptionAddress")}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 min-w-0 truncate rounded-xl bg-background/50 border border-border/50 px-3 py-2.5 text-[13px] font-mono text-foreground/80" title={vpnUrl}>
-                          {vpnUrl}
-                        </code>
-                      </div>
-                      <div className="flex items-center gap-3 mt-3">
-                        <Button variant="outline" onClick={copySubUrl} className="flex-1 h-10 rounded-xl hover:scale-[1.02] transition-transform border border-border/50 bg-background/50 gap-2 text-[13px] font-medium">
-                          {subUrlCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-foreground/70" />}
-                          <span>{subUrlCopied ? t("dashboard.copied") : t("dashboard.copySubAddress")}</span>
-                        </Button>
-                        <Link to="/cabinet/subscribe" className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[13px] font-medium text-primary-foreground shadow-sm transition-transform hover:scale-[1.02] hover:bg-primary/90">
-                          <Link2 className="h-4 w-4 shrink-0" />
-                          <span>{t("dashboard.connectVPN")}</span>
-                        </Link>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
 
-        {/* ═══ ROW 2: Balance (left 7) + Referral (right 5) ═══ */}
+                {/* Bottom divider line with subtle gradient */}
+                <div className="h-px bg-gradient-to-r from-transparent via-border/30 to-transparent" />
+              </div>
+            </motion.div>
+          </>
+        )}
+
+        {/* â•â•â• ROW 2: Balance (left 7) + Referral/Connection (right 5) â•â•â• */}
 
         {/* Balance */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.12 }}
           className="lg:col-span-7"
         >
-          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-sm transition-all duration-300 h-full relative overflow-hidden group">
-            <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-primary/10 blur-[70px] pointer-events-none group-hover:bg-primary/20 transition-colors duration-700" />
-
-            <CardContent className="relative z-10 p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-5">
-                  <div className="p-3 bg-primary/20 rounded-xl shadow-inner border border-primary/10">
-                    <Wallet className="h-7 w-7 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{t("dashboard.balance")}</p>
-                    <p className="text-4xl font-extrabold tracking-tight text-foreground drop-shadow-sm leading-none">
-                      {formatMoney(client.balance, client.preferredCurrency)}
-                    </p>
-                    <p className="text-[13px] text-muted-foreground mt-1">{t("dashboard.onAccount")}</p>
-                  </div>
-                </div>
-                <Link to="/cabinet/profile#topup" className="inline-flex h-13 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-7 text-[15px] font-medium text-primary-foreground shadow-sm transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
-                  <PlusCircle className="h-5 w-5 shrink-0" />
-                  <span className="inline-flex items-center leading-none">{t("dashboard.topUpBalance")}</span>
-                </Link>
+          <div className="h-full rounded-3xl bg-card/20 backdrop-blur-xl border border-border/40 p-8 sm:p-10 transition-all duration-500 hover:bg-card/20 hover:border-border/40 relative overflow-hidden group">
+            <div className="absolute -top-24 -right-24 h-52 w-52 rounded-full bg-primary/6 blur-[100px] pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="relative z-10 flex items-end justify-between gap-6 flex-wrap">
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40">{t("dashboard.balance")}</p>
+                <p className="text-5xl sm:text-6xl font-black tracking-tighter text-foreground leading-none">
+                  {formatMoney(client.balance, client.preferredCurrency)}
+                </p>
               </div>
-            </CardContent>
-          </Card>
+              <Link to="/cabinet/profile#topup" className="inline-flex h-12 shrink-0 items-center justify-center gap-2.5 rounded-2xl bg-primary px-8 text-sm font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
+                <PlusCircle className="h-4 w-4 shrink-0" />
+                <span>{t("dashboard.topUpBalance")}</span>
+              </Link>
+            </div>
+          </div>
         </motion.div>
 
         {/* Referral / Connection */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
+          transition={{ duration: 0.4, delay: 0.16 }}
           className="lg:col-span-5"
         >
-          <Card className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-xl shadow-sm transition-all duration-300 h-full relative overflow-hidden group">
-            <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-primary/10 blur-[60px] pointer-events-none group-hover:bg-primary/20 transition-colors duration-700" />
-
-            <CardContent className="relative z-10 p-6 sm:p-8 flex flex-col justify-center h-full">
+          <div className="h-full rounded-3xl bg-card/20 backdrop-blur-xl border border-border/40 p-8 sm:p-10 transition-all duration-500 hover:bg-card/20 hover:border-border/40 relative overflow-hidden group">
+            <div className="absolute -bottom-20 -left-20 h-44 w-44 rounded-full bg-primary/6 blur-[90px] pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="relative z-10 flex flex-col justify-center h-full">
               {hasReferralLinks ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className="p-2.5 bg-primary/20 rounded-xl shadow-inner border border-primary/10">
-                      <Users className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-bold text-foreground">{t("dashboard.referrals")}</h3>
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40 mb-3">{t("dashboard.referrals")}</p>
+                    <p className="text-sm text-muted-foreground/25 leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: t("dashboard.referralShareDesc") }}
+                    />
                   </div>
-                  <p className="text-[14px] text-muted-foreground leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: t("dashboard.referralShareDesc") }}
-                  />
                   {referralLinkSite && (
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("dashboard.site")}</p>
-                      <div className="flex items-center gap-2">
-                        <code className="rounded-xl bg-background/50 border border-border/50 px-3 py-2.5 text-[13px] font-mono flex-1 truncate block text-foreground/80" title={referralLinkSite}>
-                          {referralLinkSite}
-                        </code>
-                        <Button variant="secondary" size="icon" onClick={() => copyReferral("site")} className="shrink-0 h-10 w-10 rounded-xl hover:scale-105 transition-transform border border-border/50 bg-background/50" title={t("common.copy")}>
-                          {referralCopied === "site" ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-foreground/70" />}
-                        </Button>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <code className="rounded-xl bg-background/10 border border-border/40 px-3 py-2.5 text-[11px] font-mono flex-1 truncate text-foreground/30" title={referralLinkSite}>
+                        {referralLinkSite}
+                      </code>
+                      <Button variant="secondary" size="icon" onClick={() => copyReferral("site")} className="shrink-0 h-10 w-10 rounded-xl border border-border/40 bg-background/10 hover:bg-background/25" title={t("common.copy")}>
+                        {referralCopied === "site" ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-foreground/30" />}
+                      </Button>
                     </div>
                   )}
-                  <Link to="/cabinet/referral" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border/50 bg-background/30 text-[14px] transition-colors hover:bg-background/60 [&_svg]:self-center [&_span]:leading-none">
-                    <span className="inline-flex items-center leading-none">{t("dashboard.referralStats")}</span>
-                    <ArrowRight className="h-4 w-4 shrink-0" />
+                  <Link to="/cabinet/referral" className="group/link inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border/40 bg-background/5 text-sm font-medium transition-all duration-300 hover:bg-background/5">
+                    <span>{t("dashboard.referralStats")}</span>
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover/link:translate-x-0.5" />
                   </Link>
                 </div>
               ) : vpnUrl ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className="p-2.5 bg-primary/20 rounded-xl shadow-inner border border-primary/10">
-                      <Wifi className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-bold text-foreground">{t("dashboard.connection")}</h3>
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40 mb-3">{t("dashboard.connection")}</p>
+                    <p className="text-sm text-muted-foreground/25 leading-relaxed">{t("dashboard.vpnReadyDesc")}</p>
                   </div>
-                  <p className="text-[14px] text-muted-foreground leading-relaxed">{t("dashboard.vpnReadyDesc")}</p>
-                  <Link to="/cabinet/subscribe" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] text-primary-foreground shadow-sm transition-transform hover:scale-105 hover:bg-primary/90 [&_svg]:self-center [&_span]:leading-none">
-                    <Link2 className="h-5 w-5 shrink-0" />
-                    <span className="inline-flex items-center leading-none">{t("dashboard.setupVPN")}</span>
+                  <Link to="/cabinet/subscribe" className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
+                    <Shield className="h-4 w-4 shrink-0" />
+                    <span>{t("dashboard.setupVPN")}</span>
                   </Link>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className="p-2.5 bg-background/50 rounded-xl shadow-inner border border-border/50">
-                      <Package className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-bold text-foreground">{t("dashboard.connection")}</h3>
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40 mb-3">{t("dashboard.connection")}</p>
+                    <p className="text-sm text-muted-foreground/25 leading-relaxed">{t("dashboard.payToGetLink")}</p>
                   </div>
-                  <p className="text-[14px] text-muted-foreground leading-relaxed">{t("dashboard.payToGetLink")}</p>
-                  <Link to="/cabinet/tariffs" className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-border/50 bg-background/30 text-[15px] transition-colors hover:bg-background/60 [&_span]:leading-none">
-                    <span className="inline-flex items-center leading-none">{t("dashboard.choosePlan")}</span>
+                  <Link to="/cabinet/tariffs" className="group/link inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border/40 bg-background/5 text-sm font-medium transition-all duration-300 hover:bg-background/5">
+                    <span>{t("dashboard.choosePlan")}</span>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover/link:translate-x-0.5" />
                   </Link>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </motion.div>
       </div>
+
+      {/* Announcement detail modal */}
+      {announcementModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={() => setAnnouncementModal(null)}>
+          <div className="absolute inset-0 bg-black/70" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative z-10 w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl"
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 truncate">{announcementModal.title}</h2>
+              <button onClick={() => setAnnouncementModal(null)} className="shrink-0 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {announcementModal.publishedAt && (
+                <p className="text-xs text-zinc-400 mb-3">{new Date(announcementModal.publishedAt).toLocaleDateString()}</p>
+              )}
+              <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none prose-code:before:content-none prose-code:after:content-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{announcementModal.content}</ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

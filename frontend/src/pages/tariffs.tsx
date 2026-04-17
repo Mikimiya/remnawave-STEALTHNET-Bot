@@ -58,6 +58,7 @@ const TRAFFIC_RESET_STRATEGIES = [
   { value: "DAY", labelKey: "admin.tariffs.resetStrategyDay" },
   { value: "WEEK", labelKey: "admin.tariffs.resetStrategyWeek" },
   { value: "MONTH", labelKey: "admin.tariffs.resetStrategyMonth" },
+  { value: "MONTH_ROLLING", labelKey: "admin.tariffs.resetStrategyMonthRolling" },
 ];
 
 const CURRENCIES = [

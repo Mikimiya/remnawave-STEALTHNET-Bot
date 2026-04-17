@@ -5,7 +5,6 @@
 
 import { prisma } from "../../db.js";
 import { getSystemConfig } from "../client/client.service.js";
-import { createClientNotification } from "./client-notification.service.js";
 import { t } from "../../i18n/index.js";
 
 type AdminNotificationEventType = "balance_topup" | "tariff_payment" | "new_client" | "new_ticket";
@@ -115,14 +114,6 @@ export async function notifyBalanceToppedUp(clientId: string, amount: number, cu
     const textForClient = t(lang, "notifyBalanceTopup", { amount: amountStr });
     await sendTelegramToUser(client.telegramId, textForClient);
   }
-  // In-app notification
-  await createClientNotification({
-    clientId,
-    type: "balance_topup",
-    title: t(lang, "inAppBalanceTopupTitle"),
-    body: t(lang, "inAppBalanceTopupBody", { amount: amountStr }),
-    metadata: { amount, currency },
-  }).catch(() => {});
   const clientLabel =
     client.email?.trim() ||
     (client.telegramUsername ? `@${client.telegramUsername}` : client.id);
@@ -153,14 +144,6 @@ export async function notifyTariffActivated(clientId: string, paymentId: string)
     const textClient = t(lang, "notifyTariffActivated", { name: escapeHtml(tariffName) });
     await sendTelegramToUser(client.telegramId, textClient);
   }
-  // In-app notification
-  await createClientNotification({
-    clientId,
-    type: "payment_success",
-    title: t(lang, "inAppTariffActivatedTitle"),
-    body: t(lang, "inAppTariffActivatedBody", { name: tariffName }),
-    metadata: { tariffName, paymentId },
-  }).catch(() => {});
   const clientLabel =
     client.email?.trim() ||
     (client.telegramUsername ? `@${client.telegramUsername}` : client.id);

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield, LayoutDashboard, Users, CreditCard, Settings, LogOut, KeyRound,
   Megaphone, Tag, BarChart3, FileText, ExternalLink, Sun, Moon, Monitor,
-  Palette, Menu, X, Database, Target, UserCog, Send, CalendarClock, Globe, Server, MessageSquare, Trophy,
+  Palette, Menu, X, Database, Target, UserCog, Send, CalendarClock, Globe, Server, MessageSquare, Trophy, Bell,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useTheme, ACCENT_PALETTES, type ThemeMode, type ThemeAccent } from "@/contexts/theme";
@@ -32,6 +32,7 @@ const navSections: { to: string; labelKey: string; icon: typeof LayoutDashboard;
   { to: "/admin/backup", labelKey: "backup", icon: Database, section: "backup" },
   { to: "/admin/contests", labelKey: "contests", icon: Trophy, section: "contests" },
   { to: "/admin/tickets", labelKey: "tickets", icon: MessageSquare, section: "tickets" },
+  { to: "/admin/announcements", labelKey: "announcements", icon: Bell, section: "announcements" },
   { to: "/admin/settings", labelKey: "settings", icon: Settings, section: "settings" },
   { to: "/admin/admins", labelKey: "admins", icon: UserCog, section: "admins" },
 ];

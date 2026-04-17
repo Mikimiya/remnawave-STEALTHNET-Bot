@@ -259,6 +259,9 @@ export const en = {
   promoExpired: "Promo code has expired",
   promoUsageLimitReached: "Promo code usage limit reached",
   promoAlreadyUsedByYou: "You have already used this promo code",
+  promoNotForThisCategory: "This promo code is not applicable to this category",
+  promoNotForThisSubGroup: "This promo code is not applicable to this plan group",
+  promoNotForThisTariff: "This promo code is not applicable to this tariff",
 
   // ── AI chat fallbacks ─────────────────────────────────────────────
   aiNotConfigured: "Sorry, the AI assistant is not configured yet. Please contact support or set up the Groq API Key in the admin panel.",

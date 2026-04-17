@@ -6,7 +6,6 @@ import { prisma } from "../../db.js";
 import { t } from "../../i18n/index.js";
 import { getSystemConfig } from "../client/client.service.js";
 import { sendEmail } from "../mail/mail.service.js";
-import { createBulkNotifications } from "../notification/client-notification.service.js";
 
 const TELEGRAM_SEND_DELAY_MS = 60;
 const EMAIL_SEND_DELAY_MS = 200;
@@ -224,23 +223,6 @@ export async function runBroadcast(options: {
   }
 
   if (result.errors.length > 0) result.ok = false;
-
-  // Also create in-app notifications for all non-blocked clients
-  try {
-    const allClients = await prisma.client.findMany({
-      where: { isBlocked: false },
-      select: { id: true },
-    });
-    const serviceName = config.serviceName || "STEALTHNET";
-    await createBulkNotifications(
-      allClients.map((c) => c.id),
-      "broadcast",
-      `📢 ${serviceName}`,
-      message.length > 500 ? message.slice(0, 497) + "..." : message,
-    );
-  } catch (e) {
-    console.error("[Broadcast] Failed to create in-app notifications:", e);
-  }
 
   return result;
 }

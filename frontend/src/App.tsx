@@ -30,6 +30,7 @@ import { BroadcastPage } from "@/pages/broadcast";
 import { AutoBroadcastPage } from "@/pages/auto-broadcast";
 import { ProxyPage } from "@/pages/proxy";
 import { SingboxPage } from "@/pages/singbox";
+import { AnnouncementsPage } from "@/pages/announcements";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { CabinetLayout } from "@/pages/cabinet/cabinet-layout";
 import { ClientLoginPage } from "@/pages/cabinet/client-login";
@@ -50,8 +51,8 @@ import { ClientProxyPage } from "@/pages/cabinet/client-proxy";
 import { ClientSingboxPage } from "@/pages/cabinet/client-singbox";
 import { ClientTicketsPage } from "@/pages/cabinet/client-tickets";
 import { ClientCustomBuildPage } from "@/pages/cabinet/client-custom-build";
-import { ClientNotificationsPage } from "@/pages/cabinet/client-notifications";
 import { ClientTrafficPage } from "@/pages/cabinet/client-traffic";
+import { ClientAnnouncementsPage } from "@/pages/cabinet/client-announcements";
 import { LandingPage } from "@/pages/landing";
 import type { PublicConfig } from "@/lib/api";
 
@@ -194,6 +195,7 @@ function AppRoutes() {
         <Route path="backup" element={<ForceChangePassword><BackupPage /></ForceChangePassword>} />
         <Route path="contests" element={<ForceChangePassword><ContestsPage /></ForceChangePassword>} />
         <Route path="tickets" element={<ForceChangePassword><AdminTicketsPage /></ForceChangePassword>} />
+        <Route path="announcements" element={<ForceChangePassword><AnnouncementsPage /></ForceChangePassword>} />
       </Route>
       {/* Онбординг — вне CabinetLayout (без навбара) */}
       <Route
@@ -311,18 +313,18 @@ function AppRoutes() {
           }
         />
         <Route
-          path="notifications"
-          element={
-            <RequireClientAuth>
-              <ClientNotificationsPage />
-            </RequireClientAuth>
-          }
-        />
-        <Route
           path="traffic"
           element={
             <RequireClientAuth>
               <ClientTrafficPage />
+            </RequireClientAuth>
+          }
+        />
+        <Route
+          path="announcements"
+          element={
+            <RequireClientAuth>
+              <ClientAnnouncementsPage />
             </RequireClientAuth>
           }
         />

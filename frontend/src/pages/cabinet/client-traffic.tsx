@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BarChart3, Loader2, ArrowUpFromLine, ArrowDownToLine, Activity } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
-import type { TrafficLogEntry } from "@/lib/api";
+import type { TrafficLogEntry, TrafficSummary } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import {
@@ -45,14 +45,6 @@ function formatDateShort(dateStr: string, lang?: string): string {
   }
 }
 
-/* ──── source tabs ──── */
-
-const SOURCES = [
-  { key: "vpn", labelKey: "trafficReport.sourceVpn" },
-  { key: "proxy", labelKey: "trafficReport.sourceProxy" },
-  { key: "singbox", labelKey: "trafficReport.sourceSingbox" },
-] as const;
-
 const PERIOD_OPTIONS = [
   { days: 7, labelKey: "trafficReport.period7d" },
   { days: 30, labelKey: "trafficReport.period30d" },
@@ -65,30 +57,35 @@ export function ClientTrafficPage() {
   const lang = i18n.language;
   const token = state.token ?? null;
 
-  const [source, setSource] = useState<string>("vpn");
   const [days, setDays] = useState<number>(30);
   const [data, setData] = useState<TrafficLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [monthlySummary, setMonthlySummary] = useState<TrafficSummary | null>(null);
 
   const loadData = useCallback(async () => {
     if (!token) return;
     setError(null);
     setLoading(true);
     try {
-      const res = await api.clientGetTrafficLog(token, { days, source });
+      const res = await api.clientGetTrafficLog(token, { days });
       setData(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("trafficReport.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [token, days, source, t]);
+  }, [token, days, t]);
 
   useEffect(() => {
     if (!token) return;
     loadData();
-  }, [token, days, source, loadData]);
+  }, [token, days, loadData]);
+
+  useEffect(() => {
+    if (!token) return;
+    api.clientGetTrafficSummary(token).then(setMonthlySummary).catch(() => {});
+  }, [token]);
 
   /* chart data */
   const chartData = data.map((d) => ({
@@ -114,20 +111,26 @@ export function ClientTrafficPage() {
         <h1 className="text-xl font-bold tracking-tight">{t("trafficReport.title")}</h1>
       </div>
 
-      {/* Source tabs */}
-      <div className="flex flex-wrap gap-2">
-        {SOURCES.map((s) => (
-          <Button
-            key={s.key}
-            variant={source === s.key ? "default" : "outline"}
-            size="sm"
-            className="rounded-xl text-xs"
-            onClick={() => setSource(s.key)}
-          >
-            {t(s.labelKey)}
-          </Button>
-        ))}
-      </div>
+      {/* Monthly summary */}
+      {monthlySummary && (
+        <div className="rounded-2xl border bg-card/60 p-4 space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">{t("trafficReport.monthlySummary")}</p>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div>
+              <p className="text-lg font-bold">{formatBytes(Number(monthlySummary.totalUsedBytes))}</p>
+              <p className="text-[11px] text-muted-foreground">{t("trafficReport.totalTraffic")}</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-blue-500">{formatBytes(Number(monthlySummary.totalUploadBytes))}</p>
+              <p className="text-[11px] text-muted-foreground">{t("trafficReport.upload")}</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-emerald-500">{formatBytes(Number(monthlySummary.totalDownloadBytes))}</p>
+              <p className="text-[11px] text-muted-foreground">{t("trafficReport.download")}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Period selector */}
       <div className="flex flex-wrap gap-2">

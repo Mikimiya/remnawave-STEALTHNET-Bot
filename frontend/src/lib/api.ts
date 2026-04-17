@@ -34,6 +34,7 @@ export const MANAGER_SECTIONS = [
   { key: "proxy", label: "Прокси" },
   { key: "singbox", label: "Sing-box" },
   { key: "contests", label: "Конкурсы" },
+  { key: "announcements", label: "Объявления" },
   { key: "settings", label: "Настройки" },
 ] as const;
 
@@ -1220,35 +1221,12 @@ export const api = {
   },
 
   // ——— Промокоды (клиент) ———
-  async clientCheckPromoCode(token: string, code: string): Promise<{ type: string; discountPercent?: number | null; discountFixed?: number | null; durationDays?: number | null; name: string }> {
-    return request("/client/promo-code/check", { method: "POST", body: JSON.stringify({ code }), token });
+  async clientCheckPromoCode(token: string, code: string, tariffId?: string): Promise<{ type: string; discountPercent?: number | null; discountFixed?: number | null; durationDays?: number | null; name: string; restrictions?: { allowedCategoryIds: string[]; allowedSubGroupIds: string[]; allowedTariffIds: string[] } }> {
+    return request("/client/promo-code/check", { method: "POST", body: JSON.stringify({ code, tariffId }), token });
   },
 
   async clientActivatePromoCode(token: string, code: string): Promise<{ message: string }> {
     return request("/client/promo-code/activate", { method: "POST", body: JSON.stringify({ code }), token });
-  },
-
-  // ——— Уведомления (клиент) ———
-  async clientGetNotifications(
-    token: string,
-    opts?: { cursor?: string; limit?: number }
-  ): Promise<{ items: ClientNotification[]; nextCursor: string | null }> {
-    const params = new URLSearchParams();
-    if (opts?.cursor) params.set("cursor", opts.cursor);
-    if (opts?.limit) params.set("limit", String(opts.limit));
-    const qs = params.toString();
-    return request(`/client/notifications${qs ? `?${qs}` : ""}`, { token });
-  },
-
-  async clientGetUnreadCount(token: string): Promise<{ count: number }> {
-    return request("/client/notifications/unread-count", { token });
-  },
-
-  async clientMarkNotificationsRead(
-    token: string,
-    data: { ids?: string[]; all?: boolean }
-  ): Promise<{ updated: number }> {
-    return request("/client/notifications/read", { method: "POST", body: JSON.stringify(data), token });
   },
 
   // ——— Статистика трафика (клиент) ———
@@ -1260,20 +1238,39 @@ export const api = {
     if (opts?.days) params.set("days", String(opts.days));
     if (opts?.source) params.set("source", opts.source);
     const qs = params.toString();
-    return request(`/client/traffic-log${qs ? `?${qs}` : ""}`, { token });
+    const res = await request<{ logs: TrafficLogEntry[] }>(`/client/traffic-log${qs ? `?${qs}` : ""}`, { token });
+    return res.logs;
+  },
+
+  // ——— 流量月度汇总 ———
+  async clientGetTrafficSummary(token: string): Promise<TrafficSummary> {
+    return request("/client/traffic-summary", { token });
+  },
+
+  // ——— 公告 (公开) ———
+  async getPublicAnnouncements(): Promise<AnnouncementRecord[]> {
+    return request("/public/announcements");
+  },
+  async getPublicAnnouncement(id: string): Promise<AnnouncementRecord> {
+    return request(`/public/announcements/${id}`);
+  },
+
+  // ——— 公告 (admin) ———
+  async getAdminAnnouncements(token: string): Promise<AnnouncementRecord[]> {
+    return request("/admin/announcements", { token });
+  },
+  async createAnnouncement(token: string, data: CreateAnnouncementPayload): Promise<AnnouncementRecord> {
+    return request("/admin/announcements", { method: "POST", body: JSON.stringify(data), token });
+  },
+  async updateAnnouncement(token: string, id: string, data: Partial<CreateAnnouncementPayload>): Promise<AnnouncementRecord> {
+    return request(`/admin/announcements/${id}`, { method: "PATCH", body: JSON.stringify(data), token });
+  },
+  async deleteAnnouncement(token: string, id: string): Promise<void> {
+    return request(`/admin/announcements/${id}`, { method: "DELETE", token });
   },
 };
 
-// ——— Типы: Уведомления и трафик ———
-export interface ClientNotification {
-  id: string;
-  type: string;
-  title: string;
-  body: string | null;
-  isRead: boolean;
-  metadata: string | null;
-  createdAt: string;
-}
+// ——— Типы: трафик ———
 
 export interface TrafficLogEntry {
   date: string;
@@ -1282,6 +1279,33 @@ export interface TrafficLogEntry {
   downloadBytes: string;
   source: string;
 }
+
+export interface TrafficSummary {
+  month: string;
+  totalUsedBytes: string;
+  totalUploadBytes: string;
+  totalDownloadBytes: string;
+  bySource: Record<string, { usedBytes: string; uploadBytes: string; downloadBytes: string }>;
+  daysLogged: number;
+}
+
+export interface AnnouncementRecord {
+  id: string;
+  title: string;
+  content: string;
+  pinned: boolean;
+  published: boolean;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type CreateAnnouncementPayload = {
+  title: string;
+  content: string;
+  pinned?: boolean;
+  published?: boolean;
+};
 
 export interface ClientReferralStats {
   referralCode: string | null;
@@ -2273,6 +2297,9 @@ export interface PromoCodeRecord {
   trafficLimitBytes: string | null;
   deviceLimit: number | null;
   durationDays: number | null;
+  allowedCategoryIds: string[];
+  allowedSubGroupIds: string[];
+  allowedTariffIds: string[];
   maxUses: number;
   maxUsesPerClient: number;
   isActive: boolean;
@@ -2311,6 +2338,9 @@ export type CreatePromoCodePayload = {
   trafficLimitBytes?: string | number | null;
   deviceLimit?: number | null;
   durationDays?: number | null;
+  allowedCategoryIds?: string[];
+  allowedSubGroupIds?: string[];
+  allowedTariffIds?: string[];
   maxUses: number;
   maxUsesPerClient: number;
   isActive?: boolean;

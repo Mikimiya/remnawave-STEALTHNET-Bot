@@ -7,6 +7,7 @@ import type {
   PromoCodeDetail,
   CreatePromoCodePayload,
   UpdatePromoCodePayload,
+  TariffCategoryWithTariffs,
 } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ export function PromoCodesPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [squads, setSquads] = useState<Squad[]>([]);
+  const [categories, setCategories] = useState<TariffCategoryWithTariffs[]>([]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -88,11 +90,13 @@ export function PromoCodesPage() {
     setLoading(true);
     setError(null);
     try {
-      const [codesRes, squadsRes] = await Promise.all([
+      const [codesRes, squadsRes, catsRes] = await Promise.all([
         api.getPromoCodes(token),
         api.getRemnaSquadsInternal(token).catch(() => ({ response: { internalSquads: [] } })),
+        api.getTariffCategories(token).catch(() => ({ items: [] as TariffCategoryWithTariffs[] })),
       ]);
       setCodes(codesRes);
+      setCategories(catsRes.items ?? []);
       const res = squadsRes as { response?: { internalSquads?: { uuid?: string; name?: string }[] } };
       const list = res?.response?.internalSquads ?? (Array.isArray(res?.response) ? res.response : []);
       setSquads(Array.isArray(list) ? list.map((s: { uuid?: string; name?: string }) => ({ uuid: s.uuid ?? "", name: s.name })) : []);
@@ -121,6 +125,9 @@ export function PromoCodesPage() {
       maxUsesPerClient: 1,
       isActive: true,
       expiresAt: null,
+      allowedCategoryIds: [],
+      allowedSubGroupIds: [],
+      allowedTariffIds: [],
     });
     setShowForm(true);
   };
@@ -141,6 +148,9 @@ export function PromoCodesPage() {
       maxUsesPerClient: c.maxUsesPerClient,
       isActive: c.isActive,
       expiresAt: c.expiresAt,
+      allowedCategoryIds: (c as any).allowedCategoryIds ?? [],
+      allowedSubGroupIds: (c as any).allowedSubGroupIds ?? [],
+      allowedTariffIds: (c as any).allowedTariffIds ?? [],
     });
     setShowForm(true);
   };
@@ -570,6 +580,89 @@ export function PromoCodesPage() {
               />
               <Label htmlFor="code-active">{t("admin.promoCodes.formActiveLabel")}</Label>
             </div>
+
+            {/* Restriction selectors */}
+            {categories.length > 0 && (
+              <div className="space-y-3 border rounded-md p-3 bg-muted/30">
+                <p className="text-sm font-medium">{t("admin.promoCodes.restrictions")}</p>
+                <p className="text-xs text-muted-foreground">{t("admin.promoCodes.restrictionsHint")}</p>
+
+                {/* Categories */}
+                <div>
+                  <Label className="text-xs">{t("admin.promoCodes.allowedCategories")}</Label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {categories.map((cat) => (
+                      <label key={cat.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded"
+                          checked={form.allowedCategoryIds?.includes(cat.id) ?? false}
+                          onChange={(e) => {
+                            setForm((f) => {
+                              const ids = f.allowedCategoryIds ?? [];
+                              return { ...f, allowedCategoryIds: e.target.checked ? [...ids, cat.id] : ids.filter((id) => id !== cat.id) };
+                            });
+                          }}
+                        />
+                        {cat.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sub-groups */}
+                {categories.some((c) => c.subGroups?.length > 0) && (
+                  <div>
+                    <Label className="text-xs">{t("admin.promoCodes.allowedSubGroups")}</Label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {categories.flatMap((cat) =>
+                        (cat.subGroups ?? []).map((sg) => (
+                          <label key={sg.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={form.allowedSubGroupIds?.includes(sg.id) ?? false}
+                              onChange={(e) => {
+                                setForm((f) => {
+                                  const ids = f.allowedSubGroupIds ?? [];
+                                  return { ...f, allowedSubGroupIds: e.target.checked ? [...ids, sg.id] : ids.filter((id) => id !== sg.id) };
+                                });
+                              }}
+                            />
+                            <span className="text-muted-foreground">{cat.name} /</span> {sg.name}
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tariffs */}
+                <div>
+                  <Label className="text-xs">{t("admin.promoCodes.allowedTariffs")}</Label>
+                  <div className="flex flex-wrap gap-2 mt-1 max-h-40 overflow-y-auto">
+                    {categories.flatMap((cat) =>
+                      cat.tariffs.map((tar) => (
+                        <label key={tar.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rounded"
+                            checked={form.allowedTariffIds?.includes(tar.id) ?? false}
+                            onChange={(e) => {
+                              setForm((f) => {
+                                const ids = f.allowedTariffIds ?? [];
+                                return { ...f, allowedTariffIds: e.target.checked ? [...ids, tar.id] : ids.filter((id) => id !== tar.id) };
+                              });
+                            }}
+                          />
+                          <span className="text-muted-foreground">{cat.name} /</span> {tar.name}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <DialogFooter className="mt-4">
               <Button variant="outline" onClick={() => setShowForm(false)}>{t("admin.common.cancel")}</Button>

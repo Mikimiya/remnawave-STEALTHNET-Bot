@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
-import { UserPlus, Mail, AlertCircle } from "lucide-react";
+import { UserPlus, Mail, AlertCircle, ArrowLeft, ArrowRight, Inbox } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { useCabinetConfig } from "@/contexts/cabinet-config";
 import { Button } from "@/components/ui/button";
@@ -77,13 +76,13 @@ function useUtmCapture(searchParams: URLSearchParams) {
 }
 
 export function ClientRegisterPage() {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   const config = useCabinetConfig();
   const brand = { serviceName: config?.serviceName ?? "", logo: config?.logo ?? "/favicon.svg" };
   const defaults = {
@@ -116,32 +115,7 @@ export function ClientRegisterPage() {
     return "";
   }
 
-  function handleEmailBlur() {
-    setEmailError(validateEmail(email));
-  }
-
-  function handlePasswordBlur() {
-    setPasswordError(validatePassword(password));
-  }
-
-  function handleEmailChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setEmail(e.target.value);
-    if (emailError) setEmailError("");
-  }
-
-  function handlePasswordChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setPassword(e.target.value);
-    if (passwordError) setPasswordError("");
-  }
-
-  function validateAll(): boolean {
-    const emailErr = validateEmail(email);
-    const passwordErr = validatePassword(password);
-    setEmailError(emailErr);
-    setPasswordError(passwordErr);
-    return !emailErr && !passwordErr;
-  }
-
+  /* ── OAuth handlers (unchanged logic) ── */
   const handleGoogleLogin = useCallback(() => {
     if (!googleEnabled || !googleClientId) return;
     setError("");
@@ -150,9 +124,7 @@ export function ClientRegisterPage() {
     try {
       sessionStorage.setItem("stealthnet_google_oauth_state", state);
       sessionStorage.setItem("stealthnet_google_oauth_nonce", nonce);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
     const baseUrl = (publicAppUrl ?? "").trim().replace(/\/$/, "") || window.location.origin;
     const redirectUri = baseUrl + "/cabinet/register";
     const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -177,9 +149,7 @@ export function ClientRegisterPage() {
       if (saved !== state) return;
       sessionStorage.removeItem("stealthnet_google_oauth_state");
       sessionStorage.removeItem("stealthnet_google_oauth_nonce");
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     setLoading(true);
     loginByGoogle(idToken)
@@ -227,13 +197,22 @@ export function ClientRegisterPage() {
       .finally(() => setLoading(false));
   }, [loginByApple, navigate, t]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  /* ── step handlers ── */
+  function handleEmailNext() {
+    const err = validateEmail(email);
+    setEmailError(err);
+    if (!err) {
+      setError("");
+      setStep(2);
+    }
+  }
+
+  async function handlePasswordSubmit() {
+    const err = validatePassword(password);
+    setPasswordError(err);
+    if (err) return;
+
     setError("");
-    setEmailSent(false);
-
-    if (!validateAll()) return;
-
     setLoading(true);
     try {
       const result = await register({
@@ -245,7 +224,7 @@ export function ClientRegisterPage() {
         ...utm,
       });
       if (result?.requiresVerification) {
-        setEmailSent(true);
+        setStep(3);
       } else {
         navigate("/cabinet/dashboard", { replace: true });
       }
@@ -256,158 +235,194 @@ export function ClientRegisterPage() {
     }
   }
 
-  return (
-    <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}>
+  /* ── step indicator ── */
+  const stepIndicator = (
+    <div className="mb-6 flex items-center justify-center gap-1.5">
+      {[1, 2, 3].map((s) => (
+        <div
+          key={s}
+          className={cn(
+            "h-1 rounded-full transition-all duration-300",
+            s === step ? "w-6 bg-primary" : s < step ? "w-3 bg-primary/40" : "w-3 bg-border/60",
+          )}
+        />
+      ))}
+    </div>
+  );
+
+  /* ── Step 1: Email ── */
+  if (step === 1) {
+    return (
       <AuthShell
         brand={brand}
         icon={UserPlus}
-        eyebrow="create account"
         title={t("auth.registerTitle")}
         subtitle={t("auth.registerSubtitle")}
-        sideTitle={brand.serviceName ? `Join ${brand.serviceName} in a minute.` : "Create your secure account in a minute."}
-        sideDescription="Register once and get instant access to the cabinet, subscription management, payments, support, and one-click VPN setup across devices."
-        sidePoints={[
-          "Fast onboarding with email, Telegram, Google, or Apple",
-          "Referral links, preferred language, and currency are preserved automatically",
-          "Built for a polished first impression on mobile and desktop",
-        ]}
-        footer={
-          <>
-            {t("auth.haveAccount")}{" "}
-            <Link to="/cabinet/login" className="font-medium text-primary transition-colors hover:text-primary/80 hover:underline">
-              {t("auth.login")}
-            </Link>
-          </>
-        }
+        footer={<>{t("auth.haveAccount")} <Link to="/cabinet/login" className="font-semibold text-primary transition-colors hover:text-primary/80">{t("auth.login")}</Link></>}
       >
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <input type="text" name="prevent_autofill" autoComplete="off" tabIndex={-1} className="absolute h-0 w-0 overflow-hidden opacity-0 pointer-events-none" aria-hidden />
-
+        {stepIndicator}
+        <div className="space-y-4">
           {error && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+            <div className="flex items-start gap-2.5 rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-sm text-destructive dark:border-red-500/20 dark:bg-red-500/5 dark:text-red-400">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
-            </motion.div>
+            </div>
           )}
 
-          <div className="space-y-2.5">
-            <Label htmlFor="email" className="text-sm font-medium">{t("auth.email")}</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="email" className="text-[13px] font-medium text-foreground/70">{t("auth.email")}</Label>
             <Input
               id="email"
               type="email"
               name="register_email"
               placeholder={t("auth.enterEmail")}
               value={email}
-              onChange={handleEmailChange}
-              onBlur={handleEmailBlur}
+              onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(""); }}
+              onBlur={() => { if (email) setEmailError(validateEmail(email)); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleEmailNext(); } }}
               required
+              autoFocus
               autoComplete="email"
               className={cn(
-                "h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/50 dark:bg-white/5 transition-all duration-200",
-                emailError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40"
+                "h-11 rounded-lg border-border/60 bg-muted/30 px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 dark:bg-white/5",
+                emailError && "border-destructive focus-visible:ring-destructive/30"
               )}
             />
-            {emailError && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-1 text-xs text-destructive dark:text-red-400">{emailError}</motion.p>}
+            {emailError && <p className="px-0.5 text-xs text-destructive">{emailError}</p>}
           </div>
 
-          <div className="space-y-2.5">
-            <Label htmlFor="password" className="text-sm font-medium">{t("auth.password")}</Label>
+          <Button onClick={handleEmailNext} className="mt-1 h-11 w-full rounded-lg text-sm font-semibold shadow-sm transition-all duration-150 hover:shadow-md" disabled={!email.trim()}>
+            <span className="flex items-center gap-2">{t("common.next") || "Next"}<ArrowRight className="h-4 w-4" /></span>
+          </Button>
+
+          {(googleEnabled || appleEnabled || telegramEnabled) && (
+            <>
+              <div className="relative flex items-center gap-3 py-1">
+                <div className="h-px flex-1 bg-border/40" />
+                <span className="text-[11px] font-medium text-muted-foreground/50">{t("common.or")}</span>
+                <div className="h-px flex-1 bg-border/40" />
+              </div>
+              <div className="grid gap-2.5">
+                {telegramEnabled && (
+                  <a href={`https://t.me/${telegramBotUsername}`} target="_blank" rel="noopener noreferrer" className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+                    <TelegramIcon className="h-4 w-4 text-[#2AABEE]" />
+                    {t("auth.loginViaTelegram")}
+                  </a>
+                )}
+                {googleEnabled && googleClientId && (
+                  <button type="button" onClick={handleGoogleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+                    <GoogleIcon className="h-4 w-4" />
+                    {t("auth.registerViaGoogle")}
+                  </button>
+                )}
+                {appleEnabled && (
+                  <button type="button" onClick={handleAppleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                    {t("auth.registerViaApple")}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </AuthShell>
+    );
+  }
+
+  /* ── Step 2: Password ── */
+  if (step === 2) {
+    return (
+      <AuthShell
+        brand={brand}
+        title={t("auth.password") || "Create password"}
+        subtitle={email}
+        footer={<>{t("auth.haveAccount")} <Link to="/cabinet/login" className="font-semibold text-primary transition-colors hover:text-primary/80">{t("auth.login")}</Link></>}
+      >
+        {stepIndicator}
+        <div className="space-y-4">
+          {error && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-sm text-destructive dark:border-red-500/20 dark:bg-red-500/5 dark:text-red-400">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="password" className="text-[13px] font-medium text-foreground/70">{t("auth.password")}</Label>
             <Input
               id="password"
               type="password"
               name="register_password"
+              placeholder="••••••••"
               value={password}
-              onChange={handlePasswordChange}
-              onBlur={handlePasswordBlur}
+              onChange={(e) => { setPassword(e.target.value); if (passwordError) setPasswordError(""); }}
+              onBlur={() => { if (password) setPasswordError(validatePassword(password)); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handlePasswordSubmit(); } }}
               required
+              autoFocus
               autoComplete="new-password"
               className={cn(
-                "h-12 rounded-xl border-white/10 bg-white/50 px-4 shadow-sm backdrop-blur placeholder:text-muted-foreground/50 dark:bg-white/5 transition-all duration-200",
-                passwordError ? "border-destructive focus-visible:ring-destructive" : "focus-visible:ring-primary/40"
+                "h-11 rounded-lg border-border/60 bg-muted/30 px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 dark:bg-white/5",
+                passwordError && "border-destructive focus-visible:ring-destructive/30"
               )}
             />
-            {passwordError && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-1 text-xs text-destructive dark:text-red-400">{passwordError}</motion.p>}
-            {!passwordError && password && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-1.5 px-1 text-xs font-medium text-emerald-500">
-                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500/20">
-                  <svg className="h-2.5 w-2.5" viewBox="0 0 12 12" fill="none"><path d="M2.5 6l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </span>
-                {t("auth.passwordAccepted")}
-              </motion.p>
-            )}
+            {passwordError && <p className="px-0.5 text-xs text-destructive">{passwordError}</p>}
+            <p className="px-0.5 text-xs text-muted-foreground/60">{t("auth.passwordTooShort") || "Minimum 8 characters"}</p>
           </div>
 
-          {emailSent && (
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 shadow-sm dark:text-emerald-400">
-              <Mail className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{t("auth.emailVerificationSent")}</span>
-            </motion.div>
-          )}
-
-          <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold shadow-lg shadow-primary/25 transition-all duration-200 hover:scale-[1.01] hover:shadow-primary/35" disabled={loading || !email || !password}>
-            {loading ? (
-              <span className="flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />{t("auth.registerLoading")}</span>
-            ) : t("auth.register")}
-          </Button>
-
-          {(googleEnabled || appleEnabled || telegramEnabled) && (
-            <div className="space-y-4">
-              <div className="relative flex items-center gap-3">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-                <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground/60">{t("common.or")}</span>
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-              </div>
-
-              <div className="grid gap-3">
-                {telegramEnabled && (
-                  <a
-                    href={`https://t.me/${telegramBotUsername}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                      "flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-[#2AABEE]/10 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all duration-200 hover:bg-[#2AABEE]/20 hover:shadow-md dark:bg-[#2AABEE]/10 dark:hover:bg-[#2AABEE]/20",
-                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    )}
-                  >
-                    <TelegramIcon className="h-5 w-5 text-[#2AABEE]" />
-                    {t("auth.loginViaTelegram")}
-                  </a>
-                )}
-
-                {googleEnabled && googleClientId && (
-                  <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    disabled={loading}
-                    title={t("auth.registerViaGoogle")}
-                    className={cn(
-                      "flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/50 px-4 text-sm font-medium text-foreground shadow-sm backdrop-blur transition-all duration-200 hover:bg-white/70 hover:shadow-md dark:bg-white/5 dark:hover:bg-white/10",
-                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    )}
-                  >
-                    <GoogleIcon className="h-5 w-5" />
-                    {t("auth.registerViaGoogle")}
-                  </button>
-                )}
-
-                {appleEnabled && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-12 w-full rounded-xl gap-3 border-white/10 bg-white/50 text-sm font-medium shadow-sm backdrop-blur transition-all duration-200 hover:bg-white/70 hover:shadow-md dark:bg-white/5 dark:hover:bg-white/10"
-                    onClick={handleAppleLogin}
-                    disabled={loading}
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                    {t("auth.registerViaApple")}
-                  </Button>
-                )}
-
-              </div>
-            </div>
-          )}
-        </form>
+          <div className="flex gap-2.5">
+            <Button variant="outline" onClick={() => { setStep(1); setError(""); }} className="h-11 rounded-lg px-4">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <Button onClick={handlePasswordSubmit} className="h-11 flex-1 rounded-lg text-sm font-semibold shadow-sm transition-all duration-150 hover:shadow-md" disabled={loading || !password}>
+              {loading ? (
+                <span className="flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />{t("auth.registerLoading")}</span>
+              ) : t("auth.register")}
+            </Button>
+          </div>
+        </div>
       </AuthShell>
-    </motion.div>
+    );
+  }
+
+  /* ── Step 3: Check your email ── */
+  return (
+    <AuthShell
+      brand={brand}
+      title={t("auth.emailVerificationSent") || "Check your email"}
+      footer={<>{t("auth.haveAccount")} <Link to="/cabinet/login" className="font-semibold text-primary transition-colors hover:text-primary/80">{t("auth.login")}</Link></>}
+    >
+      <div className="space-y-5 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/[0.1]">
+          <Mail className="h-8 w-8" />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm text-foreground">
+            {t("auth.verificationEmailSentTo") || "We've sent a verification link to"}
+          </p>
+          <p className="text-sm font-semibold text-foreground">{email}</p>
+        </div>
+
+        <div className="rounded-lg border border-amber-200/60 bg-amber-50/80 px-4 py-3 text-left dark:border-amber-500/20 dark:bg-amber-500/5">
+          <div className="flex items-start gap-2.5">
+            <Inbox className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="space-y-1 text-[13px] text-amber-800 dark:text-amber-300">
+              <p className="font-medium">{t("auth.checkSpamTitle") || "Didn't receive it?"}</p>
+              <ul className="list-inside list-disc space-y-0.5 text-xs text-amber-700/80 dark:text-amber-400/70">
+                <li>{t("auth.checkSpamFolder") || "Check your Spam / Junk folder"}</li>
+                <li>{t("auth.checkEmailTypo") || "Make sure the email address is correct"}</li>
+                <li>{t("auth.waitFewMinutes") || "Wait a few minutes and try again"}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <Button variant="outline" onClick={() => { setStep(1); setPassword(""); setError(""); }} className="h-11 w-full rounded-lg text-sm font-medium">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          {t("auth.tryAnotherEmail") || "Try another email"}
+        </Button>
+      </div>
+    </AuthShell>
   );
 }

@@ -499,7 +499,7 @@ adminRouter.delete("/tariff-sub-groups/:id", async (req, res) => {
 
 // ——— Тарифы ———
 const tariffIdSchema = z.object({ id: z.string().min(1) });
-const TRAFFIC_RESET_STRATEGIES = ["NO_RESET", "DAY", "WEEK", "MONTH"] as const;
+const TRAFFIC_RESET_STRATEGIES = ["NO_RESET", "DAY", "WEEK", "MONTH", "MONTH_ROLLING"] as const;
 const createTariffSchema = z.object({
   categoryId: z.string().min(1),
   subGroupId: z.string().min(1).nullable().optional(),
@@ -2350,6 +2350,9 @@ const createPromoCodeSchema = z.object({
   trafficLimitBytes: z.union([z.string(), z.number()]).transform((v) => (v != null ? BigInt(v) : null)).nullable().optional(),
   deviceLimit: z.number().int().min(0).nullable().optional(),
   durationDays: z.number().int().min(1).nullable().optional(),
+  allowedCategoryIds: z.array(z.string()).default([]),
+  allowedSubGroupIds: z.array(z.string()).default([]),
+  allowedTariffIds: z.array(z.string()).default([]),
   maxUses: z.number().int().min(0).default(0),
   maxUsesPerClient: z.number().int().min(1).default(1),
   isActive: z.boolean().optional(),
@@ -2377,6 +2380,9 @@ adminRouter.post("/promo-codes", async (req, res) => {
       trafficLimitBytes: d.type === "FREE_DAYS" ? (d.trafficLimitBytes ?? BigInt(0)) : null,
       deviceLimit: d.type === "FREE_DAYS" ? (d.deviceLimit ?? null) : null,
       durationDays: d.type === "FREE_DAYS" ? (d.durationDays ?? null) : null,
+      allowedCategoryIds: d.allowedCategoryIds ?? [],
+      allowedSubGroupIds: d.allowedSubGroupIds ?? [],
+      allowedTariffIds: d.allowedTariffIds ?? [],
       maxUses: d.maxUses,
       maxUsesPerClient: d.maxUsesPerClient,
       isActive: d.isActive ?? true,
@@ -2395,6 +2401,9 @@ const updatePromoCodeSchema = z.object({
   trafficLimitBytes: z.union([z.string(), z.number()]).transform((v) => (v != null ? BigInt(v) : null)).nullable().optional(),
   deviceLimit: z.number().int().min(0).nullable().optional(),
   durationDays: z.number().int().min(1).nullable().optional(),
+  allowedCategoryIds: z.array(z.string()).optional(),
+  allowedSubGroupIds: z.array(z.string()).optional(),
+  allowedTariffIds: z.array(z.string()).optional(),
   maxUses: z.number().int().min(0).optional(),
   maxUsesPerClient: z.number().int().min(1).optional(),
   isActive: z.boolean().optional(),
@@ -2858,6 +2867,8 @@ export const ADMIN_ALLOWED_SECTIONS = [
   "auto-broadcast",
   "backup",
   "settings",
+  "announcements",
+  "activities",
 ] as const;
 
 /** Список админов и менеджеров (только ADMIN). */
@@ -3021,3 +3032,122 @@ adminRouter.delete("/admins/:id", asyncRoute(async (req, res) => {
   await prisma.admin.delete({ where: { id: req.params.id } });
   return res.json({ success: true });
 }));
+
+// ═══════════════════════════════════════════════════════════════
+// ──── Объявления (Announcements) ─────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+
+/** Получить все объявления */
+adminRouter.get("/announcements", async (_req, res) => {
+  const list = await prisma.announcement.findMany({ orderBy: [{ pinned: "desc" }, { createdAt: "desc" }] });
+  return res.json(list);
+});
+
+const upsertAnnouncementSchema = z.object({
+  title: z.string().min(1).max(500),
+  content: z.string().min(1),
+  pinned: z.boolean().optional(),
+  published: z.boolean().optional(),
+});
+
+/** Создать объявление */
+adminRouter.post("/announcements", async (req, res) => {
+  const parsed = upsertAnnouncementSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+  const d = parsed.data;
+  const item = await prisma.announcement.create({
+    data: {
+      title: d.title,
+      content: d.content,
+      pinned: d.pinned ?? false,
+      published: d.published ?? false,
+      publishedAt: d.published ? new Date() : null,
+    },
+  });
+  return res.json(item);
+});
+
+/** Обновить объявление */
+adminRouter.patch("/announcements/:id", async (req, res) => {
+  const existing = await prisma.announcement.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ message: "Not found" });
+  const parsed = upsertAnnouncementSchema.partial().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+  const d = parsed.data;
+  const data: Record<string, unknown> = { ...d };
+  if (d.published === true && !existing.published) data.publishedAt = new Date();
+  if (d.published === false) data.publishedAt = null;
+  const item = await prisma.announcement.update({ where: { id: req.params.id }, data });
+  return res.json(item);
+});
+
+/** Удалить объявление */
+adminRouter.delete("/announcements/:id", async (req, res) => {
+  const existing = await prisma.announcement.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ message: "Not found" });
+  await prisma.announcement.delete({ where: { id: req.params.id } });
+  return res.json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ──── Активности / акции (Activities) ────────────────────────
+// ═══════════════════════════════════════════════════════════════
+
+/** Получить все активности */
+adminRouter.get("/activities", async (_req, res) => {
+  const list = await prisma.activity.findMany({ orderBy: { startAt: "desc" } });
+  return res.json(list);
+});
+
+const upsertActivitySchema = z.object({
+  title: z.string().min(1).max(500),
+  summary: z.string().max(1000).nullable().optional(),
+  content: z.string().min(1),
+  coverImage: z.string().nullable().optional(),
+  startAt: z.string(),
+  endAt: z.string().nullable().optional(),
+  showOnDashboard: z.boolean().optional(),
+  published: z.boolean().optional(),
+});
+
+/** Создать активность */
+adminRouter.post("/activities", async (req, res) => {
+  const parsed = upsertActivitySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+  const d = parsed.data;
+  const item = await prisma.activity.create({
+    data: {
+      title: d.title,
+      summary: d.summary ?? null,
+      content: d.content,
+      coverImage: d.coverImage ?? null,
+      startAt: new Date(d.startAt),
+      endAt: d.endAt ? new Date(d.endAt) : null,
+      showOnDashboard: d.showOnDashboard ?? false,
+      published: d.published ?? false,
+    },
+  });
+  return res.json(item);
+});
+
+/** Обновить активность */
+adminRouter.patch("/activities/:id", async (req, res) => {
+  const existing = await prisma.activity.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ message: "Not found" });
+  const parsed = upsertActivitySchema.partial().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+  const d = parsed.data;
+  const data: Record<string, unknown> = { ...d };
+  if (d.startAt) data.startAt = new Date(d.startAt);
+  if (d.endAt !== undefined) data.endAt = d.endAt ? new Date(d.endAt) : null;
+  const item = await prisma.activity.update({ where: { id: req.params.id }, data });
+  return res.json(item);
+});
+
+/** Удалить активность */
+adminRouter.delete("/activities/:id", async (req, res) => {
+  const existing = await prisma.activity.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ message: "Not found" });
+  await prisma.activity.delete({ where: { id: req.params.id } });
+  return res.json({ ok: true });
+});
