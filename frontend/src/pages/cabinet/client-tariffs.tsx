@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, memo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Package,
@@ -14,7 +14,6 @@ import {
   Shield,
   Zap,
   ArrowLeft,
-  ChevronDown,
   Flame,
   RotateCcw,
   Info,
@@ -99,6 +98,110 @@ type TariffForPay = {
   deviceLimit?: number | null;
 };
 
+/* ── Isolated promo input to avoid re-rendering entire page on keystroke ── */
+const PromoCodeInput = memo(function PromoCodeInput({
+  onApply,
+  onCancel,
+  checking,
+  disabled,
+  isMobile,
+  result,
+  error,
+  t,
+}: {
+  onApply: (code: string) => void;
+  onCancel: () => void;
+  checking: boolean;
+  disabled: boolean;
+  isMobile: boolean;
+  result: { name: string; discountPercent?: number | null; discountFixed?: number | null } | null;
+  error: string | null;
+  t: (k: string) => string;
+}) {
+  const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 py-1">
+        <Tag className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium text-muted-foreground">{t("tariffs.promoCode")}</span>
+      </div>
+
+      {result ? (
+        /* ── Applied state: show result + cancel button ── */
+        <div className="flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-green-500/10 border border-green-500/20 rounded-xl">
+            <Check className="h-4 w-4 text-green-500 shrink-0" />
+            <span className="text-sm font-bold text-green-600 dark:text-green-400">
+              {result.name}: -{result.discountPercent ? `${result.discountPercent}%` : ""}
+              {result.discountFixed ? ` ${result.discountFixed}` : ""}
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => { setInput(""); onCancel(); }}
+            className={cn(
+              "shrink-0 font-bold text-destructive hover:text-destructive",
+              isMobile
+                ? "h-12 px-4 rounded-2xl text-sm"
+                : "h-11 px-4 rounded-xl text-sm"
+            )}
+          >
+            {t("common.cancel")}
+          </Button>
+        </div>
+      ) : (
+        /* ── Input state: show input + apply button ── */
+        <>
+          <div className="flex gap-2">
+            <Input
+              ref={inputRef}
+              name="promo_code"
+              autoComplete="off"
+              inputMode="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={t("tariffs.enterPromoCode")}
+              className={cn(
+                "font-mono font-medium focus-visible:ring-primary/50",
+                isMobile
+                  ? "text-base bg-muted/40 dark:bg-white/[0.06] border-white/5 h-12 rounded-2xl"
+                  : "text-sm bg-background border-border/50 dark:border-white/10 h-11 rounded-xl"
+              )}
+              disabled={disabled || checking}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && input.trim()) {
+                  onApply(input.trim());
+                }
+              }}
+            />
+            <Button
+              onClick={() => onApply(input.trim())}
+              disabled={!input.trim() || disabled || checking}
+              className={cn(
+                "shrink-0 font-bold",
+                isMobile
+                  ? "h-12 px-5 rounded-2xl text-sm"
+                  : "h-11 px-4 rounded-xl text-sm"
+              )}
+            >
+              {checking ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                t("tariffs.apply")
+              )}
+            </Button>
+          </div>
+          {error && (
+            <p className="text-sm font-medium text-destructive px-1">{error}</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+});
+
 export function ClientTariffsPage() {
   const { state, refreshProfile } = useClientAuth();
   const token = state.token;
@@ -123,10 +226,9 @@ export function ClientTariffsPage() {
   const epayMethods = config?.epayMethods ?? [];
   const trialConfig = { trialEnabled: !!config?.trialEnabled, trialDays: config?.trialDays ?? 0 };
 
-  // Promo code — collapsed by default
-  const [promoOpen, setPromoOpen] = useState(false);
-  const [promoInput, setPromoInput] = useState("");
+  // Promo code
   const [promoChecking, setPromoChecking] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
   const [promoResult, setPromoResult] = useState<{
     type: string;
     discountPercent?: number | null;
@@ -172,21 +274,21 @@ export function ClientTariffsPage() {
     }
   }
 
-  async function checkPromo() {
-    if (!token || !promoInput.trim()) return;
+  const checkPromo = useCallback(async (code: string) => {
+    if (!token || !code) return;
     setPromoChecking(true);
     setPromoError(null);
     setPromoResult(null);
     try {
       const tariffId = payModal?.tariff?.id;
-      const res = await api.clientCheckPromoCode(token, promoInput.trim(), tariffId);
+      const res = await api.clientCheckPromoCode(token, code, tariffId);
       if (res.type === "DISCOUNT") {
         setPromoResult(res);
+        setPromoCode(code);
       } else {
-        const activateRes = await api.clientActivatePromoCode(token, promoInput.trim());
+        const activateRes = await api.clientActivatePromoCode(token, code);
         setPromoError(null);
         setPromoResult(null);
-        setPromoInput("");
         setPayModal(null);
         alert(translateBackendMessage(activateRes.message, t));
         await refreshProfile();
@@ -198,7 +300,7 @@ export function ClientTariffsPage() {
     } finally {
       setPromoChecking(false);
     }
-  }
+  }, [token, payModal?.tariff?.id, t, refreshProfile]);
 
   function getDiscountedPrice(price: number): number {
     if (!promoResult) return price;
@@ -223,10 +325,9 @@ export function ClientTariffsPage() {
         paymentMethod: methodId,
         description: tariff.name,
         tariffId: tariff.id,
-        promoCode: promoResult ? promoInput.trim() : undefined,
+        promoCode: promoResult ? promoCode : undefined,
       });
       setPayModal(null);
-      setPromoInput("");
       setPromoResult(null);
       openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
@@ -243,10 +344,9 @@ export function ClientTariffsPage() {
     try {
       const res = await api.clientPayByBalance(token, {
         tariffId: tariff.id,
-        promoCode: promoResult ? promoInput.trim() : undefined,
+        promoCode: promoResult ? promoCode : undefined,
       });
       setPayModal(null);
-      setPromoInput("");
       setPromoResult(null);
       const msg = res.tariffName && res.amount != null && res.currency
         ? t("tariffs.balancePaySuccess", { name: res.tariffName, amount: res.amount.toFixed(2), currency: res.currency })
@@ -273,10 +373,9 @@ export function ClientTariffsPage() {
         amount: tariff.price,
         paymentType: "AC",
         tariffId: tariff.id,
-        promoCode: promoResult ? promoInput.trim() : undefined,
+        promoCode: promoResult ? promoCode : undefined,
       });
       setPayModal(null);
-      setPromoInput("");
       setPromoResult(null);
       if (res.paymentUrl) openPaymentInBrowser(res.paymentUrl);
     } catch (e) {
@@ -299,10 +398,9 @@ export function ClientTariffsPage() {
         amount: tariff.price,
         currency: "RUB",
         tariffId: tariff.id,
-        promoCode: promoResult ? promoInput.trim() : undefined,
+        promoCode: promoResult ? promoCode : undefined,
       });
       setPayModal(null);
-      setPromoInput("");
       setPromoResult(null);
       if (res.confirmationUrl) openPaymentInBrowser(res.confirmationUrl);
     } catch (e) {
@@ -321,10 +419,9 @@ export function ClientTariffsPage() {
         amount: tariff.price,
         currency: tariff.currency,
         tariffId: tariff.id,
-        promoCode: promoResult ? promoInput.trim() : undefined,
+        promoCode: promoResult ? promoCode : undefined,
       });
       setPayModal(null);
-      setPromoInput("");
       setPromoResult(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
@@ -343,10 +440,9 @@ export function ClientTariffsPage() {
         amount: tariff.price,
         currency: tariff.currency,
         tariffId: tariff.id,
-        promoCode: promoResult ? promoInput.trim() : undefined,
+        promoCode: promoResult ? promoCode : undefined,
       });
       setPayModal(null);
-      setPromoInput("");
       setPromoResult(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
@@ -365,11 +461,10 @@ export function ClientTariffsPage() {
         amount: tariff.price,
         currency: tariff.currency,
         tariffId: tariff.id,
-        promoCode: promoResult ? promoInput.trim() : undefined,
+        promoCode: promoResult ? promoCode : undefined,
         type: epayType,
       });
       setPayModal(null);
-      setPromoInput("");
       setPromoResult(null);
       if (res.payUrl) openPaymentInBrowser(res.payUrl);
     } catch (e) {
@@ -381,11 +476,10 @@ export function ClientTariffsPage() {
 
   const closePayment = () => {
     setPayModal(null);
-    setPromoInput("");
     setPromoResult(null);
+    setPromoCode("");
     setPromoError(null);
     setPayError(null);
-    setPromoOpen(false);
   };
 
   // ── Payment content (shared for mobile page + desktop dialog) ──────────
@@ -402,8 +496,8 @@ export function ClientTariffsPage() {
           className={cn(
             "rounded-2xl relative overflow-hidden",
             isMobileOrMiniapp
-              ? "bg-card/40 border border-white/5 p-5"
-              : "bg-background/50 border border-border/50 p-4"
+              ? "bg-muted/40 dark:bg-white/[0.06] border border-white/5 p-5"
+              : "bg-muted/40 dark:bg-white/10 border border-border/50 dark:border-white/10 p-4"
           )}
         >
           <div className="flex justify-between items-start gap-4">
@@ -492,90 +586,17 @@ export function ClientTariffsPage() {
           </div>
         )}
 
-        {/* Promo code — collapsible */}
-        <div>
-          <button
-            type="button"
-            onClick={() => setPromoOpen((v) => !v)}
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-          >
-            <Tag className="h-4 w-4 text-primary" />
-            {t("tariffs.promoCode")}
-            <ChevronDown
-              className={cn(
-                "h-3.5 w-3.5 transition-transform duration-200",
-                promoOpen && "rotate-180"
-              )}
-            />
-          </button>
-
-          <AnimatePresence>
-            {promoOpen && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="pt-3 space-y-2">
-                  <div className="flex gap-2">
-                    <Input
-                      name="promo_code"
-                      autoComplete="off"
-                      inputMode="text"
-                      value={promoInput}
-                      onChange={(e) => {
-                        setPromoInput(e.target.value);
-                        if (promoResult) {
-                          setPromoResult(null);
-                          setPromoError(null);
-                        }
-                      }}
-                      placeholder={t("tariffs.enterPromoCode")}
-                      className={cn(
-                        "font-mono font-medium focus-visible:ring-primary/50",
-                        isMobileOrMiniapp
-                          ? "text-base bg-card/40 border-white/5 h-12 rounded-2xl"
-                          : "text-sm bg-background border-border/50 h-11 rounded-xl"
-                      )}
-                      disabled={payLoading || promoChecking}
-                    />
-                    <Button
-                      onClick={checkPromo}
-                      disabled={!promoInput.trim() || payLoading || promoChecking}
-                      className={cn(
-                        "shrink-0 font-bold",
-                        isMobileOrMiniapp
-                          ? "h-12 px-5 rounded-2xl text-sm"
-                          : "h-11 px-4 rounded-xl text-sm"
-                      )}
-                    >
-                      {promoChecking ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        t("tariffs.apply")
-                      )}
-                    </Button>
-                  </div>
-
-                  {promoResult && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-xl">
-                      <Check className="h-4 w-4 text-green-500 shrink-0" />
-                      <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                        {promoResult.name}: -{promoResult.discountPercent ? `${promoResult.discountPercent}%` : ""}
-                        {promoResult.discountFixed ? ` ${promoResult.discountFixed}` : ""}
-                      </span>
-                    </div>
-                  )}
-                  {promoError && (
-                    <p className="text-sm font-medium text-destructive px-1">{promoError}</p>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        {/* Promo code */}
+        <PromoCodeInput
+          onApply={checkPromo}
+          onCancel={() => { setPromoCode(""); setPromoResult(null); setPromoError(null); }}
+          checking={promoChecking}
+          disabled={payLoading}
+          isMobile={isMobileOrMiniapp}
+          result={promoResult}
+          error={promoError}
+          t={t}
+        />
 
         {/* Payment methods */}
         <div className="space-y-3">
@@ -612,7 +633,7 @@ export function ClientTariffsPage() {
                 className={cn(
                   "flex items-center gap-3 rounded-2xl border transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed",
                   isMobileOrMiniapp
-                    ? "flex-col items-center justify-center p-4 border-white/5 bg-card/50 hover:bg-card/70 hover:border-primary/30 active:scale-95 col-span-2"
+                    ? "flex-col items-center justify-center p-4 border-white/5 bg-muted/40 dark:bg-white/[0.06] hover:bg-muted/60 dark:hover:bg-white/10 hover:border-primary/30 active:scale-95 col-span-2"
                     : "px-4 py-3.5 bg-gradient-to-r from-primary to-primary/80 border-transparent text-primary-foreground hover:shadow-lg hover:-translate-y-0.5"
                 )}
               >
@@ -749,13 +770,13 @@ export function ClientTariffsPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.2 }}
-            className="flex flex-col w-full rounded-[2rem] border border-border/40 bg-card/30 backdrop-blur-2xl relative"
+            className="flex flex-col w-full rounded-[2rem] border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] relative"
           >
-            <div className="flex items-center gap-3 px-4 py-4 border-b border-border/50 bg-background/30 backdrop-blur-md rounded-t-[2rem]">
+            <div className="flex items-center gap-3 px-4 py-4 border-b border-border/50 dark:border-white/10 bg-background/30 backdrop-blur-md rounded-t-[2rem]">
               <Button
                 variant="ghost"
                 size="icon"
-                className="shrink-0 h-9 w-9 rounded-full bg-background/50 hover:bg-background/80"
+                className="shrink-0 h-9 w-9 rounded-full bg-muted/40 dark:bg-white/10 hover:bg-background/80"
                 onClick={closePayment}
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -795,7 +816,7 @@ export function ClientTariffsPage() {
                     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all duration-200 border shrink-0",
                     showPlanInfo
                       ? "bg-primary/15 text-primary border-primary/30"
-                      : "bg-background/60 text-muted-foreground border-border/50 hover:bg-background/80 hover:text-foreground"
+                      : "bg-muted/40 dark:bg-white/10 text-muted-foreground border-border/50 dark:border-white/10 hover:bg-background/80 hover:text-foreground"
                   )}
                 >
                   <Info className="h-3.5 w-3.5" />
@@ -818,7 +839,7 @@ export function ClientTariffsPage() {
                   className="overflow-hidden"
                 >
                   <div className="rounded-2xl border border-primary/20 bg-primary/5 backdrop-blur-xl px-4 py-3 space-y-1">
-                    <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoStandard")}</p>
+                    {/* <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoStandard")}</p> */}
                     <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoPremium")}</p>
                     <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoNoReset")}</p>
                   </div>
@@ -868,7 +889,7 @@ export function ClientTariffsPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
               </div>
             ) : tariffs.length === 0 ? (
-              <Card className="rounded-[2rem] border border-border/40 bg-card/30 backdrop-blur-2xl">
+              <Card className="rounded-[2rem] border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06]">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-4">
                   <Package className="h-12 w-12 opacity-20" />
                   <p className="text-base font-medium">{t("tariffs.noTariffs")}</p>
@@ -889,7 +910,7 @@ export function ClientTariffsPage() {
                           "shrink-0 px-4 py-2 rounded-full text-sm font-semibold border transition-all duration-200",
                           selectedCatIndex === idx
                             ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                            : "bg-card/30 border-border/40 text-muted-foreground"
+                            : "bg-muted/30 dark:bg-white/[0.06] border-border/50 dark:border-white/10 text-muted-foreground"
                         )}
                       >
                         {cat.name}
@@ -931,7 +952,7 @@ export function ClientTariffsPage() {
                                   "shrink-0 px-4 py-2 rounded-xl text-[12px] font-bold border transition-all duration-200 whitespace-nowrap",
                                   selectedSgIdx === sgIdx
                                     ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                    : "bg-card/30 border-border/40 text-muted-foreground"
+                                    : "bg-muted/30 dark:bg-white/[0.06] border-border/50 dark:border-white/10 text-muted-foreground"
                                 )}
                               >
                                 {sg.name}
@@ -960,7 +981,7 @@ export function ClientTariffsPage() {
                             "relative rounded-[2rem] overflow-hidden flex flex-col",
                             isPopular
                               ? "shadow-lg ring-1 ring-primary/40"
-                              : "border border-border/40 shadow-sm bg-card/30 backdrop-blur-2xl"
+                              : "border border-border/50 dark:border-white/10 shadow-sm bg-muted/40 dark:bg-white/[0.06]"
                           )}
                         >
                           {isPopular && (
@@ -987,12 +1008,29 @@ export function ClientTariffsPage() {
                             {/* Price + specs row — horizontal layout for mobile */}
                             <div className="flex items-end justify-between gap-3">
                               <div className="min-w-0">
-                                <p className={cn(
-                                  "font-black tabular-nums leading-none",
-                                  isPopular ? "text-primary-foreground" : "text-foreground"
-                                )} style={{ fontSize: 32 }}>
-                                  {formatMoney(tariffItem.price, tariffItem.currency)}
-                                </p>
+                                {promoResult ? (
+                                  <div className="flex items-baseline gap-2">
+                                    <p className={cn(
+                                      "font-black tabular-nums leading-none",
+                                      isPopular ? "text-primary-foreground" : "text-foreground"
+                                    )} style={{ fontSize: 32 }}>
+                                      {formatMoney(getDiscountedPrice(tariffItem.price), tariffItem.currency)}
+                                    </p>
+                                    <p className={cn(
+                                      "text-sm font-bold tabular-nums line-through decoration-2",
+                                      isPopular ? "text-primary-foreground/40" : "text-muted-foreground/60"
+                                    )}>
+                                      {formatMoney(tariffItem.price, tariffItem.currency)}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className={cn(
+                                    "font-black tabular-nums leading-none",
+                                    isPopular ? "text-primary-foreground" : "text-foreground"
+                                  )} style={{ fontSize: 32 }}>
+                                    {formatMoney(tariffItem.price, tariffItem.currency)}
+                                  </p>
+                                )}
                                 {pricePerGB && (
                                   <p className={cn(
                                     "text-[11px] font-medium mt-1",
@@ -1020,7 +1058,7 @@ export function ClientTariffsPage() {
                                   "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
                                   isPopular
                                     ? "bg-primary-foreground/15 text-primary-foreground"
-                                    : "bg-background/60 border border-border/40 text-foreground"
+                                    : "bg-muted/40 dark:bg-white/10 border border-border/50 dark:border-white/10 text-foreground"
                                 )}>
                                   {chip.icon}{chip.label}
                                 </span>
@@ -1052,7 +1090,7 @@ export function ClientTariffsPage() {
                             ) : (
                               <div className={cn(
                                 "w-full h-12 rounded-2xl flex items-center justify-center",
-                                isPopular ? "bg-primary-foreground/10" : "bg-muted/40 border border-border/50"
+                                isPopular ? "bg-primary-foreground/10" : "bg-muted/40 border border-border/50 dark:border-white/10"
                               )}>
                                 <span className={cn(
                                   "text-[11px] font-bold uppercase tracking-wider",
@@ -1106,7 +1144,7 @@ export function ClientTariffsPage() {
                           <Layers className="h-4 w-4 text-primary" />
                           <span>{t("tariffs.subGroup")}</span>
                         </div>
-                        <div className="rounded-xl border border-border/40 bg-card/30 backdrop-blur-sm p-1 flex gap-1 flex-wrap">
+                        <div className="rounded-xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/[0.06] backdrop-blur-sm p-1 flex gap-1 flex-wrap">
                           {subGroups.map((sg, sgIdx) => (
                             <button
                               key={sg.id}
@@ -1116,7 +1154,7 @@ export function ClientTariffsPage() {
                                 "px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200",
                                 selectedSgIdx === sgIdx
                                   ? "bg-primary text-primary-foreground shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:bg-white/10"
                               )}
                             >
                               {sg.name}
@@ -1143,7 +1181,7 @@ export function ClientTariffsPage() {
                               "relative rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1",
                               isPopular
                                 ? "shadow-lg ring-1 ring-primary/40 hover:-translate-y-1.5"
-                                : "border border-border/40 shadow-sm hover:shadow-md bg-card/30 backdrop-blur-2xl"
+                                : "border border-border/50 dark:border-white/10 shadow-sm hover:shadow-md bg-muted/40 dark:bg-white/[0.06]"
                             )}
                           >
                             {isPopular && (
@@ -1169,12 +1207,29 @@ export function ClientTariffsPage() {
 
                               {/* Price — HERO */}
                               <div>
-                                <p className={cn(
-                                  "font-black tabular-nums leading-none",
-                                  isPopular ? "text-primary-foreground" : "text-foreground"
-                                )} style={{ fontSize: 36 }}>
-                                  {formatMoney(tariffItem.price, tariffItem.currency)}
-                                </p>
+                                {promoResult ? (
+                                  <div className="flex items-baseline gap-2.5">
+                                    <p className={cn(
+                                      "font-black tabular-nums leading-none",
+                                      isPopular ? "text-primary-foreground" : "text-foreground"
+                                    )} style={{ fontSize: 36 }}>
+                                      {formatMoney(getDiscountedPrice(tariffItem.price), tariffItem.currency)}
+                                    </p>
+                                    <p className={cn(
+                                      "text-base font-bold tabular-nums line-through decoration-2",
+                                      isPopular ? "text-primary-foreground/40" : "text-muted-foreground/60"
+                                    )}>
+                                      {formatMoney(tariffItem.price, tariffItem.currency)}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className={cn(
+                                    "font-black tabular-nums leading-none",
+                                    isPopular ? "text-primary-foreground" : "text-foreground"
+                                  )} style={{ fontSize: 36 }}>
+                                    {formatMoney(tariffItem.price, tariffItem.currency)}
+                                  </p>
+                                )}
                                 {pricePerGB && (
                                   <p className={cn(
                                     "text-[13px] font-medium mt-1.5",
@@ -1201,7 +1256,7 @@ export function ClientTariffsPage() {
                                     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold",
                                     isPopular
                                       ? "bg-primary-foreground/15 text-primary-foreground"
-                                      : "bg-background/60 border border-border/50 text-foreground"
+                                      : "bg-muted/40 dark:bg-white/10 border border-border/50 dark:border-white/10 text-foreground"
                                   )}>
                                     {chip.icon}{chip.label}
                                   </span>
@@ -1235,7 +1290,7 @@ export function ClientTariffsPage() {
                                 ) : (
                                   <div className={cn(
                                     "w-full h-12 rounded-xl flex items-center justify-center",
-                                    isPopular ? "bg-primary-foreground/10" : "bg-muted/50 border border-border/50"
+                                    isPopular ? "bg-primary-foreground/10" : "bg-muted/50 border border-border/50 dark:border-white/10"
                                   )}>
                                     <span className={cn(
                                       "text-sm font-bold uppercase tracking-wider",
@@ -1269,7 +1324,7 @@ export function ClientTariffsPage() {
           }}
         >
           <DialogContent
-            className="w-full max-w-md mx-auto sm:rounded-2xl p-5 sm:p-6 border border-border/40 bg-card/30 backdrop-blur-2xl"
+            className="w-full max-w-md mx-auto sm:rounded-2xl p-5 sm:p-6 border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06]"
             showCloseButton={!payLoading}
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
@@ -1285,12 +1340,12 @@ export function ClientTariffsPage() {
 
             <PaymentContent />
 
-            <DialogFooter className="mt-4 sm:justify-center border-t border-border/50 pt-4">
+            <DialogFooter className="mt-4 sm:justify-center border-t border-border/50 dark:border-white/10 pt-4">
               <Button
                 variant="ghost"
                 onClick={closePayment}
                 disabled={payLoading}
-                className="rounded-xl hover:bg-background/50 hover:text-foreground text-muted-foreground"
+                className="rounded-xl hover:bg-muted/40 dark:bg-white/10 hover:text-foreground text-muted-foreground"
               >
                 {t("common.cancel")}
               </Button>
@@ -1326,8 +1381,8 @@ function PayMethodButton({
       className={cn(
         "flex items-center gap-3 rounded-2xl border transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed",
         isMobile
-          ? "flex-col items-center justify-center p-4 border-white/5 bg-card/50 hover:bg-card/70 hover:border-primary/30 active:scale-95"
-          : "px-4 py-3.5 border-border/50 bg-background/40 hover:bg-background/70 hover:border-primary/30 hover:-translate-y-0.5"
+          ? "flex-col items-center justify-center p-4 border-white/5 bg-muted/40 dark:bg-white/[0.06] hover:bg-muted/60 dark:hover:bg-white/10 hover:border-primary/30 active:scale-95"
+          : "px-4 py-3.5 border-border/50 dark:border-white/10 bg-background/40 hover:bg-background/70 hover:border-primary/30 hover:-translate-y-0.5"
       )}
     >
       {isMobile ? (

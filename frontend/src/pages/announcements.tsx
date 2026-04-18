@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import { api } from "@/lib/api";
 import type { AnnouncementRecord, CreateAnnouncementPayload } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +38,7 @@ export function AnnouncementsPage() {
   const [form, setForm] = useState<CreateAnnouncementPayload>({ title: "", content: "", pinned: false, published: false });
   const [saving, setSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [viewItem, setViewItem] = useState<AnnouncementRecord | null>(null);
 
   async function load() {
     setLoading(true);
@@ -118,43 +119,63 @@ export function AnnouncementsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {items.map((item) => (
-            <Card key={item.id} className="overflow-hidden">
-              <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {item.pinned && <Pin className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
-                    <CardTitle className="text-base truncate">{item.title}</CardTitle>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {item.publishedAt ? new Date(item.publishedAt).toLocaleString() : t("admin.announcements.draft")}
-                    {!item.published && (
-                      <span className="ml-2 text-amber-500 font-medium">{t("admin.announcements.unpublished")}</span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => togglePublish(item)}>
-                    {item.published ? <Eye className="h-4 w-4 text-emerald-500" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(item)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(item.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm dark:prose-invert max-w-none line-clamp-3 text-sm text-muted-foreground">
-                  <ReactMarkdown>{item.content}</ReactMarkdown>
-                </div>
-              </CardContent>
-            </Card>
+            <div
+              key={item.id}
+              className="flex items-center gap-3 rounded-xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] px-4 py-3 cursor-pointer hover:bg-muted/60 dark:hover:bg-white/10 transition-colors"
+              onClick={() => setViewItem(item)}
+            >
+              {item.pinned && <Pin className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{item.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {item.publishedAt ? new Date(item.publishedAt).toLocaleString() : t("admin.announcements.draft")}
+                  {!item.published && (
+                    <span className="ml-2 text-amber-500 font-medium">{t("admin.announcements.unpublished")}</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => togglePublish(item)}>
+                  {item.published ? <Eye className="h-4 w-4 text-emerald-500" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(item)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(item.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           ))}
         </div>
       )}
+
+      {/* View Detail Dialog */}
+      <Dialog open={!!viewItem} onOpenChange={(open) => !open && setViewItem(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {viewItem?.pinned && <Pin className="h-4 w-4 text-amber-500" />}
+              {viewItem?.title}
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              {viewItem?.publishedAt ? new Date(viewItem.publishedAt).toLocaleString() : t("admin.announcements.draft")}
+            </p>
+          </DialogHeader>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown>{viewItem?.content ?? ""}</ReactMarkdown>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setViewItem(null); if (viewItem) openEdit(viewItem); }}>
+              <Pencil className="h-4 w-4 mr-2" />
+              {t("admin.announcements.edit")}
+            </Button>
+            <Button variant="outline" onClick={() => setViewItem(null)}>{t("common.close")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit/Create Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

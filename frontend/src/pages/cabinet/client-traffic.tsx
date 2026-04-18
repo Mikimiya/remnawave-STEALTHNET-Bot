@@ -102,7 +102,7 @@ export function ClientTrafficPage() {
   const totalTraffic = chartData.reduce((s, d) => s + d.total, 0);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="mx-auto max-w-6xl space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -113,7 +113,7 @@ export function ClientTrafficPage() {
 
       {/* Monthly summary */}
       {monthlySummary && (
-        <div className="rounded-2xl border bg-card/60 p-4 space-y-2">
+        <div className="rounded-2xl border bg-muted/40 dark:bg-white/[0.06] p-4 space-y-2">
           <p className="text-sm font-medium text-muted-foreground">{t("trafficReport.monthlySummary")}</p>
           <div className="grid grid-cols-3 gap-3 text-center">
             <div>
@@ -183,7 +183,7 @@ export function ClientTrafficPage() {
           <p className="text-sm">{t("trafficReport.noData")}</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-border/60 bg-card/40 backdrop-blur-xl p-4">
+        <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl p-4">
           <ResponsiveContainer width="100%" height={320}>
             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
@@ -250,14 +250,14 @@ export function ClientTrafficPage() {
 
       {/* Daily breakdown table */}
       {!loading && chartData.length > 0 && (
-        <div className="rounded-2xl border border-border/60 bg-card/40 backdrop-blur-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border/40">
+        <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-border/50 dark:border-white/10">
             <h3 className="text-sm font-semibold">{t("trafficReport.dailyBreakdown")}</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-border/30">
+                <tr className="border-b border-border/40 dark:border-white/10">
                   <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">{t("trafficReport.date")}</th>
                   <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">{t("trafficReport.upload")}</th>
                   <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">{t("trafficReport.download")}</th>
@@ -266,8 +266,8 @@ export function ClientTrafficPage() {
               </thead>
               <tbody>
                 {[...chartData].reverse().map((d) => (
-                  <tr key={d.rawDate} className="border-b border-border/20 last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 text-foreground/80">{d.date}</td>
+                  <tr key={d.rawDate} className="border-b border-border/30 dark:border-white/5 last:border-0 hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-2.5 text-foreground/90">{d.date}</td>
                     <td className="px-4 py-2.5 text-right text-blue-500/90 font-medium">{formatBytes(d.upload)}</td>
                     <td className="px-4 py-2.5 text-right text-emerald-500/90 font-medium">{formatBytes(d.download)}</td>
                     <td className="px-4 py-2.5 text-right text-foreground font-medium">{formatBytes(d.total)}</td>
@@ -284,7 +284,7 @@ export function ClientTrafficPage() {
 
 function SummaryCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/40 backdrop-blur-xl p-3 flex flex-col gap-1.5">
+    <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl p-3 flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         {icon}
         <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{label}</span>

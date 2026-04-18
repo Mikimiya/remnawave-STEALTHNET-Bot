@@ -1753,6 +1753,20 @@ clientRouter.get("/subscription", async (req, res) => {
     return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, trafficResetStrategy: null, isTrial: false, message: result.error });
   }
 
+  // 先判断当前是否为试用（基于 internalSquads UUID 匹配）
+  const tariffInfo = await resolveTariffInfo(result.data ?? null, reqLang(req));
+
+  // 如果当前是试用用户，直接返回试用状态，不查付费记录
+  if (tariffInfo.isTrial) {
+    return res.json({
+      subscription: result.data ?? null,
+      tariffDisplayName: tariffInfo.name,
+      tariffCategoryName: tariffInfo.categoryName,
+      trafficResetStrategy: tariffInfo.trafficResetStrategy ?? "NO_RESET",
+      isTrial: true,
+    });
+  }
+
   // 1) 优先从最后一次已支付的套餐付款记录中获取（精确，不受 UUID 一对多影响）
   const lastPaidTariff = await prisma.payment.findFirst({
     where: { clientId: client.id, status: "PAID", tariffId: { not: null } },
@@ -1772,14 +1786,13 @@ clientRouter.get("/subscription", async (req, res) => {
     });
   }
 
-  // 2) 没有付费记录 → 回退到 UUID 匹配（仅用于判断试用等场景）
-  const tariffInfo = await resolveTariffInfo(result.data ?? null, reqLang(req));
+  // 2) 没有付费记录也不是试用 → 使用 UUID 匹配结果
   return res.json({
     subscription: result.data ?? null,
     tariffDisplayName: tariffInfo.name,
     tariffCategoryName: tariffInfo.categoryName,
     trafficResetStrategy: tariffInfo.trafficResetStrategy ?? "NO_RESET",
-    isTrial: tariffInfo.isTrial,
+    isTrial: false,
   });
 });
 

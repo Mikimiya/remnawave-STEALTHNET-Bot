@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,10 +12,13 @@ import {
   Gift,
   Loader2,
   AlertCircle,
-  Shield,
   ChevronRight,
   Megaphone,
   X,
+  Link2,
+  BarChart3,
+  Users,
+  TicketCheck,
 } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { useCabinetConfig } from "@/contexts/cabinet-config";
@@ -57,7 +60,7 @@ function getLocale(lang?: string): string {
 }
 
 function formatDate(s: string | null, lang?: string) {
-  if (!s) return "â€”";
+  if (!s) return "—";
   try {
     return new Date(s).toLocaleDateString(getLocale(lang), {
       day: "numeric",
@@ -71,9 +74,9 @@ function formatDate(s: string | null, lang?: string) {
 
 function formatBytes(bytes: number, lang?: string) {
   const l = (lang || "zh").slice(0, 2);
-  const gbLabel = l === "ru" ? "Ð“Ð‘" : "GB";
-  const mbLabel = l === "ru" ? "ÐœÐ‘" : "MB";
-  const kbLabel = l === "ru" ? "ÐšÐ‘" : "KB";
+  const gbLabel = l === "ru" ? "ГБ" : "GB";
+  const mbLabel = l === "ru" ? "МБ" : "MB";
+  const kbLabel = l === "ru" ? "КБ" : "KB";
   if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(1) + " " + gbLabel;
   if (bytes >= 1024 ** 2) return (bytes / 1024 ** 2).toFixed(1) + " " + mbLabel;
   return (bytes / 1024).toFixed(0) + " " + kbLabel;
@@ -266,25 +269,6 @@ export function ClientDashboardPage() {
       setTimeout(() => setSubUrlCopied(false), 2000);
     }
   };
-  const [referralCopied, setReferralCopied] = useState<"site" | "bot" | null>(null);
-  const siteOrigin = config?.publicAppUrl?.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
-  const referralLinkSite =
-    client.referralCode && siteOrigin
-      ? `${siteOrigin}/cabinet/register?ref=${encodeURIComponent(client.referralCode)}`
-      : "";
-  const referralLinkBot =
-    client.referralCode && config?.telegramBotUsername
-      ? `https://t.me/${config.telegramBotUsername.replace(/^@/, "")}?start=ref_${client.referralCode}`
-      : "";
-  const hasReferralLinks = Boolean(referralLinkSite || referralLinkBot);
-  const copyReferral = (which: "site" | "bot") => {
-    const url = which === "site" ? referralLinkSite : referralLinkBot;
-    if (url) {
-      navigator.clipboard.writeText(url);
-      setReferralCopied(which);
-      setTimeout(() => setReferralCopied(null), 2000);
-    }
-  };
   const trafficPercent = subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0 && subParsed.trafficUsed != null
     ? Math.min(100, Math.round((subParsed.trafficUsed / subParsed.trafficLimitBytes) * 100))
     : null;
@@ -292,17 +276,17 @@ export function ClientDashboardPage() {
   const expireDate = subParsed.expireAt ? (() => { try { const d = new Date(subParsed.expireAt); return Number.isNaN(d.getTime()) ? null : d; } catch { return null; } })() : null;
   const daysLeft = expireDate && expireDate > new Date()
     ? (() => {
-        // æŒ‰è‡ªç„¶æ—¥è®¡ç®—å‰©ä½™å¤©æ•°ï¼šå°†åˆ°æœŸæ—¥å’Œå½“å‰æ—¶é—´éƒ½å½’é›¶åˆ°å½“å¤© 00:00ï¼Œå†ç®—å¤©æ•°å·®
+        // 按自然日计算剩余天数：将到期日和当前时间都归零到当天 00:00，再算天数差
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const expireStart = new Date(expireDate.getFullYear(), expireDate.getMonth(), expireDate.getDate());
         const diffDays = Math.round((expireStart.getTime() - todayStart.getTime()) / (24 * 60 * 60 * 1000));
-        // å¦‚æžœåˆ°æœŸæ—¥å’Œä»Šå¤©æ˜¯åŒä¸€å¤©ä½†è¿˜æ²¡è¿‡æœŸï¼Œæ˜¾ç¤º 0 å¤©ï¼ˆå³"ä»Šå¤©åˆ°æœŸ"ï¼‰
+        // 如果到期日和今天是同一天但还没过期，显示 0 天（即"今天到期"）
         return Math.max(0, diffDays);
       })()
     : null;
 
-  // ÐšÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ‚-ÑÐ¾ÑÑ‚Ð¾ÑÐ½Ð¸Ðµ Ð¾Ñ‚ÑÑƒÑ‚ÑÑ‚Ð²Ð¸Ñ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸
+  // Компонент-состояние отсутствия подписки
   const NoSubscriptionState = () => (
     <div className="flex flex-col items-center justify-center py-16 text-center space-y-8">
       <motion.div
@@ -376,7 +360,7 @@ export function ClientDashboardPage() {
               >
                 <button
                   onClick={(e) => { e.stopPropagation(); dismissAnnouncement(ann.id); }}
-                  className="absolute top-3 right-3 text-muted-foreground/30 hover:text-foreground transition-colors z-10"
+                  className="absolute top-3 right-3 text-muted-foreground/70 hover:text-foreground transition-colors z-10"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -389,7 +373,7 @@ export function ClientDashboardPage() {
                   </div>
                   <div className="min-w-0 space-y-1">
                     <p className="text-[13px] font-bold text-foreground leading-tight">{ann.title}</p>
-                    <p className="text-[12px] text-muted-foreground/50 leading-relaxed line-clamp-2">{plain.slice(0, 150)}{plain.length > 150 ? "…" : ""}</p>
+                    <p className="text-[12px] text-muted-foreground/50 leading-relaxed line-clamp-2">{plain.slice(0, 150)}{plain.length > 150 ? "�" : ""}</p>
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-1">
                       <span>{t("dashboard.readMore")}</span>
                       <ChevronRight className="h-3 w-3" />
@@ -403,23 +387,23 @@ export function ClientDashboardPage() {
 
         {/* Loading */}
         {loading ? (
-          <div className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl flex items-center justify-center py-20">
+          <div className="rounded-[1.75rem] border border-border/50 bg-muted/40 dark:bg-white/[0.06] dark:border-white/10 flex items-center justify-center py-20">
             <Loader2 className="h-7 w-7 animate-spin text-primary/30" />
           </div>
         ) : subscriptionError || !hasActiveSubscription ? (
-          /* â•â•â• No subscription â•â•â• */
+          /* ═══ No subscription ═══ */
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-6 relative overflow-hidden"
+            className="rounded-[1.75rem] border border-border/50 bg-muted/40 dark:bg-white/[0.06] dark:border-white/10 p-6 relative overflow-hidden"
           >
             <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-primary/8 blur-[80px] pointer-events-none" />
             <div className="relative z-10">
               <NoSubscriptionState />
               {showTrial && (
                 <div className="mt-6 space-y-3">
-                  <p className="text-[13px] text-muted-foreground/25 text-center leading-relaxed">
+                  <p className="text-[13px] text-muted-foreground/70 text-center leading-relaxed">
                     {t("dashboard.trialDesc", { days: formatDays(trialDays, lang) })}
                   </p>
                   <Button className="w-full gap-2.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/15 h-12 rounded-2xl active:scale-[0.98] transition-all duration-300" onClick={activateTrial} disabled={trialLoading}>
@@ -432,14 +416,14 @@ export function ClientDashboardPage() {
             </div>
           </motion.div>
         ) : (
-          /* â•â•â• Active subscription â•â•â• */
+          /* ═══ Active subscription ═══ */
           <>
             {/* Hero subscription card */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
-              className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl relative overflow-hidden"
+              className="rounded-[1.75rem] border border-border/50 bg-muted/40 dark:bg-white/[0.06] dark:border-white/10 relative overflow-hidden"
             >
               {/* Ambient glow */}
               <div className="absolute -top-20 -right-20 h-44 w-44 rounded-full bg-primary/8 blur-[80px] pointer-events-none" />
@@ -462,7 +446,7 @@ export function ClientDashboardPage() {
                           {t("dashboard.trialLimitedNodesShort")}
                         </p>
                       ) : tariffCategoryName ? (
-                        <p className="text-[11px] text-muted-foreground/40 mt-0.5 font-medium">{tariffCategoryName}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 font-medium">{tariffCategoryName}</p>
                       ) : null}
                     </div>
                   </div>
@@ -476,21 +460,21 @@ export function ClientDashboardPage() {
                 <div className="grid grid-cols-3 gap-4 mb-5">
                   {/* Days */}
                   <div className="space-y-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/35">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                       {t("dashboard.validUntil")}
                     </p>
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl font-black tabular-nums tracking-tighter text-foreground leading-none">
-                        {daysLeft != null ? daysLeft : "â€”"}
+                        {daysLeft != null ? daysLeft : "—"}
                       </span>
-                      <span className="text-xs font-bold text-muted-foreground/25">
-                        {lang.startsWith("zh") ? "å¤©" : lang.startsWith("ru") ? "Ð´Ð½" : "d"}
+                      <span className="text-xs font-bold text-muted-foreground/70">
+                        {lang.startsWith("zh") ? "天" : lang.startsWith("ru") ? "дн" : "d"}
                       </span>
                     </div>
                   </div>
                   {/* Traffic */}
                   <div className="space-y-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/35">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                       {t("dashboard.traffic")}
                     </p>
                     {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0 ? (
@@ -498,19 +482,19 @@ export function ClientDashboardPage() {
                         <span className="text-3xl font-black tabular-nums tracking-tighter text-foreground leading-none">
                           {trafficPercent ?? 0}
                         </span>
-                        <span className="text-xs font-bold text-muted-foreground/25">%</span>
+                        <span className="text-xs font-bold text-muted-foreground/70">%</span>
                       </div>
                     ) : (
-                      <span className="text-3xl font-black text-foreground tracking-tighter leading-none">âˆž</span>
+                      <span className="text-3xl font-black text-foreground tracking-tighter leading-none">∞</span>
                     )}
                   </div>
                   {/* Devices */}
                   <div className="space-y-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/35">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                       {t("dashboard.devices")}
                     </p>
                     <span className="text-3xl font-black tabular-nums tracking-tighter text-foreground leading-none">
-                      {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "âˆž"}
+                      {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "∞"}
                     </span>
                   </div>
                 </div>
@@ -518,11 +502,11 @@ export function ClientDashboardPage() {
                 {/* Traffic progress bar */}
                 {trafficPercent != null && (
                   <div className="mb-5">
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/30 font-medium mb-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/70 font-medium mb-1.5">
                       <span>{formatBytes(subParsed.trafficUsed ?? 0, lang)}</span>
                       <span>{formatBytes(subParsed.trafficLimitBytes!, lang)}</span>
                     </div>
-                    <div className="h-1.5 w-full rounded-full bg-muted/10 overflow-hidden">
+                    <div className="h-1.5 w-full rounded-full bg-muted/20 dark:bg-white/10 overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${trafficPercent}%` }}
@@ -536,7 +520,7 @@ export function ClientDashboardPage() {
                 {/* Expire date + reset strategy tags */}
                 <div className="flex items-center gap-2 flex-wrap mb-5">
                   {subParsed.expireAt && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/20 bg-background/5 px-2.5 py-1 text-[10px] font-medium text-muted-foreground/40">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/40 dark:border-white/10 bg-muted/20 dark:bg-white/5 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
                       <Calendar className="h-3 w-3" />
                       {formatDate(subParsed.expireAt, lang)}
                     </span>
@@ -551,7 +535,7 @@ export function ClientDashboardPage() {
               </div>
 
               {/* Bottom gradient divider */}
-              <div className="h-px bg-gradient-to-r from-transparent via-border/30 to-transparent" />
+              <div className="h-px bg-gradient-to-r from-transparent via-border/40 dark:via-white/10 to-transparent" />
             </motion.div>
 
             {/* VPN / Connection card */}
@@ -560,28 +544,28 @@ export function ClientDashboardPage() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.06 }}
-                className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-5 relative overflow-hidden"
+                className="rounded-[1.75rem] border border-border/50 bg-muted/40 dark:bg-white/[0.06] dark:border-white/10 p-5 relative overflow-hidden"
               >
                 <div className="absolute -bottom-16 -right-16 h-36 w-36 rounded-full bg-primary/6 blur-[70px] pointer-events-none" />
                 <div className="relative z-10 space-y-3.5">
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 truncate rounded-xl bg-background/10 border border-border/20 px-3 py-2.5 text-[11px] font-mono text-foreground/30" title={vpnUrl}>
+                    <code className="flex-1 truncate rounded-xl bg-muted/30 dark:bg-white/10 border border-border/40 dark:border-white/10 px-3 py-2.5 text-[11px] font-mono text-foreground/60" title={vpnUrl}>
                       {vpnUrl}
                     </code>
                     <Button
                       variant="secondary"
                       size="icon"
-                      className="shrink-0 h-10 w-10 rounded-xl border border-border/20 bg-background/10 hover:bg-background/25"
+                      className="shrink-0 h-10 w-10 rounded-xl border border-border/40 dark:border-white/10 bg-muted/30 dark:bg-white/10 hover:bg-muted/50 dark:hover:bg-white/15"
                       onClick={() => {
                         copySubUrl();
                         window.Telegram?.WebApp?.showPopup?.({ title: t("dashboard.copied"), message: t("subscribe.linkCopied") });
                       }}
                     >
-                      {subUrlCopied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-foreground/30" />}
+                      {subUrlCopied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-foreground/60" />}
                     </Button>
                   </div>
                   <Link to="/cabinet/subscribe" className="group inline-flex w-full h-12 items-center justify-center gap-2.5 rounded-2xl bg-primary text-[13px] font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
-                    <Shield className="h-4 w-4 shrink-0" />
+                    <Link2 className="h-4 w-4 shrink-0" />
                     <span>{t("dashboard.connectVPN")}</span>
                   </Link>
                 </div>
@@ -591,14 +575,14 @@ export function ClientDashboardPage() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.06 }}
-                className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-5 relative overflow-hidden"
+                className="rounded-[1.75rem] border border-border/50 bg-muted/40 dark:bg-white/[0.06] dark:border-white/10 p-5 relative overflow-hidden"
               >
                 <div className="absolute -top-12 -left-12 h-32 w-32 rounded-full bg-emerald-500/8 blur-[60px] pointer-events-none" />
                 <div className="relative z-10 space-y-3.5 text-center">
                   <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/15 text-emerald-600 dark:text-emerald-400">
                     <Gift className="h-5 w-5" />
                   </div>
-                  <p className="text-[13px] text-muted-foreground/25 leading-relaxed">
+                  <p className="text-[13px] text-muted-foreground/70 leading-relaxed">
                     {t("dashboard.trialDesc", { days: formatDays(trialDays, lang) })}
                   </p>
                   <Button className="w-full gap-2.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/15 h-12 rounded-2xl active:scale-[0.98] transition-all duration-300" onClick={activateTrial} disabled={trialLoading}>
@@ -613,7 +597,7 @@ export function ClientDashboardPage() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.06 }}
-                className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-5 relative overflow-hidden"
+                className="rounded-[1.75rem] border border-border/50 bg-muted/40 dark:bg-white/[0.06] dark:border-white/10 p-5 relative overflow-hidden"
               >
                 <div className="absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-primary/6 blur-[60px] pointer-events-none" />
                 <div className="relative z-10 space-y-3.5">
@@ -636,12 +620,12 @@ export function ClientDashboardPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.12 }}
-          className="rounded-[1.75rem] border border-border/30 bg-card/20 backdrop-blur-2xl p-5 relative overflow-hidden group"
+          className="rounded-[1.75rem] border border-border/50 bg-muted/40 dark:bg-white/[0.06] dark:border-white/10 p-5 relative overflow-hidden group"
         >
           <div className="absolute -top-16 -right-16 h-36 w-36 rounded-full bg-primary/6 blur-[80px] pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
           <div className="relative z-10 flex items-center justify-between gap-4">
             <div className="min-w-0 space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/35">{t("dashboard.myBalance")}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">{t("dashboard.myBalance")}</p>
               <p className="text-3xl font-black tracking-tighter text-foreground truncate leading-none">{formatMoney(client.balance, client.preferredCurrency)}</p>
             </div>
             <Link to="/cabinet/profile#topup" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-[13px] font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
@@ -684,12 +668,12 @@ export function ClientDashboardPage() {
   // DESKTOP LAYOUT
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl mx-auto">
-      {/* â•â•â• HERO SECTION â•â•â• */}
+      {/* ═══ HERO SECTION ═══ */}
       <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative overflow-hidden rounded-3xl bg-card/25 backdrop-blur-2xl border border-border/40 p-8 sm:p-10"
+        className="relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] border border-border/50 dark:border-white/10 p-8 sm:p-10"
       >
         {/* Decorative ambient glow */}
         <div className="absolute top-0 right-0 -mr-24 -mt-24 w-72 h-72 rounded-full bg-primary/10 blur-[100px] pointer-events-none" />
@@ -709,7 +693,7 @@ export function ClientDashboardPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.15 }}
-              className="text-[15px] text-muted-foreground/35 max-w-lg leading-relaxed"
+              className="text-[15px] text-muted-foreground max-w-lg leading-relaxed"
             >
               {hasActiveSubscription
                 ? t("dashboard.activeSubscriptionDesc")
@@ -757,7 +741,7 @@ export function ClientDashboardPage() {
               </Button>
             ) : vpnUrl ? (
               <Link to="/cabinet/subscribe" className="group inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
-                <Shield className="h-4 w-4 shrink-0" />
+                <Link2 className="h-4 w-4 shrink-0" />
                 <span className="text-sm font-bold">{t("dashboard.setupVPN")}</span>
               </Link>
             ) : (
@@ -766,7 +750,7 @@ export function ClientDashboardPage() {
                 <span className="text-sm font-bold">{t("dashboard.choosePlan")}</span>
               </Link>
             )}
-            <Link to="/cabinet/profile#topup" className="group inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl border border-border/40 bg-background/15 backdrop-blur-sm transition-all duration-300 hover:bg-background/10 active:scale-[0.98]">
+            <Link to="/cabinet/profile#topup" className="group inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl border border-border/40 bg-background/15 backdrop-blur-sm transition-all duration-300 hover:bg-muted/30 dark:bg-white/10 active:scale-[0.98]">
               <PlusCircle className="h-4 w-4 shrink-0 text-foreground/50" />
               <span className="text-sm font-semibold">{t("dashboard.topUpBalance")}</span>
             </Link>
@@ -788,7 +772,7 @@ export function ClientDashboardPage() {
             >
               <button
                 onClick={(e) => { e.stopPropagation(); dismissAnnouncement(ann.id); }}
-                className="absolute top-4 right-5 text-muted-foreground/30 hover:text-foreground transition-colors z-10"
+                className="absolute top-4 right-5 text-muted-foreground/70 hover:text-foreground transition-colors z-10"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -801,7 +785,7 @@ export function ClientDashboardPage() {
                 </div>
                 <div className="min-w-0 space-y-1.5">
                   <p className="text-[15px] font-bold text-foreground leading-tight">{ann.title}</p>
-                  <p className="text-sm text-muted-foreground/40 leading-relaxed line-clamp-2">{plain.slice(0, 250)}{plain.length > 250 ? "…" : ""}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{plain.slice(0, 250)}{plain.length > 250 ? "�" : ""}</p>
                   <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-amber-600 dark:text-amber-400 mt-1">
                     <span>{t("dashboard.readMore")}</span>
                     <ChevronRight className="h-3 w-3" />
@@ -813,7 +797,7 @@ export function ClientDashboardPage() {
         })}
       </AnimatePresence>
 
-      {/* â•â•â• CONTENT GRID â•â•â• */}
+      {/* ��� CONTENT GRID ��� */}
       <div className="grid gap-6 lg:grid-cols-12">
 
         {loading ? (
@@ -827,20 +811,20 @@ export function ClientDashboardPage() {
             transition={{ duration: 0.4, delay: 0.06 }}
             className="lg:col-span-12"
           >
-            <div className="rounded-3xl border border-border/40 bg-card/20 backdrop-blur-2xl overflow-hidden p-8">
+            <div className="rounded-3xl border border-border/50 bg-muted/40 dark:bg-white/[0.06] dark:border-white/10 overflow-hidden p-8">
               <NoSubscriptionState />
             </div>
           </motion.div>
         ) : (
           <>
-            {/* â•â•â• SUBSCRIPTION OVERVIEW â€” full width hero card â•â•â• */}
+            {/* ═══ SUBSCRIPTION OVERVIEW — full width hero card ═══ */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45, delay: 0.04 }}
               className="lg:col-span-12"
             >
-              <div className="relative rounded-3xl border border-border/40 bg-card/20 backdrop-blur-2xl overflow-hidden">
+              <div className="relative rounded-3xl border border-border/50 bg-muted/40 dark:bg-white/[0.06] dark:border-white/10 overflow-hidden">
                 {/* Ambient decorations */}
                 <div className="absolute top-0 left-1/4 w-64 h-64 rounded-full bg-primary/6 blur-[120px] pointer-events-none" />
                 <div className="absolute bottom-0 right-1/4 w-48 h-48 rounded-full bg-primary/4 blur-[100px] pointer-events-none" />
@@ -857,7 +841,7 @@ export function ClientDashboardPage() {
                           {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
                         </p>
                         {tariffCategoryName && (
-                          <p className="text-sm text-muted-foreground/40 mt-1 font-medium">{tariffCategoryName}</p>
+                          <p className="text-sm text-muted-foreground mt-1 font-medium">{tariffCategoryName}</p>
                         )}
                       </div>
                     </div>
@@ -881,24 +865,24 @@ export function ClientDashboardPage() {
                     </div>
                   </div>
 
-                  {/* Metric row â€” 3 or 4 giant stat blocks */}
+                  {/* Metric row — 3 or 4 giant stat blocks */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
                     {/* Days remaining */}
                     {daysLeft != null && (
                       <div className="space-y-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                           {t("dashboard.validUntil")}
                         </p>
                         <div className="flex items-baseline gap-2">
                           <span className="text-5xl sm:text-6xl font-black text-foreground tabular-nums tracking-tighter leading-none">
                             {daysLeft}
                           </span>
-                          <span className="text-lg font-bold text-muted-foreground/30">
-                            {lang.startsWith("zh") ? "å¤©" : lang.startsWith("ru") ? "Ð´Ð½" : "d"}
+                          <span className="text-lg font-bold text-muted-foreground/70">
+                            {lang.startsWith("zh") ? "天" : lang.startsWith("ru") ? "дн" : "d"}
                           </span>
                         </div>
                         {subParsed.expireAt && (
-                          <p className="text-[11px] text-muted-foreground/30 font-medium">
+                          <p className="text-[11px] text-muted-foreground/70 font-medium">
                             {formatDate(subParsed.expireAt, lang)}
                           </p>
                         )}
@@ -907,7 +891,7 @@ export function ClientDashboardPage() {
 
                     {/* Traffic */}
                     <div className="space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                         {t("dashboard.traffic")}
                       </p>
                       {subParsed.trafficLimitBytes != null && subParsed.trafficLimitBytes > 0 ? (
@@ -916,12 +900,12 @@ export function ClientDashboardPage() {
                             <span className="text-5xl sm:text-6xl font-black text-foreground tabular-nums tracking-tighter leading-none">
                               {trafficPercent ?? 0}
                             </span>
-                            <span className="text-lg font-bold text-muted-foreground/30">%</span>
+                            <span className="text-lg font-bold text-muted-foreground/70">%</span>
                           </div>
-                          <p className="text-[11px] text-muted-foreground/30 font-medium">
+                          <p className="text-[11px] text-muted-foreground/70 font-medium">
                             {formatBytes(subParsed.trafficUsed ?? 0, lang)} / {formatBytes(subParsed.trafficLimitBytes, lang)}
                           </p>
-                          <div className="mt-1 h-1 w-full max-w-[160px] rounded-full bg-muted/10 overflow-hidden">
+                          <div className="mt-1 h-1 w-full max-w-[160px] rounded-full bg-muted/20 dark:bg-white/10 overflow-hidden">
                             <motion.div
                               initial={{ width: 0 }}
                               animate={{ width: `${trafficPercent ?? 0}%` }}
@@ -931,19 +915,19 @@ export function ClientDashboardPage() {
                           </div>
                         </>
                       ) : (
-                        <span className="text-5xl sm:text-6xl font-black text-foreground tracking-tighter leading-none">âˆž</span>
+                        <span className="text-5xl sm:text-6xl font-black text-foreground tracking-tighter leading-none">∞</span>
                       )}
                     </div>
 
                     {/* Devices */}
                     <div className="space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                         {t("dashboard.devices")}
                       </p>
                       <span className="text-5xl sm:text-6xl font-black text-foreground tabular-nums tracking-tighter leading-none">
                         {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0
                           ? subParsed.hwidDeviceLimit
-                          : "âˆž"}
+                          : "∞"}
                       </span>
                     </div>
 
@@ -951,7 +935,7 @@ export function ClientDashboardPage() {
                     <div className="flex flex-col justify-center space-y-3">
                       {vpnUrl ? (
                         <Link to="/cabinet/subscribe" className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
-                          <Shield className="h-4 w-4 shrink-0" />
+                          <Link2 className="h-4 w-4 shrink-0" />
                           <span>{t("dashboard.setupVPN")}</span>
                         </Link>
                       ) : (
@@ -960,7 +944,7 @@ export function ClientDashboardPage() {
                           <span>{t("dashboard.choosePlan")}</span>
                         </Link>
                       )}
-                      <Link to="/cabinet/tariffs" className="group/link inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border/40 bg-background/5 text-[13px] font-medium text-muted-foreground/35 transition-all duration-300 hover:bg-background/15 hover:text-foreground/80">
+                      <Link to="/cabinet/tariffs" className="group/link inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border/40 bg-muted/20 dark:bg-white/5 text-[13px] font-medium text-muted-foreground transition-all duration-300 hover:bg-background/15 hover:text-foreground/80">
                         <span>{t("dashboard.changePlan")}</span>
                         <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover/link:translate-x-0.5" />
                       </Link>
@@ -969,13 +953,13 @@ export function ClientDashboardPage() {
                 </div>
 
                 {/* Bottom divider line with subtle gradient */}
-                <div className="h-px bg-gradient-to-r from-transparent via-border/30 to-transparent" />
+                <div className="h-px bg-gradient-to-r from-transparent via-border/40 dark:via-white/10 to-transparent" />
               </div>
             </motion.div>
           </>
         )}
 
-        {/* â•â•â• ROW 2: Balance (left 7) + Referral/Connection (right 5) â•â•â• */}
+        {/* ═══ ROW 2: Balance (left 7) + Referral/Connection (right 5) ═══ */}
 
         {/* Balance */}
         <motion.div
@@ -984,11 +968,11 @@ export function ClientDashboardPage() {
           transition={{ duration: 0.4, delay: 0.12 }}
           className="lg:col-span-7"
         >
-          <div className="h-full rounded-3xl bg-card/20 backdrop-blur-xl border border-border/40 p-8 sm:p-10 transition-all duration-500 hover:bg-card/20 hover:border-border/40 relative overflow-hidden group">
+          <div className="h-full rounded-3xl bg-muted/40 dark:bg-white/[0.06] border border-border/50 dark:border-white/10 p-8 sm:p-10 transition-all duration-500 hover:bg-muted/60 dark:hover:bg-white/10 hover:border-border/50 relative overflow-hidden group">
             <div className="absolute -top-24 -right-24 h-52 w-52 rounded-full bg-primary/6 blur-[100px] pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
             <div className="relative z-10 flex items-end justify-between gap-6 flex-wrap">
               <div className="space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40">{t("dashboard.balance")}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{t("dashboard.balance")}</p>
                 <p className="text-5xl sm:text-6xl font-black tracking-tighter text-foreground leading-none">
                   {formatMoney(client.balance, client.preferredCurrency)}
                 </p>
@@ -1001,62 +985,43 @@ export function ClientDashboardPage() {
           </div>
         </motion.div>
 
-        {/* Referral / Connection */}
+        {/* Quick Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.16 }}
           className="lg:col-span-5"
         >
-          <div className="h-full rounded-3xl bg-card/20 backdrop-blur-xl border border-border/40 p-8 sm:p-10 transition-all duration-500 hover:bg-card/20 hover:border-border/40 relative overflow-hidden group">
+          <div className="h-full rounded-3xl bg-muted/40 dark:bg-white/[0.06] border border-border/50 dark:border-white/10 p-8 sm:p-10 transition-all duration-500 hover:bg-muted/60 dark:hover:bg-white/10 hover:border-border/50 relative overflow-hidden group">
             <div className="absolute -bottom-20 -left-20 h-44 w-44 rounded-full bg-primary/6 blur-[90px] pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
             <div className="relative z-10 flex flex-col justify-center h-full">
-              {hasReferralLinks ? (
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40 mb-3">{t("dashboard.referrals")}</p>
-                    <p className="text-sm text-muted-foreground/25 leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: t("dashboard.referralShareDesc") }}
-                    />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-5">{t("dashboard.quickActions")}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Link to="/cabinet/subscribe" className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/5 p-4 text-center transition-all duration-200 hover:bg-muted/50 dark:hover:bg-white/10 hover:border-primary/30 active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Link2 className="h-5 w-5" />
                   </div>
-                  {referralLinkSite && (
-                    <div className="flex items-center gap-2">
-                      <code className="rounded-xl bg-background/10 border border-border/40 px-3 py-2.5 text-[11px] font-mono flex-1 truncate text-foreground/30" title={referralLinkSite}>
-                        {referralLinkSite}
-                      </code>
-                      <Button variant="secondary" size="icon" onClick={() => copyReferral("site")} className="shrink-0 h-10 w-10 rounded-xl border border-border/40 bg-background/10 hover:bg-background/25" title={t("common.copy")}>
-                        {referralCopied === "site" ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-foreground/30" />}
-                      </Button>
-                    </div>
-                  )}
-                  <Link to="/cabinet/referral" className="group/link inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border/40 bg-background/5 text-sm font-medium transition-all duration-300 hover:bg-background/5">
-                    <span>{t("dashboard.referralStats")}</span>
-                    <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover/link:translate-x-0.5" />
-                  </Link>
-                </div>
-              ) : vpnUrl ? (
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40 mb-3">{t("dashboard.connection")}</p>
-                    <p className="text-sm text-muted-foreground/25 leading-relaxed">{t("dashboard.vpnReadyDesc")}</p>
+                  <span className="text-xs font-medium">{t("dashboard.connectVPN")}</span>
+                </Link>
+                <Link to="/cabinet/traffic" className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/5 p-4 text-center transition-all duration-200 hover:bg-muted/50 dark:hover:bg-white/10 hover:border-emerald-500/30 active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
+                    <BarChart3 className="h-5 w-5" />
                   </div>
-                  <Link to="/cabinet/subscribe" className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98]">
-                    <Shield className="h-4 w-4 shrink-0" />
-                    <span>{t("dashboard.setupVPN")}</span>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/40 mb-3">{t("dashboard.connection")}</p>
-                    <p className="text-sm text-muted-foreground/25 leading-relaxed">{t("dashboard.payToGetLink")}</p>
+                  <span className="text-xs font-medium">{t("nav.traffic")}</span>
+                </Link>
+                <Link to="/cabinet/referral" className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/5 p-4 text-center transition-all duration-200 hover:bg-muted/50 dark:hover:bg-white/10 hover:border-amber-500/30 active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+                    <Users className="h-5 w-5" />
                   </div>
-                  <Link to="/cabinet/tariffs" className="group/link inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border/40 bg-background/5 text-sm font-medium transition-all duration-300 hover:bg-background/5">
-                    <span>{t("dashboard.choosePlan")}</span>
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover/link:translate-x-0.5" />
-                  </Link>
-                </div>
-              )}
+                  <span className="text-xs font-medium">{t("dashboard.referrals")}</span>
+                </Link>
+                <Link to="/cabinet/tickets" className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/5 p-4 text-center transition-all duration-200 hover:bg-muted/50 dark:hover:bg-white/10 hover:border-blue-500/30 active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
+                    <TicketCheck className="h-5 w-5" />
+                  </div>
+                  <span className="text-xs font-medium">{t("dashboard.tickets")}</span>
+                </Link>
+              </div>
             </div>
           </div>
         </motion.div>
