@@ -432,9 +432,9 @@ export function ClientDashboardPage() {
               <div className="absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-primary/5 blur-[60px] pointer-events-none" />
 
               <div className="relative z-10 p-5 pb-0">
-                {/* Plan name + active badge */}
-                <div className="flex items-center justify-between gap-3 mb-5">
-                  <div className="flex items-center gap-3 min-w-0">
+                {/* Plan name */}
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
                       <Package className="h-4.5 w-4.5 text-primary" />
                     </div>
@@ -822,27 +822,23 @@ export function ClientDashboardPage() {
                 <div className="absolute bottom-0 right-1/4 w-48 h-48 rounded-full bg-primary/4 blur-[100px] pointer-events-none" />
 
                 <div className="relative z-10 p-8 sm:p-10">
-                  {/* Top row: Plan name + status badge */}
-                  <div className="flex items-center justify-between gap-4 mb-10">
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="h-12 w-12 shrink-0 rounded-2xl bg-primary/10 flex items-center justify-center">
-                        <Package className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-2xl sm:text-3xl font-black text-foreground tracking-tight truncate leading-none" title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
-                          {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
-                        </p>
-                        {tariffCategoryName && (
-                          <p className="text-sm text-muted-foreground mt-1 font-medium">{tariffCategoryName}</p>
-                        )}
-                      </div>
+                  {/* Top row: Plan name */}
+                  <div className="flex items-center gap-4 mb-10">
+                    <div className="h-12 w-12 shrink-0 rounded-2xl bg-primary/10 flex items-center justify-center">
+                      <Package className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="min-w-0">
+                      <p className="text-2xl sm:text-3xl font-black text-foreground tracking-tight truncate leading-none" title={isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}>
+                        {isTrial ? t("dashboard.trial") : ((tariffDisplayName ?? subParsed.productName?.trim() ?? "").trim()) || t("dashboard.trial")}
+                      </p>
+                      {tariffCategoryName && (
+                        <p className="text-sm text-muted-foreground mt-1 font-medium">{tariffCategoryName}</p>
+                      )}
                       {isTrial && (
-                        <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/8 px-3 py-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-1 flex items-center gap-1.5">
                           <AlertCircle className="h-3 w-3" />
                           {t("dashboard.trialLimitedNodesShort")}
-                        </span>
+                        </p>
                       )}
                     </div>
                   </div>

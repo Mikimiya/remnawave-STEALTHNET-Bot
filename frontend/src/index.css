@@ -166,4 +166,17 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome/Safari/Opera */
   }
+
+  /* ── Global button radius override — less rounded ── */
+  button,
+  a[class*="inline-flex"][class*="items-center"][class*="justify-center"] {
+    border-radius: 0.75rem !important; /* 12px = rounded-xl */
+  }
+  /* Keep small pill badges rounded-full */
+  span[class*="rounded-full"],
+  button[class*="size-icon"],
+  button[class*="w-10"][class*="h-10"],
+  button[class*="w-9"][class*="h-9"] {
+    border-radius: 9999px !important;
+  }
 }
