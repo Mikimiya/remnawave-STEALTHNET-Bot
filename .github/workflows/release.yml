@@ -30,9 +30,6 @@ jobs:
           - name: bot
             context: ./bot
             dockerfile: ./bot/Dockerfile
-          - name: frontend
-            context: ./frontend
-            dockerfile: ./frontend/Dockerfile
 
     steps:
       - name: Checkout
