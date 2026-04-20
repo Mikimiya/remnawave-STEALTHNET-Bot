@@ -6,7 +6,6 @@ import {
   Calendar,
   ArrowRight,
   PlusCircle,
-  RotateCcw,
   Copy,
   Check,
   Gift,
@@ -125,14 +124,6 @@ function parseSubscription(sub: unknown): {
   };
 }
 
-const RESET_STRATEGY_I18N: Record<string, string> = {
-  NO_RESET: "tariffs.resetNoReset",
-  DAY: "tariffs.resetDay",
-  WEEK: "tariffs.resetWeek",
-  MONTH: "tariffs.resetMonth",
-  MONTH_ROLLING: "tariffs.resetMonthRolling",
-};
-
 export function ClientDashboardPage() {
   const { state, refreshProfile } = useClientAuth();
   const config = useCabinetConfig();
@@ -142,7 +133,7 @@ export function ClientDashboardPage() {
   const [subscription, setSubscription] = useState<unknown>(null);
   const [tariffDisplayName, setTariffDisplayName] = useState<string | null>(null);
   const [tariffCategoryName, setTariffCategoryName] = useState<string | null>(null);
-  const [trafficResetStrategy, setTrafficResetStrategy] = useState<string | null>(null);
+  const [_trafficResetStrategy, setTrafficResetStrategy] = useState<string | null>(null);
   const [isTrial, setIsTrial] = useState(false);
   const [usedDevicesCount, setUsedDevicesCount] = useState(0);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
