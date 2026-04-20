@@ -7,7 +7,7 @@ import { useIsMiniapp } from "@/hooks/use-is-miniapp";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { GlassSelect } from "@/components/ui/glass-select";
-import { LayoutDashboard, Package, User, LogOut, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X, Megaphone, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Package, User, LogOut, Users, Sun, Moon, PlusCircle, Globe, KeyRound, MessageSquare, Palette, Monitor, Check, Loader2, Settings, Layers, MoreHorizontal, ChevronDown, Wallet, X, Megaphone, BarChart3, Smartphone } from "lucide-react";
 import { useTheme, ACCENT_PALETTES, type ThemeMode, type ThemeAccent } from "@/contexts/theme";
 import { cn, formatMoney, translateBackendMessage } from "@/lib/utils";
 import { FloatingChat } from "@/components/floating-chat";
@@ -147,6 +147,7 @@ const ALL_NAV_ITEMS = [
   { to: "/cabinet/traffic", labelKey: "nav.traffic", icon: BarChart3, alwaysMore: true },
   { to: "/cabinet/profile", labelKey: "nav.profile", icon: User, alwaysMore: true },
   { to: "/cabinet/extra-options", labelKey: "nav.extraOptions", icon: PlusCircle, alwaysMore: true },
+  { to: "/cabinet/overseas-apps", labelKey: "nav.overseasApps", icon: Smartphone, alwaysMore: true },
   { to: "/cabinet/tickets", labelKey: "nav.tickets", icon: MessageSquare, alwaysMore: true },
   { to: "/cabinet/announcements", labelKey: "nav.announcements", icon: Megaphone, alwaysMore: true },
 ];

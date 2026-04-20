@@ -194,7 +194,7 @@ export function ClientLoginPage() {
 
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-[13px] font-medium text-foreground/70">{t("auth.email")}</Label>
-            <Input id="email" type="email" name="login_email" placeholder={t("auth.enterEmail")} value={email} onChange={handleEmailChange} onBlur={handleEmailBlur} required autoComplete="username" className={cn("h-11 rounded-lg border-border/60 bg-muted/30 px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 dark:bg-white/5", emailError && "border-destructive focus-visible:ring-destructive/30")} />
+            <Input id="email" type="email" name="login_email" placeholder={t("auth.enterEmail")} value={email} onChange={handleEmailChange} onBlur={handleEmailBlur} required autoComplete="username" className={cn("h-11 rounded-xl border-border/40 bg-muted/40 dark:bg-white/[0.06] px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 backdrop-blur-sm", emailError && "border-destructive focus-visible:ring-destructive/30")} />
             {emailError && <p className="px-0.5 text-xs text-destructive">{emailError}</p>}
           </div>
 
@@ -203,10 +203,10 @@ export function ClientLoginPage() {
               <Label htmlFor="password" className="text-[13px] font-medium text-foreground/70">{t("auth.password")}</Label>
               <Link to="/cabinet/forgot-password" className="text-xs text-muted-foreground transition-colors hover:text-primary">{t("auth.forgotPassword")}</Link>
             </div>
-            <Input id="password" type="password" name="login_password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" className="h-11 rounded-lg border-border/60 bg-muted/30 px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 dark:bg-white/5" />
+            <Input id="password" type="password" name="login_password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" className="h-11 rounded-xl border-border/40 bg-muted/40 dark:bg-white/[0.06] px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 backdrop-blur-sm" />
           </div>
 
-          <Button type="submit" className="mt-1 h-11 w-full rounded-lg text-sm font-semibold shadow-sm transition-all duration-150 hover:shadow-md" disabled={loading}>
+          <Button type="submit" className="mt-1 h-11 w-full rounded-xl text-sm font-semibold shadow-sm transition-all duration-200 hover:shadow-lg hover:shadow-primary/20" disabled={loading}>
             {loading ? (
               <span className="flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />{t("auth.loginLoading")}</span>
             ) : t("auth.login")}
@@ -222,19 +222,19 @@ export function ClientLoginPage() {
 
               <div className="grid gap-2.5">
                 {telegramEnabled && (
-                  <a href={`https://t.me/${telegramBotUsername}`} target="_blank" rel="noopener noreferrer" className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+                  <a href={`https://t.me/${telegramBotUsername}`} target="_blank" rel="noopener noreferrer" className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-border/40 bg-muted/30 dark:bg-white/[0.04] text-sm font-medium text-foreground transition-all hover:bg-muted/50 dark:hover:bg-white/[0.08] hover:shadow-sm backdrop-blur-sm">
                     <TelegramIcon className="h-4.5 w-4.5 text-[#2AABEE]" />
                     {t("auth.loginViaTelegram")}
                   </a>
                 )}
                 {googleEnabled && googleClientId && (
-                  <button type="button" onClick={handleGoogleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+                  <button type="button" onClick={handleGoogleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-border/40 bg-muted/30 dark:bg-white/[0.04] text-sm font-medium text-foreground transition-all hover:bg-muted/50 dark:hover:bg-white/[0.08] hover:shadow-sm backdrop-blur-sm">
                     <GoogleIcon className="h-4.5 w-4.5" />
                     {t("auth.loginViaGoogle")}
                   </button>
                 )}
                 {appleEnabled && (
-                  <button type="button" onClick={handleAppleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+                  <button type="button" onClick={handleAppleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-border/40 bg-muted/30 dark:bg-white/[0.04] text-sm font-medium text-foreground transition-all hover:bg-muted/50 dark:hover:bg-white/[0.08] hover:shadow-sm backdrop-blur-sm">
                     <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
                     {t("auth.loginViaApple")}
                   </button>

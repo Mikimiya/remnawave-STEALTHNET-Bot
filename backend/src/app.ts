@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import path from "node:path";
 import rateLimit from "express-rate-limit";
 import { env } from "./config/index.js";
 import { authRouter } from "./modules/auth/index.js";
@@ -113,6 +114,12 @@ app.use("/api/", limiter);
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", version: "3.2.4" });
 });
+
+// ——— Static file serving for ticket uploads ———
+app.use("/api/uploads/tickets", express.static(path.resolve(process.cwd(), "uploads", "tickets"), {
+  maxAge: "1y",
+  immutable: true,
+}));
 
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);

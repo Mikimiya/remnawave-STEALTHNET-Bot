@@ -489,18 +489,16 @@ export function ClientExtraOptionsPage() {
             transition={{ duration: 0.2 }}
             className="space-y-8 max-w-6xl mx-auto pb-24"
           >
-            <div className="relative overflow-hidden rounded-3xl bg-card/40 backdrop-blur-2xl border border-border/50 p-8 sm:p-10 shadow-xl">
+            <div className="relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-5 sm:p-8">
               <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
-              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-                <div className="flex-1">
-                  <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground flex items-center gap-3">
-                    <Layers className="h-8 w-8 text-primary" />
-                    {t("extraOptions.title")}
-                  </h1>
-                  <p className="mt-3 text-[16px] text-muted-foreground max-w-xl leading-relaxed">
-                    {t("extraOptions.pageDesc")}
-                  </p>
-                </div>
+              <div className="relative z-10 flex-1">
+                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground flex items-center gap-3">
+                  <Layers className="h-7 w-7 text-primary shrink-0" />
+                  {t("extraOptions.title")}
+                </h1>
+                <p className="mt-2 text-[14px] sm:text-[15px] text-muted-foreground max-w-xl leading-relaxed">
+                  {t("extraOptions.pageDesc")}
+                </p>
               </div>
             </div>
 

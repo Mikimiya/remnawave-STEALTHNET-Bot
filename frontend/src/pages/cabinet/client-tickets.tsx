@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { MessageSquarePlus, Inbox, Loader2, Send, ArrowLeft, CircleDot, CircleCheck, User } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { MessageSquarePlus, Inbox, Loader2, Send, ArrowLeft, CircleDot, CircleCheck, User, ImagePlus, Clock } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 type TicketItem = { id: string; subject: string; status: string; createdAt: string; updatedAt: string };
-type TicketMessage = { id: string; authorType: string; content: string; createdAt: string };
+type TicketMessage = { id: string; authorType: string; content: string; createdAt: string; imageUrl?: string | null };
 
 export function ClientTicketsPage() {
   const { state } = useClientAuth();
@@ -38,6 +38,8 @@ export function ClientTicketsPage() {
   const [newSubject, setNewSubject] = useState("");
   const [newMessage, setNewMessage] = useState("");
   const [createSending, setCreateSending] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadList = () => {
     if (!token) return;
@@ -113,6 +115,22 @@ export function ClientTicketsPage() {
       .finally(() => setCreateSending(false));
   };
 
+  const handleImageUpload = (file: File) => {
+    if (!token || !detailId) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert(t("tickets.uploadError") + " (max 10MB)");
+      return;
+    }
+    setImageUploading(true);
+    api
+      .uploadTicketImage(token, detailId, file)
+      .then((msg) => {
+        setDetail((d) => (d ? { ...d, messages: [...d.messages, msg] } : d));
+      })
+      .catch(() => {})
+      .finally(() => setImageUploading(false));
+  };
+
   const formatDate = (s: string) => {
     try {
       const d = new Date(s);
@@ -159,9 +177,9 @@ export function ClientTicketsPage() {
             <div className="min-w-0 flex-1">
               <h2 className="text-sm sm:text-base font-bold truncate text-foreground">{detail.subject}</h2>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", detail.status === "open" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
-                  {detail.status === "open" ? <CircleDot className="h-3 w-3" /> : <CircleCheck className="h-3 w-3" />}
-                  {detail.status === "open" ? t("tickets.statusOpen") : t("tickets.statusClosed")}
+                <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", detail.status === "closed" ? "bg-muted text-muted-foreground" : detail.status === "needs_reply" ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400")}>
+                  {detail.status === "closed" ? <CircleCheck className="h-3 w-3" /> : detail.status === "needs_reply" ? <Clock className="h-3 w-3" /> : <CircleDot className="h-3 w-3" />}
+                  {detail.status === "closed" ? t("tickets.statusClosed") : detail.status === "needs_reply" ? t("tickets.statusNeedsReply") : t("tickets.statusOpen")}
                 </span>
                 <span className="text-[10px] text-muted-foreground font-medium">{t("tickets.updated")}: {formatDate(detail.updatedAt)}</span>
               </div>
@@ -169,11 +187,11 @@ export function ClientTicketsPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scroll-smooth">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scroll-smooth flex flex-col-reverse">
           {detail.messages.length === 0 ? (
             <div className="flex h-full items-center justify-center text-muted-foreground text-sm font-medium">{t("tickets.noMessages")}</div>
           ) : (
-            detail.messages.map((m) => {
+            [...detail.messages].reverse().map((m) => {
               const isSupport = m.authorType === "support";
               return (
                 <div key={m.id} className={cn("flex w-full flex-col", isSupport ? "items-start" : "items-end")}>
@@ -192,7 +210,12 @@ export function ClientTicketsPage() {
                             : "bg-primary text-primary-foreground rounded-br-sm shadow-primary/20"
                         )}
                       >
-                        <p className="whitespace-pre-wrap break-words font-medium">{m.content}</p>
+                        {m.imageUrl && (
+                          <a href={m.imageUrl} target="_blank" rel="noopener noreferrer" className="block mb-2">
+                            <img src={m.imageUrl} alt="" className="max-w-full max-h-60 rounded-xl border border-white/10" loading="lazy" />
+                          </a>
+                        )}
+                        {m.content && <p className="whitespace-pre-wrap break-words font-medium">{m.content}</p>}
                       </div>
                       <span className={cn("text-[10px] text-muted-foreground px-1 font-semibold", isSupport ? "text-left" : "text-right")}>
                         {formatDate(m.createdAt)}
@@ -205,9 +228,30 @@ export function ClientTicketsPage() {
           )}
         </div>
 
-        {detail.status === "open" && (
+        {detail.status !== "closed" && (
           <div className="p-4 sm:p-5 border-t border-border/50 bg-background/40 backdrop-blur-md shrink-0">
             <div className="flex gap-3 items-end max-w-4xl mx-auto">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-[50px] w-[50px] rounded-[1.2rem] shrink-0 border border-white/10 dark:border-white/5"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={imageUploading}
+                title={t("tickets.uploadImage")}
+              >
+                {imageUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+              </Button>
               <Textarea
                 placeholder={t("tickets.messagePlaceholder")}
                 value={replyText}
@@ -247,21 +291,29 @@ export function ClientTicketsPage() {
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">{t("tickets.title")}</h2>
-          <p className="text-sm text-muted-foreground mt-1 font-medium">{t("tickets.subtitle")}</p>
-        </div>
-        {!showNewForm && (
-          <Button
-            onClick={() => setShowNewForm(true)}
-            className="rounded-xl shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-all hover:scale-105 h-11 px-5"
-          >
+    <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-5 sm:p-8">
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground flex items-center gap-3">
+              <Inbox className="h-7 w-7 text-primary shrink-0" />
+              {t("tickets.title")}
+            </h1>
+            <p className="mt-2 text-[14px] sm:text-[15px] text-muted-foreground max-w-xl leading-relaxed">
+              {t("tickets.subtitle")}
+            </p>
+          </div>
+          {!showNewForm && (
+            <Button
+              onClick={() => setShowNewForm(true)}
+              className="rounded-xl shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-all hover:scale-105 h-11 px-5"
+            >
             <MessageSquarePlus className="h-4 w-4 mr-2" />
             <span className="font-semibold text-[13px] tracking-wide">{t("tickets.createTicket").toUpperCase()}</span>
           </Button>
-        )}
+          )}
+        </div>
       </div>
 
       {showNewForm && (
@@ -273,6 +325,14 @@ export function ClientTicketsPage() {
               {t("tickets.newTicketTitle")}
             </h3>
             <div className="space-y-5">
+              <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4">
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2">{t("tickets.reminderTitle")}</p>
+                <ul className="list-disc list-inside space-y-1 text-xs text-amber-700/80 dark:text-amber-400/80">
+                  {(t("tickets.reminderItems", { returnObjects: true }) as string[]).map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="new-subject" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">{t("tickets.subjectLabel")}</Label>
                 <Input
@@ -328,7 +388,8 @@ export function ClientTicketsPage() {
       ) : !showNewForm ? (
         <div className="grid gap-3 sm:gap-4">
           {list.map((ticket) => {
-            const isOpen = ticket.status === "open";
+            const isOpen = ticket.status === "open" || ticket.status === "needs_reply";
+            const isNeedsReply = ticket.status === "needs_reply";
             return (
               <div
                 key={ticket.id}
@@ -336,7 +397,7 @@ export function ClientTicketsPage() {
                 className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 overflow-hidden rounded-[2rem] border border-white/20 dark:border-white/10 bg-[hsl(var(--card)/0.8)] dark:bg-[hsl(var(--card)/0.5)] backdrop-blur-[32px] p-5 sm:p-6 transition-all duration-300 hover:bg-card/90 dark:hover:bg-card/70 hover:shadow-[0_10px_40px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 cursor-pointer"
               >
                 {isOpen && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                  <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", isNeedsReply ? "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]" : "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]")} />
                 )}
                 <div className="min-w-0 flex-1 pl-1">
                   <h4 className="font-bold text-base sm:text-lg text-foreground truncate group-hover:text-primary transition-colors">{ticket.subject}</h4>
@@ -344,11 +405,11 @@ export function ClientTicketsPage() {
                     <span
                       className={cn(
                         "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                        isOpen ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"
+                        isNeedsReply ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : isOpen ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"
                       )}
                     >
-                      {isOpen ? <CircleDot className="h-3 w-3" /> : <CircleCheck className="h-3 w-3" />}
-                      {isOpen ? t("tickets.statusOpen") : t("tickets.statusClosed")}
+                      {isNeedsReply ? <Clock className="h-3 w-3" /> : isOpen ? <CircleDot className="h-3 w-3" /> : <CircleCheck className="h-3 w-3" />}
+                      {isNeedsReply ? t("tickets.statusNeedsReply") : isOpen ? t("tickets.statusOpen") : t("tickets.statusClosed")}
                     </span>
                     <span className="text-xs font-semibold text-muted-foreground">{t("tickets.lastMessage")}: {formatDate(ticket.updatedAt)}</span>
                   </div>

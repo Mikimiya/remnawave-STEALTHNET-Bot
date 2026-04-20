@@ -177,6 +177,18 @@ export function remnaGetSystemStats() {
   return remnaFetch<unknown>("/api/system/stats");
 }
 
+/** GET /api/bandwidth-stats/users/:uuid?start=...&end=...&topNodesLimit=20 — 用户流量统计 */
+export function remnaGetUserBandwidthStats(uuid: string, start: string, end: string, topNodesLimit = 20) {
+  const params = new URLSearchParams({ start, end, topNodesLimit: String(topNodesLimit) });
+  return remnaFetch<unknown>(`/api/bandwidth-stats/users/${uuid}?${params}`);
+}
+
+/** GET /api/bandwidth-stats/users/:uuid/legacy?start=...&end=... — Legacy 用户流量明细 */
+export function remnaGetUserBandwidthStatsLegacy(uuid: string, start: string, end: string) {
+  const params = new URLSearchParams({ start, end });
+  return remnaFetch<unknown>(`/api/bandwidth-stats/users/${uuid}/legacy?${params}`);
+}
+
 /** GET /api/system/stats/nodes — статистика нод по дням */
 export function remnaGetSystemStatsNodes() {
   return remnaFetch<unknown>("/api/system/stats/nodes");

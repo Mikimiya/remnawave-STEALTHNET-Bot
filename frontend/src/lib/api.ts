@@ -543,7 +543,7 @@ export const api = {
   },
 
   /** Админ: список тикетов (опционально ?status=open|closed) */
-  async getAdminTickets(token: string, status?: "open" | "closed"): Promise<{
+  async getAdminTickets(token: string, status?: "open" | "closed" | "needs_reply"): Promise<{
     items: { id: string; subject: string; status: string; createdAt: string; updatedAt: string; client: { id: string; email: string | null; telegramUsername: string | null } }[];
   }> {
     const q = status ? `?status=${status}` : "";
@@ -557,7 +557,8 @@ export const api = {
     createdAt: string;
     updatedAt: string;
     client: { id: string; email: string | null; telegramUsername: string | null };
-    messages: { id: string; authorType: string; content: string; createdAt: string }[];
+    tariffInfo?: { tariffName: string | null; status: string | null; expiresAt: string | null } | null;
+    messages: { id: string; authorType: string; content: string; createdAt: string; imageUrl?: string | null }[];
   }> {
     return request(`/admin/tickets/${id}`, { token });
   },
@@ -874,7 +875,7 @@ export const api = {
     return request("/client/auth/me", { token });
   },
 
-  async clientSubscription(token: string): Promise<{ subscription: unknown; tariffDisplayName?: string | null; tariffCategoryName?: string | null; trafficResetStrategy?: string | null; isTrial?: boolean; message?: string }> {
+  async clientSubscription(token: string): Promise<{ subscription: unknown; tariffDisplayName?: string | null; tariffCategoryName?: string | null; trafficResetStrategy?: string | null; isTrial?: boolean; usedDevicesCount?: number; message?: string }> {
     return request("/client/subscription", { token });
   },
 
@@ -1143,7 +1144,7 @@ export const api = {
     status: string;
     createdAt: string;
     updatedAt: string;
-    messages: { id: string; authorType: string; content: string; createdAt: string }[];
+    messages: { id: string; authorType: string; content: string; createdAt: string; imageUrl?: string | null }[];
   }> {
     return request(`/client/tickets/${id}`, { token });
   },
@@ -1157,7 +1158,7 @@ export const api = {
     status: string;
     createdAt: string;
     updatedAt: string;
-    messages: { id: string; authorType: string; content: string; createdAt: string }[];
+    messages: { id: string; authorType: string; content: string; createdAt: string; imageUrl?: string | null }[];
   }> {
     return request("/client/tickets", { method: "POST", body: JSON.stringify(data), token });
   },
@@ -1166,8 +1167,24 @@ export const api = {
     token: string,
     ticketId: string,
     data: { content: string }
-  ): Promise<{ id: string; authorType: string; content: string; createdAt: string }> {
+  ): Promise<{ id: string; authorType: string; content: string; createdAt: string; imageUrl?: string | null }> {
     return request(`/client/tickets/${ticketId}/messages`, { method: "POST", body: JSON.stringify(data), token });
+  },
+  /** Загрузить скриншот в тикет */
+  async uploadTicketImage(
+    token: string,
+    ticketId: string,
+    file: File
+  ): Promise<{ id: string; authorType: string; content: string; createdAt: string; imageUrl?: string | null }> {
+    const formData = new FormData();
+    formData.append("image", file);
+    const res = await fetch(`${API_BASE}/client/tickets/${ticketId}/upload-image`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) throw new Error("Upload failed");
+    return res.json();
   },
 
   /** AI Чат (Groq) */
@@ -1233,13 +1250,12 @@ export const api = {
   async clientGetTrafficLog(
     token: string,
     opts?: { days?: number; source?: string }
-  ): Promise<TrafficLogEntry[]> {
+  ): Promise<TrafficLogResponse> {
     const params = new URLSearchParams();
     if (opts?.days) params.set("days", String(opts.days));
     if (opts?.source) params.set("source", opts.source);
     const qs = params.toString();
-    const res = await request<{ logs: TrafficLogEntry[] }>(`/client/traffic-log${qs ? `?${qs}` : ""}`, { token });
-    return res.logs;
+    return request<TrafficLogResponse>(`/client/traffic-log${qs ? `?${qs}` : ""}`, { token });
   },
 
   // ——— 流量月度汇总 ———
@@ -1271,6 +1287,28 @@ export const api = {
 };
 
 // ——— Типы: трафик ———
+
+export interface TrafficNodeSeries {
+  uuid: string;
+  name: string;
+  countryCode: string;
+  total: number;
+  data: number[];
+}
+
+export interface TrafficTopNode {
+  uuid: string;
+  name: string;
+  countryCode: string;
+  total: number;
+}
+
+export interface TrafficLogResponse {
+  logs: TrafficLogEntry[];
+  topNodes: TrafficTopNode[];
+  series: TrafficNodeSeries[];
+  categories: string[];
+}
 
 export interface TrafficLogEntry {
   date: string;

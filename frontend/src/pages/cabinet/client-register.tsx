@@ -263,13 +263,13 @@ export function ClientRegisterPage() {
         {stepIndicator}
         <div className="space-y-4">
           {error && (
-            <div className="flex items-start gap-2.5 rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-sm text-destructive dark:border-red-500/20 dark:bg-red-500/5 dark:text-red-400">
+            <div className="flex items-start gap-2.5 rounded-xl border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-sm text-destructive dark:border-red-500/20 dark:bg-red-500/5 dark:text-red-400">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label htmlFor="email" className="text-[13px] font-medium text-foreground/70">{t("auth.email")}</Label>
             <Input
               id="email"
@@ -284,14 +284,14 @@ export function ClientRegisterPage() {
               autoFocus
               autoComplete="email"
               className={cn(
-                "h-11 rounded-lg border-border/60 bg-muted/30 px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 dark:bg-white/5",
+                "h-11 rounded-xl border-border/40 bg-muted/40 px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 dark:bg-white/[0.06] backdrop-blur-sm",
                 emailError && "border-destructive focus-visible:ring-destructive/30"
               )}
             />
             {emailError && <p className="px-0.5 text-xs text-destructive">{emailError}</p>}
           </div>
 
-          <Button onClick={handleEmailNext} className="mt-1 h-11 w-full rounded-lg text-sm font-semibold shadow-sm transition-all duration-150 hover:shadow-md" disabled={!email.trim()}>
+          <Button onClick={handleEmailNext} className="mt-1 h-11 w-full rounded-xl text-sm font-semibold shadow-sm transition-all duration-150 hover:shadow-lg hover:shadow-primary/20" disabled={!email.trim()}>
             <span className="flex items-center gap-2">{t("common.next") || "Next"}<ArrowRight className="h-4 w-4" /></span>
           </Button>
 
@@ -304,19 +304,19 @@ export function ClientRegisterPage() {
               </div>
               <div className="grid gap-2.5">
                 {telegramEnabled && (
-                  <a href={`https://t.me/${telegramBotUsername}`} target="_blank" rel="noopener noreferrer" className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+                  <a href={`https://t.me/${telegramBotUsername}`} target="_blank" rel="noopener noreferrer" className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-border/50 bg-muted/30 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.04] dark:hover:bg-white/[0.06] backdrop-blur-sm">
                     <TelegramIcon className="h-4 w-4 text-[#2AABEE]" />
                     {t("auth.loginViaTelegram")}
                   </a>
                 )}
                 {googleEnabled && googleClientId && (
-                  <button type="button" onClick={handleGoogleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+                  <button type="button" onClick={handleGoogleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-border/50 bg-muted/30 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.04] dark:hover:bg-white/[0.06] backdrop-blur-sm">
                     <GoogleIcon className="h-4 w-4" />
                     {t("auth.registerViaGoogle")}
                   </button>
                 )}
                 {appleEnabled && (
-                  <button type="button" onClick={handleAppleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border/50 bg-muted/20 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+                  <button type="button" onClick={handleAppleLogin} disabled={loading} className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-border/50 bg-muted/30 text-sm font-medium text-foreground transition-all hover:bg-muted/40 dark:bg-white/[0.04] dark:hover:bg-white/[0.06] backdrop-blur-sm">
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
                     {t("auth.registerViaApple")}
                   </button>
@@ -341,7 +341,7 @@ export function ClientRegisterPage() {
         {stepIndicator}
         <div className="space-y-4">
           {error && (
-            <div className="flex items-start gap-2.5 rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-sm text-destructive dark:border-red-500/20 dark:bg-red-500/5 dark:text-red-400">
+            <div className="flex items-start gap-2.5 rounded-xl border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-sm text-destructive dark:border-red-500/20 dark:bg-red-500/5 dark:text-red-400">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -362,7 +362,7 @@ export function ClientRegisterPage() {
               autoFocus
               autoComplete="new-password"
               className={cn(
-                "h-11 rounded-lg border-border/60 bg-muted/30 px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 dark:bg-white/5",
+                "h-11 rounded-xl border-border/40 bg-muted/40 px-3.5 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-primary/30 dark:bg-white/[0.06] backdrop-blur-sm",
                 passwordError && "border-destructive focus-visible:ring-destructive/30"
               )}
             />
@@ -371,10 +371,10 @@ export function ClientRegisterPage() {
           </div>
 
           <div className="flex gap-2.5">
-            <Button variant="outline" onClick={() => { setStep(1); setError(""); }} className="h-11 rounded-lg px-4">
+            <Button variant="outline" onClick={() => { setStep(1); setError(""); }} className="h-11 rounded-xl px-4">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <Button onClick={handlePasswordSubmit} className="h-11 flex-1 rounded-lg text-sm font-semibold shadow-sm transition-all duration-150 hover:shadow-md" disabled={loading || !password}>
+            <Button onClick={handlePasswordSubmit} className="h-11 flex-1 rounded-xl text-sm font-semibold shadow-sm transition-all duration-150 hover:shadow-lg hover:shadow-primary/20" disabled={loading || !password}>
               {loading ? (
                 <span className="flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />{t("auth.registerLoading")}</span>
               ) : t("auth.register")}
@@ -404,7 +404,7 @@ export function ClientRegisterPage() {
           <p className="text-sm font-semibold text-foreground">{email}</p>
         </div>
 
-        <div className="rounded-lg border border-amber-200/60 bg-amber-50/80 px-4 py-3 text-left dark:border-amber-500/20 dark:bg-amber-500/5">
+        <div className="rounded-xl border border-amber-200/60 bg-amber-50/80 px-4 py-3 text-left dark:border-amber-500/20 dark:bg-amber-500/5">
           <div className="flex items-start gap-2.5">
             <Inbox className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <div className="space-y-1 text-[13px] text-amber-800 dark:text-amber-300">
@@ -418,7 +418,7 @@ export function ClientRegisterPage() {
           </div>
         </div>
 
-        <Button variant="outline" onClick={() => { setStep(1); setPassword(""); setError(""); }} className="h-11 w-full rounded-lg text-sm font-medium">
+        <Button variant="outline" onClick={() => { setStep(1); setPassword(""); setError(""); }} className="h-11 w-full rounded-xl text-sm font-medium">
           <ArrowLeft className="mr-2 h-4 w-4" />
           {t("auth.tryAnotherEmail") || "Try another email"}
         </Button>

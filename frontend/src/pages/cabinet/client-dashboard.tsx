@@ -144,6 +144,7 @@ export function ClientDashboardPage() {
   const [tariffCategoryName, setTariffCategoryName] = useState<string | null>(null);
   const [trafficResetStrategy, setTrafficResetStrategy] = useState<string | null>(null);
   const [isTrial, setIsTrial] = useState(false);
+  const [usedDevicesCount, setUsedDevicesCount] = useState(0);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const [_payments, setPayments] = useState<ClientPayment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,6 +206,7 @@ export function ClientDashboardPage() {
         setTariffCategoryName(subRes.tariffCategoryName ?? null);
         setTrafficResetStrategy(subRes.trafficResetStrategy ?? null);
         setIsTrial(subRes.isTrial ?? false);
+        setUsedDevicesCount(subRes.usedDevicesCount ?? 0);
         if (subRes.message) setSubscriptionError(translateBackendMessage(subRes.message, t));
         setPayments(payRes.items ?? []);
       })
@@ -450,10 +452,6 @@ export function ClientDashboardPage() {
                       ) : null}
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-emerald-500/10 border border-emerald-500/15 px-3 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-                    {t("dashboard.active")}
-                  </span>
                 </div>
 
                 {/* Giant stat numbers */}
@@ -494,7 +492,7 @@ export function ClientDashboardPage() {
                       {t("dashboard.devices")}
                     </p>
                     <span className="text-3xl font-black tabular-nums tracking-tighter text-foreground leading-none">
-                      {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "∞"}
+                      {usedDevicesCount}<span className="text-lg font-bold text-muted-foreground/50">/{subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0 ? subParsed.hwidDeviceLimit : "∞"}</span>
                     </span>
                   </div>
                 </div>
@@ -517,18 +515,12 @@ export function ClientDashboardPage() {
                   </div>
                 )}
 
-                {/* Expire date + reset strategy tags */}
+                {/* Expire date tag */}
                 <div className="flex items-center gap-2 flex-wrap mb-5">
                   {subParsed.expireAt && (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-border/40 dark:border-white/10 bg-muted/20 dark:bg-white/5 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
                       <Calendar className="h-3 w-3" />
                       {formatDate(subParsed.expireAt, lang)}
-                    </span>
-                  )}
-                  {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-primary/5 px-2.5 py-1 text-[10px] font-semibold text-primary/60">
-                      <RotateCcw className="h-3 w-3" />
-                      {t(RESET_STRATEGY_I18N[trafficResetStrategy])}
                     </span>
                   )}
                 </div>
@@ -852,16 +844,6 @@ export function ClientDashboardPage() {
                           {t("dashboard.trialLimitedNodesShort")}
                         </span>
                       )}
-                      {trafficResetStrategy && RESET_STRATEGY_I18N[trafficResetStrategy] && (
-                        <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-primary/8 px-3 py-1.5 text-[11px] font-semibold text-primary/80">
-                          <RotateCcw className="h-3 w-3" />
-                          {t(RESET_STRATEGY_I18N[trafficResetStrategy])}
-                        </span>
-                      )}
-                      <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/15 px-4 py-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                        <span className="h-2 w-2 rounded-full bg-current animate-pulse" />
-                        {t("dashboard.active")}
-                      </span>
                     </div>
                   </div>
 
@@ -925,9 +907,9 @@ export function ClientDashboardPage() {
                         {t("dashboard.devices")}
                       </p>
                       <span className="text-5xl sm:text-6xl font-black text-foreground tabular-nums tracking-tighter leading-none">
-                        {subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0
+                        {usedDevicesCount}<span className="text-2xl sm:text-3xl font-bold text-muted-foreground/50">/{subParsed.hwidDeviceLimit != null && subParsed.hwidDeviceLimit > 0
                           ? subParsed.hwidDeviceLimit
-                          : "∞"}
+                          : "∞"}</span>
                       </span>
                     </div>
 
@@ -966,7 +948,7 @@ export function ClientDashboardPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.12 }}
-          className="lg:col-span-7"
+          className="lg:col-span-7 order-2 lg:order-none"
         >
           <div className="h-full rounded-3xl bg-muted/40 dark:bg-white/[0.06] border border-border/50 dark:border-white/10 p-8 sm:p-10 transition-all duration-500 hover:bg-muted/60 dark:hover:bg-white/10 hover:border-border/50 relative overflow-hidden group">
             <div className="absolute -top-24 -right-24 h-52 w-52 rounded-full bg-primary/6 blur-[100px] pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
@@ -990,36 +972,36 @@ export function ClientDashboardPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.16 }}
-          className="lg:col-span-5"
+          className="lg:col-span-5 order-1 lg:order-none"
         >
           <div className="h-full rounded-3xl bg-muted/40 dark:bg-white/[0.06] border border-border/50 dark:border-white/10 p-8 sm:p-10 transition-all duration-500 hover:bg-muted/60 dark:hover:bg-white/10 hover:border-border/50 relative overflow-hidden group">
             <div className="absolute -bottom-20 -left-20 h-44 w-44 rounded-full bg-primary/6 blur-[90px] pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
             <div className="relative z-10 flex flex-col justify-center h-full">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-5">{t("dashboard.quickActions")}</p>
               <div className="grid grid-cols-2 gap-3">
-                <Link to="/cabinet/subscribe" className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/5 p-4 text-center transition-all duration-200 hover:bg-muted/50 dark:hover:bg-white/10 hover:border-primary/30 active:scale-[0.97]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <Link2 className="h-5 w-5" />
+                <Link to="/cabinet/announcements" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-background/80 dark:hover:bg-white/[0.08] hover:border-primary/30 hover:shadow-sm active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 dark:bg-white/10 text-muted-foreground">
+                    <Megaphone className="h-5 w-5" />
                   </div>
-                  <span className="text-xs font-medium">{t("dashboard.connectVPN")}</span>
+                  <span className="text-xs font-semibold text-foreground/80">{t("dashboard.latestAnnouncements")}</span>
                 </Link>
-                <Link to="/cabinet/traffic" className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/5 p-4 text-center transition-all duration-200 hover:bg-muted/50 dark:hover:bg-white/10 hover:border-emerald-500/30 active:scale-[0.97]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
+                <Link to="/cabinet/traffic" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-background/80 dark:hover:bg-white/[0.08] hover:border-primary/30 hover:shadow-sm active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 dark:bg-white/10 text-muted-foreground">
                     <BarChart3 className="h-5 w-5" />
                   </div>
-                  <span className="text-xs font-medium">{t("nav.traffic")}</span>
+                  <span className="text-xs font-semibold text-foreground/80">{t("nav.traffic")}</span>
                 </Link>
-                <Link to="/cabinet/referral" className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/5 p-4 text-center transition-all duration-200 hover:bg-muted/50 dark:hover:bg-white/10 hover:border-amber-500/30 active:scale-[0.97]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+                <Link to="/cabinet/referral" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-background/80 dark:hover:bg-white/[0.08] hover:border-primary/30 hover:shadow-sm active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 dark:bg-white/10 text-muted-foreground">
                     <Users className="h-5 w-5" />
                   </div>
-                  <span className="text-xs font-medium">{t("dashboard.referrals")}</span>
+                  <span className="text-xs font-semibold text-foreground/80">{t("dashboard.referrals")}</span>
                 </Link>
-                <Link to="/cabinet/tickets" className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/5 p-4 text-center transition-all duration-200 hover:bg-muted/50 dark:hover:bg-white/10 hover:border-blue-500/30 active:scale-[0.97]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
+                <Link to="/cabinet/tickets" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-background/80 dark:hover:bg-white/[0.08] hover:border-primary/30 hover:shadow-sm active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 dark:bg-white/10 text-muted-foreground">
                     <TicketCheck className="h-5 w-5" />
                   </div>
-                  <span className="text-xs font-medium">{t("dashboard.tickets")}</span>
+                  <span className="text-xs font-semibold text-foreground/80">{t("dashboard.tickets")}</span>
                 </Link>
               </div>
             </div>

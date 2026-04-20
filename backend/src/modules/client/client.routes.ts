@@ -1,5 +1,8 @@
 import { randomBytes, createHmac } from "crypto";
 import { randomUUID } from "crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import multer from "multer";
 import { Prisma } from "@prisma/client";
 import { generateSecret, generateURI, verify } from "otplib";
 import { env } from "../../config/index.js";
@@ -1746,12 +1749,18 @@ clientRouter.get("/singbox-slots", async (req, res) => {
 clientRouter.get("/subscription", async (req, res) => {
   const client = (req as unknown as { client: { id: string; remnawaveUuid: string | null } }).client;
   if (!client.remnawaveUuid) {
-    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, trafficResetStrategy: null, isTrial: false, message: t(reqLang(req), "subscriptionNotLinked") });
+    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, trafficResetStrategy: null, isTrial: false, usedDevicesCount: 0, message: t(reqLang(req), "subscriptionNotLinked") });
   }
-  const result = await remnaGetUser(client.remnawaveUuid);
+  const [result, devicesResult] = await Promise.all([
+    remnaGetUser(client.remnawaveUuid),
+    remnaGetUserHwidDevices(client.remnawaveUuid).catch(() => ({ data: null, error: null, status: 200 })),
+  ]);
   if (result.error) {
-    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, trafficResetStrategy: null, isTrial: false, message: result.error });
+    return res.json({ subscription: null, tariffDisplayName: null, tariffCategoryName: null, trafficResetStrategy: null, isTrial: false, usedDevicesCount: 0, message: result.error });
   }
+
+  const devData = devicesResult.data as { response?: { total?: number } } | undefined;
+  const usedDevicesCount = devData?.response?.total ?? 0;
 
   // 先判断当前是否为试用（基于 internalSquads UUID 匹配）
   const tariffInfo = await resolveTariffInfo(result.data ?? null, reqLang(req));
@@ -1764,6 +1773,7 @@ clientRouter.get("/subscription", async (req, res) => {
       tariffCategoryName: tariffInfo.categoryName,
       trafficResetStrategy: tariffInfo.trafficResetStrategy ?? "NO_RESET",
       isTrial: true,
+      usedDevicesCount,
     });
   }
 
@@ -1783,6 +1793,7 @@ clientRouter.get("/subscription", async (req, res) => {
       tariffCategoryName: lastPaidTariff?.tariff?.category?.name ?? null,
       trafficResetStrategy: (lastPaidTariff?.tariff as any)?.trafficResetStrategy ?? "NO_RESET",
       isTrial: false,
+      usedDevicesCount,
     });
   }
 
@@ -1793,6 +1804,7 @@ clientRouter.get("/subscription", async (req, res) => {
     tariffCategoryName: tariffInfo.categoryName,
     trafficResetStrategy: tariffInfo.trafficResetStrategy ?? "NO_RESET",
     isTrial: false,
+    usedDevicesCount,
   });
 });
 
@@ -3671,7 +3683,7 @@ clientRouter.post("/tickets", async (req, res) => {
     data: {
       clientId,
       subject: body.data.subject.trim(),
-      status: "open",
+      status: "needs_reply",
       messages: {
         create: { authorType: "client", content: body.data.message.trim() },
       },
@@ -3690,7 +3702,7 @@ clientRouter.post("/tickets", async (req, res) => {
     status: ticket.status,
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
-    messages: ticket.messages.map((m) => ({ id: m.id, authorType: m.authorType, content: m.content, createdAt: m.createdAt.toISOString() })),
+    messages: ticket.messages.map((m) => ({ id: m.id, authorType: m.authorType, content: m.content, imageUrl: m.imageUrl, createdAt: m.createdAt.toISOString() })),
   });
 });
 
@@ -3741,7 +3753,7 @@ clientRouter.get("/tickets/:id", async (req, res) => {
     status: ticket.status,
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
-    messages: ticket.messages.map((m) => ({ id: m.id, authorType: m.authorType, content: m.content, createdAt: m.createdAt.toISOString(), isRead: m.isRead })),
+    messages: ticket.messages.map((m) => ({ id: m.id, authorType: m.authorType, content: m.content, imageUrl: m.imageUrl, createdAt: m.createdAt.toISOString(), isRead: m.isRead })),
   });
 });
 
@@ -3756,13 +3768,55 @@ clientRouter.post("/tickets/:id/messages", async (req, res) => {
   const msg = await prisma.ticketMessage.create({
     data: { ticketId: ticket.id, authorType: "client", content: body.data.content.trim() },
   });
-  await prisma.ticket.update({ where: { id: ticket.id }, data: { updatedAt: new Date() } });
+  // Mark ticket as needs_reply so admin sees it requires attention
+  await prisma.ticket.update({ where: { id: ticket.id }, data: { status: "needs_reply", updatedAt: new Date() } });
   notifyAdminsAboutClientTicketMessage({
     ticketId: ticket.id,
     clientId,
     content: body.data.content.trim(),
   }).catch(() => {});
   return res.status(201).json({ id: msg.id, authorType: msg.authorType, content: msg.content, createdAt: msg.createdAt.toISOString() });
+});
+
+// ——— Ticket image upload ———
+const TICKET_UPLOADS_DIR = path.resolve(process.cwd(), "uploads", "tickets");
+const ticketImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    if (/^image\/(jpeg|jpg|png|gif|webp)$/.test(file.mimetype)) cb(null, true);
+    else cb(new Error("Only image files allowed"));
+  },
+});
+
+clientRouter.post("/tickets/:id/upload-image", ticketImageUpload.single("image"), async (req, res) => {
+  if (!(await ensureTicketsEnabled(req, res))) return;
+  const clientId = (req as unknown as { client: { id: string } }).client.id;
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  if (!file) return res.status(400).json({ message: "No image file provided" });
+  const ticket = await prisma.ticket.findFirst({ where: { id: req.params.id, clientId } });
+  if (!ticket) return res.status(404).json({ message: t(reqLang(req), "ticketNotFound") });
+
+  // Save file to disk
+  await mkdir(TICKET_UPLOADS_DIR, { recursive: true });
+  const ext = file.originalname.split(".").pop()?.toLowerCase() || "jpg";
+  const filename = `${ticket.id}_${Date.now()}_${randomBytes(4).toString("hex")}.${ext}`;
+  const filePath = path.join(TICKET_UPLOADS_DIR, filename);
+  await writeFile(filePath, file.buffer);
+
+  const imageUrl = `/api/uploads/tickets/${filename}`;
+
+  // Create a message with the image
+  const msg = await prisma.ticketMessage.create({
+    data: { ticketId: ticket.id, authorType: "client", content: "", imageUrl },
+  });
+  await prisma.ticket.update({ where: { id: ticket.id }, data: { status: "needs_reply", updatedAt: new Date() } });
+  notifyAdminsAboutClientTicketMessage({
+    ticketId: ticket.id,
+    clientId,
+    content: "[图片]",
+  }).catch(() => {});
+  return res.status(201).json({ id: msg.id, authorType: msg.authorType, content: msg.content, imageUrl: msg.imageUrl, createdAt: msg.createdAt.toISOString() });
 });
 
 // Публичный конфиг для бота, mini app, сайта (без паролей и секретов)
@@ -4000,63 +4054,94 @@ publicConfigRouter.get("/singbox-tariffs", async (req, res) => {
   }
 });
 
-// ——————————————— Traffic usage logs (charts) ———————————————
+// ——————————————— Traffic usage (via Remnawave bandwidth-stats API) ———————————————
 
-import { getTrafficLogs } from "../notification/traffic-log.service.js";
+import { remnaGetUserBandwidthStats } from "../remna/remna.client.js";
 
-/** GET /api/client/traffic-log?days=30&source=vpn */
+/** GET /api/client/traffic-log?days=30 */
 clientRouter.get("/traffic-log", async (req, res) => {
-  const client = (req as any).client as { id: string };
-  const days = parseInt(String(req.query.days ?? "30"), 10) || 30;
-  const source = typeof req.query.source === "string" ? req.query.source : undefined;
+  const client = (req as any).client as { id: string; remnawaveUuid: string | null };
+  if (!client.remnawaveUuid) {
+    return res.json({ logs: [] });
+  }
 
-  const logs = await getTrafficLogs(client.id, { days, source });
-  return res.json({ logs });
-});
+  const days = Math.min(parseInt(String(req.query.days ?? "7"), 10) || 7, 365);
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  const startStr = start.toISOString().split("T")[0];
+  const endStr = end.toISOString().split("T")[0];
 
-/** GET /api/client/traffic-summary — месячная сводка трафика */
-clientRouter.get("/traffic-summary", async (req, res) => {
-  const client = (req as any).client as { id: string };
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const result = await remnaGetUserBandwidthStats(client.remnawaveUuid, startStr, endStr);
+  if (result.error || !result.data) {
+    return res.json({ logs: [] });
+  }
 
-  const logs = await prisma.trafficLog.findMany({
-    where: {
-      clientId: client.id,
-      date: { gte: startOfMonth },
-    },
-    orderBy: { date: "asc" },
+  const resp = (result.data as any)?.response ?? result.data;
+  const categories: string[] = resp?.categories ?? [];
+  const sparklineData: number[] = resp?.sparklineData ?? [];
+  const topNodes: any[] = (resp?.topNodes ?? []).map((n: any) => ({
+    uuid: n.uuid ?? "",
+    name: n.name ?? "",
+    countryCode: n.countryCode ?? "",
+    total: Number(n.total ?? 0),
+  }));
+  const series: any[] = (resp?.series ?? []).map((s: any) => ({
+    uuid: s.uuid ?? "",
+    name: s.name ?? "",
+    countryCode: s.countryCode ?? "",
+    total: Number(s.total ?? 0),
+    data: (s.data ?? []).map((v: any) => Number(v)),
+  }));
+
+  // Convert Remnawave format (categories + sparklineData) to per-day log entries
+  const logs = categories.map((dateStr: string, i: number) => {
+    const totalBytes = sparklineData[i] ?? 0;
+    return {
+      date: dateStr,
+      usedBytes: String(totalBytes),
+      uploadBytes: "0",
+      downloadBytes: String(totalBytes),
+      source: "vpn",
+    };
   });
 
-  let totalUsed = BigInt(0);
-  let totalUpload = BigInt(0);
-  let totalDownload = BigInt(0);
-  const bySource: Record<string, { used: bigint; upload: bigint; download: bigint }> = {};
+  return res.json({ logs, topNodes, series, categories });
+});
 
-  for (const log of logs) {
-    totalUsed += log.usedBytes;
-    totalUpload += log.uploadBytes;
-    totalDownload += log.downloadBytes;
-    const s = log.source;
-    if (!bySource[s]) bySource[s] = { used: BigInt(0), upload: BigInt(0), download: BigInt(0) };
-    bySource[s].used += log.usedBytes;
-    bySource[s].upload += log.uploadBytes;
-    bySource[s].download += log.downloadBytes;
+/** GET /api/client/traffic-summary — 月度流量汇总 */
+clientRouter.get("/traffic-summary", async (req, res) => {
+  const client = (req as any).client as { id: string; remnawaveUuid: string | null };
+  if (!client.remnawaveUuid) {
+    const now = new Date();
+    return res.json({
+      month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+      totalUsedBytes: "0",
+      totalUploadBytes: "0",
+      totalDownloadBytes: "0",
+      bySource: {},
+      daysLogged: 0,
+    });
   }
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startStr = startOfMonth.toISOString().split("T")[0];
+  const endStr = now.toISOString().split("T")[0];
+
+  const result = await remnaGetUserBandwidthStats(client.remnawaveUuid, startStr, endStr);
+  const resp = (result.data as any)?.response ?? result.data;
+  const sparklineData: number[] = resp?.sparklineData ?? [];
+
+  const totalUsed = sparklineData.reduce((s: number, v: number) => s + v, 0);
 
   return res.json({
     month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
-    totalUsedBytes: totalUsed.toString(),
-    totalUploadBytes: totalUpload.toString(),
-    totalDownloadBytes: totalDownload.toString(),
-    bySource: Object.fromEntries(
-      Object.entries(bySource).map(([k, v]) => [k, {
-        usedBytes: v.used.toString(),
-        uploadBytes: v.upload.toString(),
-        downloadBytes: v.download.toString(),
-      }])
-    ),
-    daysLogged: logs.length,
+    totalUsedBytes: String(totalUsed),
+    totalUploadBytes: "0",
+    totalDownloadBytes: String(totalUsed),
+    bySource: { vpn: { usedBytes: String(totalUsed), uploadBytes: "0", downloadBytes: String(totalUsed) } },
+    daysLogged: sparklineData.filter((v: number) => v > 0).length,
   });
 });
 
@@ -4079,25 +4164,6 @@ publicConfigRouter.get("/announcements/:id", async (req, res) => {
   const item = await prisma.announcement.findFirst({
     where: { id: req.params.id, published: true },
     select: { id: true, title: true, content: true, pinned: true, publishedAt: true, createdAt: true },
-  });
-  if (!item) return res.status(404).json({ message: "Not found" });
-  return res.json(item);
-});
-
-/** GET /api/public/activities — опубликованные активности */
-publicConfigRouter.get("/activities", async (_req, res) => {
-  const items = await prisma.activity.findMany({
-    where: { published: true },
-    orderBy: { startAt: "desc" },
-    select: { id: true, title: true, summary: true, coverImage: true, startAt: true, endAt: true, showOnDashboard: true, published: true, createdAt: true },
-  });
-  return res.json(items);
-});
-
-/** GET /api/public/activities/:id — детали активности */
-publicConfigRouter.get("/activities/:id", async (req, res) => {
-  const item = await prisma.activity.findFirst({
-    where: { id: req.params.id, published: true },
   });
   if (!item) return res.status(404).json({ message: "Not found" });
   return res.json(item);

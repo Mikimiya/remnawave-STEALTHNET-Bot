@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { BarChart3, Loader2, ArrowUpFromLine, ArrowDownToLine, Activity } from "lucide-react";
+import { BarChart3, Loader2, Globe, CalendarDays } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
-import type { TrafficLogEntry, TrafficSummary } from "@/lib/api";
+import type { TrafficLogEntry, TrafficTopNode, TrafficNodeSeries } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
+import ReactCountryFlag from "react-country-flag";
 import {
   AreaChart,
   Area,
@@ -13,7 +14,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
+  BarChart,
+  Bar,
+  Cell,
 } from "recharts";
 
 /* ──── helpers ──── */
@@ -51,17 +54,31 @@ const PERIOD_OPTIONS = [
   { days: 90, labelKey: "trafficReport.period90d" },
 ] as const;
 
+const NODE_COLORS = [
+  "hsl(var(--primary))",
+  "#f59e0b", "#10b981", "#ef4444", "#8b5cf6",
+  "#ec4899", "#06b6d4", "#f97316", "#84cc16", "#6366f1",
+];
+
+function CountryFlag({ code, size = "1.1em" }: { code?: string; size?: string }) {
+  if (!code || code.length !== 2) return <span>🌐</span>;
+  return <ReactCountryFlag countryCode={code.toUpperCase()} svg style={{ width: size, height: size, borderRadius: "2px" }} />;
+}
+
 export function ClientTrafficPage() {
   const { state } = useClientAuth();
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const token = state.token ?? null;
 
-  const [days, setDays] = useState<number>(30);
+  const [days, setDays] = useState<number>(7);
   const [data, setData] = useState<TrafficLogEntry[]>([]);
+  const [topNodes, setTopNodes] = useState<TrafficTopNode[]>([]);
+  const [series, setSeries] = useState<TrafficNodeSeries[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [monthlySummary, setMonthlySummary] = useState<TrafficSummary | null>(null);
+  const [view, setView] = useState<"date" | "node">("date");
 
   const loadData = useCallback(async () => {
     if (!token) return;
@@ -69,7 +86,10 @@ export function ClientTrafficPage() {
     setLoading(true);
     try {
       const res = await api.clientGetTrafficLog(token, { days });
-      setData(res);
+      setData(res.logs);
+      setTopNodes(res.topNodes ?? []);
+      setSeries(res.series ?? []);
+      setCategories(res.categories ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("trafficReport.loadError"));
     } finally {
@@ -82,58 +102,36 @@ export function ClientTrafficPage() {
     loadData();
   }, [token, days, loadData]);
 
-  useEffect(() => {
-    if (!token) return;
-    api.clientGetTrafficSummary(token).then(setMonthlySummary).catch(() => {});
-  }, [token]);
-
   /* chart data */
   const chartData = data.map((d) => ({
     date: formatDateShort(d.date, lang),
     rawDate: d.date,
-    upload: Number(d.uploadBytes),
-    download: Number(d.downloadBytes),
     total: Number(d.usedBytes),
   }));
 
-  /* summary */
-  const totalUpload = chartData.reduce((s, d) => s + d.upload, 0);
-  const totalDownload = chartData.reduce((s, d) => s + d.download, 0);
-  const totalTraffic = chartData.reduce((s, d) => s + d.total, 0);
+  const nodeBarData = topNodes.map((n) => ({
+    ...n,
+    label: n.name,
+  }));
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <BarChart3 className="h-5 w-5" />
+      <div className="relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-5 sm:p-8">
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
+        <div className="relative z-10 flex-1">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground flex items-center gap-3">
+            <BarChart3 className="h-7 w-7 text-primary shrink-0" />
+            {t("trafficReport.title")}
+          </h1>
+          <p className="mt-2 text-[14px] sm:text-[15px] text-muted-foreground max-w-xl leading-relaxed">
+            {t("trafficReport.subtitle")}
+          </p>
         </div>
-        <h1 className="text-xl font-bold tracking-tight">{t("trafficReport.title")}</h1>
       </div>
 
-      {/* Monthly summary */}
-      {monthlySummary && (
-        <div className="rounded-2xl border bg-muted/40 dark:bg-white/[0.06] p-4 space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">{t("trafficReport.monthlySummary")}</p>
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div>
-              <p className="text-lg font-bold">{formatBytes(Number(monthlySummary.totalUsedBytes))}</p>
-              <p className="text-[11px] text-muted-foreground">{t("trafficReport.totalTraffic")}</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-blue-500">{formatBytes(Number(monthlySummary.totalUploadBytes))}</p>
-              <p className="text-[11px] text-muted-foreground">{t("trafficReport.upload")}</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-emerald-500">{formatBytes(Number(monthlySummary.totalDownloadBytes))}</p>
-              <p className="text-[11px] text-muted-foreground">{t("trafficReport.download")}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Period selector */}
-      <div className="flex flex-wrap gap-2">
+      {/* Period selector + view toggle */}
+      <div className="flex flex-wrap items-center gap-2">
         {PERIOD_OPTIONS.map((p) => (
           <Button
             key={p.days}
@@ -145,25 +143,26 @@ export function ClientTrafficPage() {
             {t(p.labelKey)}
           </Button>
         ))}
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <SummaryCard
-          icon={<Activity className="h-4 w-4 text-primary" />}
-          label={t("trafficReport.totalTraffic")}
-          value={formatBytes(totalTraffic)}
-        />
-        <SummaryCard
-          icon={<ArrowUpFromLine className="h-4 w-4 text-blue-500" />}
-          label={t("trafficReport.upload")}
-          value={formatBytes(totalUpload)}
-        />
-        <SummaryCard
-          icon={<ArrowDownToLine className="h-4 w-4 text-emerald-500" />}
-          label={t("trafficReport.download")}
-          value={formatBytes(totalDownload)}
-        />
+        <div className="ml-auto flex gap-1">
+          <Button
+            variant={view === "date" ? "secondary" : "ghost"}
+            size="sm"
+            className="rounded-xl text-xs"
+            onClick={() => setView("date")}
+          >
+            <CalendarDays className="h-3.5 w-3.5 mr-1" />
+            {t("trafficReport.viewByDate")}
+          </Button>
+          <Button
+            variant={view === "node" ? "secondary" : "ghost"}
+            size="sm"
+            className="rounded-xl text-xs"
+            onClick={() => setView("node")}
+          >
+            <Globe className="h-3.5 w-3.5 mr-1" />
+            {t("trafficReport.viewByNode")}
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -172,124 +171,180 @@ export function ClientTrafficPage() {
         </div>
       )}
 
-      {/* Chart */}
+      {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : chartData.length === 0 ? (
+      ) : chartData.length === 0 && topNodes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
           <BarChart3 className="h-12 w-12 opacity-40" />
           <p className="text-sm">{t("trafficReport.noData")}</p>
         </div>
+      ) : view === "date" ? (
+        <>
+          {/* Daily chart */}
+          <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl p-4">
+            <ResponsiveContainer width="100%" height={320}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradTotal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => formatBytes(v)} width={70} />
+                <Tooltip
+                  contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", fontSize: 12 }}
+                  formatter={((value: any) => [formatBytes(Number(value) || 0), t("trafficReport.totalTraffic")]) as any}
+                  labelFormatter={(label: any) => String(label)}
+                />
+                <Area type="monotone" dataKey="total" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#gradTotal)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Daily breakdown table */}
+          {chartData.length > 0 && (
+            <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-border/50 dark:border-white/10">
+                <h3 className="text-sm font-semibold">{t("trafficReport.dailyBreakdown")}</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border/40 dark:border-white/10">
+                      <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">{t("trafficReport.date")}</th>
+                      <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">{t("trafficReport.totalTraffic")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...chartData].reverse().map((d) => (
+                      <tr key={d.rawDate} className="border-b border-border/30 dark:border-white/5 last:border-0 hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-2.5 text-foreground/90">{d.date}</td>
+                        <td className="px-4 py-2.5 text-right text-foreground font-medium">{formatBytes(d.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
-        <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl p-4">
-          <ResponsiveContainer width="100%" height={320}>
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gradUpload" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gradDownload" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v: number) => formatBytes(v)}
-                width={70}
-              />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: "12px",
-                  border: "1px solid hsl(var(--border))",
-                  backgroundColor: "hsl(var(--card))",
-                  fontSize: 12,
-                }}
-                formatter={((value: any, name: any) => [formatBytes(Number(value) || 0), name === "upload" ? t("trafficReport.upload") : t("trafficReport.download")]) as any}
-                labelFormatter={(label: any) => String(label)}
-              />
-              <Legend
-                verticalAlign="top"
-                height={36}
-                formatter={(value: string) =>
-                  value === "upload" ? t("trafficReport.upload") : t("trafficReport.download")
-                }
-              />
-              <Area
-                type="monotone"
-                dataKey="upload"
-                stroke="hsl(var(--primary))"
-                fillOpacity={1}
-                fill="url(#gradUpload)"
-                strokeWidth={2}
-              />
-              <Area
-                type="monotone"
-                dataKey="download"
-                stroke="#10b981"
-                fillOpacity={1}
-                fill="url(#gradDownload)"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+        <>
+          {/* Node bar chart */}
+          {topNodes.length > 0 && (
+            <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl p-4">
+              <ResponsiveContainer width="100%" height={Math.max(200, topNodes.length * 44)}>
+                <BarChart data={nodeBarData} layout="vertical" margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v: number) => formatBytes(v)} />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    tick={(props: any) => {
+                      const { x, y, payload } = props;
+                      const node = nodeBarData.find((n) => n.label === payload.value);
+                      return (
+                        <foreignObject x={x - 130} y={y - 10} width={130} height={20}>
+                          <div style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", textAlign: "right", lineHeight: "20px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                            <CountryFlag code={node?.countryCode} size="1em" />
+                            <span>{payload.value}</span>
+                          </div>
+                        </foreignObject>
+                      );
+                    }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={130}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", fontSize: 12 }}
+                    formatter={((value: any) => [formatBytes(Number(value) || 0), t("trafficReport.nodeTraffic")]) as any}
+                  />
+                  <Bar dataKey="total" radius={[0, 6, 6, 0]}>
+                    {topNodes.map((_n, i) => (
+                      <Cell key={i} fill={NODE_COLORS[i % NODE_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
-      {/* Daily breakdown table */}
-      {!loading && chartData.length > 0 && (
-        <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border/50 dark:border-white/10">
-            <h3 className="text-sm font-semibold">{t("trafficReport.dailyBreakdown")}</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border/40 dark:border-white/10">
-                  <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">{t("trafficReport.date")}</th>
-                  <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">{t("trafficReport.upload")}</th>
-                  <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">{t("trafficReport.download")}</th>
-                  <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">{t("trafficReport.total")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...chartData].reverse().map((d) => (
-                  <tr key={d.rawDate} className="border-b border-border/30 dark:border-white/5 last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 text-foreground/90">{d.date}</td>
-                    <td className="px-4 py-2.5 text-right text-blue-500/90 font-medium">{formatBytes(d.upload)}</td>
-                    <td className="px-4 py-2.5 text-right text-emerald-500/90 font-medium">{formatBytes(d.download)}</td>
-                    <td className="px-4 py-2.5 text-right text-foreground font-medium">{formatBytes(d.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+          {/* Node breakdown table */}
+          {topNodes.length > 0 && (
+            <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-border/50 dark:border-white/10">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-primary" />
+                  {t("trafficReport.viewByNode")}
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border/40 dark:border-white/10">
+                      <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">{t("trafficReport.nodeName")}</th>
+                      <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">{t("trafficReport.nodeTraffic")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topNodes.map((n, i) => (
+                      <tr key={n.uuid || i} className="border-b border-border/30 dark:border-white/5 last:border-0 hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-2.5 text-foreground/90">
+                          <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: NODE_COLORS[i % NODE_COLORS.length] }} />
+                          <CountryFlag code={n.countryCode} /> {n.name}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-foreground font-medium">{formatBytes(n.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-function SummaryCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl p-3 flex flex-col gap-1.5">
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{label}</span>
-      </div>
-      <span className="text-base font-bold tracking-tight">{value}</span>
+          {/* Per-node daily sparklines (series) */}
+          {series.length > 0 && categories.length > 0 && (
+            <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-xl p-4">
+              <ResponsiveContainer width="100%" height={320}>
+                <AreaChart
+                  data={categories.map((date, i) => {
+                    const row: Record<string, any> = { date: formatDateShort(date, lang) };
+                    series.forEach((s) => { row[s.name] = s.data[i] ?? 0; });
+                    return row;
+                  })}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => formatBytes(v)} width={70} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", fontSize: 12 }}
+                    formatter={((value: any, name: string) => [formatBytes(Number(value) || 0), name]) as any}
+                  />
+                  {series.map((s, i) => (
+                    <Area
+                      key={s.uuid || s.name}
+                      type="monotone"
+                      dataKey={s.name}
+                      stroke={NODE_COLORS[i % NODE_COLORS.length]}
+                      fill={NODE_COLORS[i % NODE_COLORS.length]}
+                      fillOpacity={0.1}
+                      strokeWidth={2}
+                      stackId="nodes"
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

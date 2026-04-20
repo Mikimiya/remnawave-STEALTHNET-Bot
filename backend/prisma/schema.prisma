@@ -102,8 +102,6 @@ model Client {
   tickets     Ticket[]
   contestWinners ContestWinner[]
   passwordResetTokens PasswordResetToken[]
-  notifications  ClientNotification[]
-  trafficLogs    TrafficLog[]
 
   @@index([telegramId])
   @@index([email])
@@ -116,7 +114,7 @@ model Ticket {
   id        String   @id @default(cuid())
   clientId  String   @map("client_id")
   subject   String   @db.VarChar(500)
-  status    String   @default("open") @db.VarChar(20) // open | closed
+  status    String   @default("open") @db.VarChar(20) // open | closed | needs_reply
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -133,6 +131,7 @@ model TicketMessage {
   ticketId  String   @map("ticket_id")
   authorType String  @map("author_type") @db.VarChar(20) // client | support
   content   String   @db.Text
+  imageUrl  String?  @map("image_url") @db.Text
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -657,42 +656,6 @@ model ContestWinner {
   @@map("contest_winners")
 }
 
-// ——— Уведомления пользователя (in-app notification center) ———
-model ClientNotification {
-  id        String   @id @default(cuid())
-  clientId  String   @map("client_id")
-  type      String   @db.VarChar(50)   // payment_success | trial_activated | subscription_expiring | subscription_expired | broadcast | promo_activated | balance_topup | system
-  title     String   @db.VarChar(500)
-  body      String   @db.Text
-  isRead    Boolean  @default(false) @map("is_read")
-  metadata  String?  @db.Text          // JSON (optional extra data)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@index([clientId, isRead])
-  @@index([clientId, createdAt])
-  @@map("client_notifications")
-}
-
-// ——— Ежедневный снимок трафика пользователя (для графиков) ———
-model TrafficLog {
-  id              String   @id @default(cuid())
-  clientId        String   @map("client_id")
-  date            DateTime @db.Date                  // Дата снимка (без времени)
-  usedBytes       BigInt   @default(0) @map("used_bytes")       // Общий трафик на дату
-  uploadBytes     BigInt   @default(0) @map("upload_bytes")     // Отправлено
-  downloadBytes   BigInt   @default(0) @map("download_bytes")   // Получено
-  source          String   @default("vpn") @db.VarChar(20)      // vpn | proxy | singbox
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@unique([clientId, date, source])
-  @@index([clientId, date])
-  @@map("traffic_logs")
-}
-
 // ——— Публичные объявления (Markdown) ———
 model Announcement {
   id          String    @id @default(cuid())
@@ -706,22 +669,4 @@ model Announcement {
 
   @@index([published, pinned])
   @@map("announcements")
-}
-
-// ——— Активности / промо-акции ———
-model Activity {
-  id          String    @id @default(cuid())
-  title       String    @db.VarChar(500)
-  summary     String?   @db.VarChar(1000)          // Краткое описание для списка
-  content     String    @db.Text                   // Markdown (детальное описание)
-  coverImage  String?   @map("cover_image") @db.Text // URL или data-url обложки
-  startAt     DateTime  @map("start_at")
-  endAt       DateTime? @map("end_at")
-  showOnDashboard Boolean @default(false) @map("show_on_dashboard") // Показывать на «витрине» как баннер
-  published   Boolean   @default(false)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  @@index([published, startAt])
-  @@map("activities")
 }

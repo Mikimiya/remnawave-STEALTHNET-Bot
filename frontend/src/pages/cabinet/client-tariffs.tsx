@@ -804,11 +804,18 @@ export function ClientTariffsPage() {
             className="space-y-6 max-w-6xl mx-auto"
           >
             {/* Header */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-3">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                  {t("tariffs.title")}
-                </h1>
+            <div className="relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-5 sm:p-8">
+              <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
+              <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground flex items-center gap-3">
+                    <Package className="h-7 w-7 text-primary shrink-0" />
+                    {t("tariffs.title")}
+                  </h1>
+                  <p className="mt-2 text-[14px] sm:text-[15px] text-muted-foreground max-w-xl leading-relaxed">
+                    {t("tariffs.subtitle")}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowPlanInfo((v) => !v)}
@@ -823,9 +830,6 @@ export function ClientTariffsPage() {
                   {t("tariffs.planInfoBtn")}
                 </button>
               </div>
-              <p className="text-muted-foreground text-[15px] font-medium max-w-2xl">
-                {t("tariffs.subtitle")}
-              </p>
             </div>
 
             {/* Plan info panel */}
@@ -839,7 +843,7 @@ export function ClientTariffsPage() {
                   className="overflow-hidden"
                 >
                   <div className="rounded-2xl border border-primary/20 bg-primary/5 backdrop-blur-xl px-4 py-3 space-y-1">
-                    {/* <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoStandard")}</p> */}
+                    <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoStandard")}</p> 
                     <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoPremium")}</p>
                     <p className="text-[12px] text-muted-foreground leading-relaxed">{t("tariffs.planInfoNoReset")}</p>
                   </div>
@@ -849,7 +853,7 @@ export function ClientTariffsPage() {
 
             {/* Trial banner */}
             {showTrial && (
-              <Card className="rounded-[2rem] border border-green-500/30 bg-green-500/5 backdrop-blur-xl">
+              <Card className="rounded-3xl border border-green-500/30 bg-green-500/5 backdrop-blur-xl">
                 <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-6">
                   <div className="flex items-center gap-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-500/20 text-green-500 shrink-0">
@@ -865,7 +869,7 @@ export function ClientTariffsPage() {
                     </div>
                   </div>
                   <Button
-                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-lg h-12 rounded-xl gap-2 shrink-0"
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-lg h-12 rounded-2xl gap-2 shrink-0"
                     onClick={activateTrial}
                     disabled={trialLoading}
                   >
@@ -889,7 +893,7 @@ export function ClientTariffsPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
               </div>
             ) : tariffs.length === 0 ? (
-              <Card className="rounded-[2rem] border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06]">
+              <Card className="rounded-3xl border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06]">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-4">
                   <Package className="h-12 w-12 opacity-20" />
                   <p className="text-base font-medium">{t("tariffs.noTariffs")}</p>
@@ -1144,14 +1148,14 @@ export function ClientTariffsPage() {
                           <Layers className="h-4 w-4 text-primary" />
                           <span>{t("tariffs.subGroup")}</span>
                         </div>
-                        <div className="rounded-xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/[0.06] backdrop-blur-sm p-1 flex gap-1 flex-wrap">
+                        <div className="rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/[0.06] backdrop-blur-sm p-1 flex gap-1 flex-wrap">
                           {subGroups.map((sg, sgIdx) => (
                             <button
                               key={sg.id}
                               type="button"
                               onClick={() => setSelectedSubGroupIndex((prev) => ({ ...prev, [cat.id]: sgIdx }))}
                               className={cn(
-                                "px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200",
+                                "px-4 py-1.5 rounded-xl text-sm font-bold transition-all duration-200",
                                 selectedSgIdx === sgIdx
                                   ? "bg-primary text-primary-foreground shadow-sm"
                                   : "text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:bg-white/10"
@@ -1178,7 +1182,7 @@ export function ClientTariffsPage() {
                           <div
                             key={tariffItem.id}
                             className={cn(
-                              "relative rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1",
+                              "relative rounded-3xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1",
                               isPopular
                                 ? "shadow-lg ring-1 ring-primary/40 hover:-translate-y-1.5"
                                 : "border border-border/50 dark:border-white/10 shadow-sm hover:shadow-md bg-muted/40 dark:bg-white/[0.06]"
@@ -1278,7 +1282,7 @@ export function ClientTariffsPage() {
                                   <Button
                                     size="lg"
                                     className={cn(
-                                      "w-full h-12 rounded-xl font-bold text-[15px]",
+                                      "w-full h-12 rounded-2xl font-bold text-[15px]",
                                       isPopular
                                         ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-xl"
                                         : "shadow-md"
@@ -1289,7 +1293,7 @@ export function ClientTariffsPage() {
                                   </Button>
                                 ) : (
                                   <div className={cn(
-                                    "w-full h-12 rounded-xl flex items-center justify-center",
+                                    "w-full h-12 rounded-2xl flex items-center justify-center",
                                     isPopular ? "bg-primary-foreground/10" : "bg-muted/50 border border-border/50 dark:border-white/10"
                                   )}>
                                     <span className={cn(
@@ -1324,7 +1328,7 @@ export function ClientTariffsPage() {
           }}
         >
           <DialogContent
-            className="w-full max-w-md mx-auto sm:rounded-2xl p-5 sm:p-6 border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06]"
+            className="w-full max-w-md mx-auto rounded-3xl p-5 sm:p-6 border border-border/50 dark:border-white/10 bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl"
             showCloseButton={!payLoading}
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
@@ -1345,7 +1349,7 @@ export function ClientTariffsPage() {
                 variant="ghost"
                 onClick={closePayment}
                 disabled={payLoading}
-                className="rounded-xl hover:bg-muted/40 dark:bg-white/10 hover:text-foreground text-muted-foreground"
+                className="rounded-2xl hover:bg-muted/40 dark:bg-white/10 hover:text-foreground text-muted-foreground"
               >
                 {t("common.cancel")}
               </Button>

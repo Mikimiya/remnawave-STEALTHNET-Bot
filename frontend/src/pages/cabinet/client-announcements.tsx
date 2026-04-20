@@ -55,8 +55,19 @@ export function ClientAnnouncementsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold tracking-tight">{t("clientAnnouncements.title")}</h1>
+    <div className="space-y-4 max-w-6xl mx-auto">
+      <div className="relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-5 sm:p-8">
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
+        <div className="relative z-10 flex-1">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground flex items-center gap-3">
+            <Megaphone className="h-7 w-7 text-primary shrink-0" />
+            {t("clientAnnouncements.title")}
+          </h1>
+          <p className="mt-2 text-[14px] sm:text-[15px] text-muted-foreground max-w-xl leading-relaxed">
+            {t("clientAnnouncements.subtitle")}
+          </p>
+        </div>
+      </div>
       {items.map((item) => {
         const isExpanded = expandedId === item.id;
         const plain = stripMarkdown(item.content);

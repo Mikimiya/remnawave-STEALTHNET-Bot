@@ -2,7 +2,7 @@
  * Админские эндпоинты — прокси к Remna API + клиенты панели + настройки
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { Router } from "express";
@@ -1903,7 +1903,10 @@ adminRouter.post("/settings/reset-landing-text", asyncRoute(async (req, res) => 
 // ——— Тикеты (админ: список, просмотр, закрытие, ответ)
 adminRouter.get("/tickets", asyncRoute(async (req, res) => {
   const status = typeof req.query.status === "string" ? req.query.status : undefined;
-  const where = status === "open" || status === "closed" ? { status } : {};
+  const where: Record<string, unknown> = {};
+  if (status === "open") where.status = { in: ["open", "needs_reply"] };
+  else if (status === "needs_reply") where.status = "needs_reply";
+  else if (status === "closed") where.status = "closed";
   const list = await prisma.ticket.findMany({
     where,
     orderBy: { updatedAt: "desc" },
@@ -1926,19 +1929,48 @@ adminRouter.get("/tickets/:id", asyncRoute(async (req, res) => {
   const ticket = await prisma.ticket.findUnique({
     where: { id: req.params.id },
     include: {
-      client: { select: { id: true, email: true, telegramUsername: true } },
+      client: { select: { id: true, email: true, telegramUsername: true, remnawaveUuid: true } },
       messages: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!ticket) return res.status(404).json({ message: t(adminLang(req), "ticketNotFound") });
+
+  // Fetch user subscription/tariff info
+  let tariffInfo: { tariffName: string | null; status: string | null; expiresAt: string | null } = { tariffName: null, status: null, expiresAt: null };
+  try {
+    // Try to get from active payment
+    const lastPayment = await prisma.payment.findFirst({
+      where: { clientId: ticket.clientId, status: "paid" },
+      orderBy: { createdAt: "desc" },
+      include: { tariff: { select: { name: true } } },
+    });
+    if (lastPayment?.tariff) {
+      tariffInfo.tariffName = lastPayment.tariff.name;
+    }
+    // Get Remna subscription info if available
+    if (ticket.client.remnawaveUuid) {
+      const { remnaGetUser } = await import("../remna/remna.client.js");
+      const result = await remnaGetUser(ticket.client.remnawaveUuid);
+      if (!result.error && result.data) {
+        const userData = result.data as Record<string, unknown>;
+        tariffInfo.status = typeof userData.status === "string" ? userData.status : null;
+        tariffInfo.expiresAt = typeof userData.expiresAt === "string" ? userData.expiresAt : null;
+        // Get subscription name from remna
+        const subName = typeof userData.subscriptionName === "string" ? userData.subscriptionName : null;
+        if (subName) tariffInfo.tariffName = subName;
+      }
+    }
+  } catch { /* ignore */ }
+
   return res.json({
     id: ticket.id,
     subject: ticket.subject,
     status: ticket.status,
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
-    client: ticket.client,
-    messages: ticket.messages.map((m) => ({ id: m.id, authorType: m.authorType, content: m.content, createdAt: m.createdAt.toISOString() })),
+    client: { id: ticket.client.id, email: ticket.client.email, telegramUsername: ticket.client.telegramUsername },
+    tariffInfo,
+    messages: ticket.messages.map((m) => ({ id: m.id, authorType: m.authorType, content: m.content, imageUrl: m.imageUrl, createdAt: m.createdAt.toISOString() })),
   });
 }));
 
@@ -1956,6 +1988,22 @@ adminRouter.patch("/tickets/:id", asyncRoute(async (req, res) => {
     subject: ticket.subject,
     status: ticket.status,
   }).catch(() => {});
+
+  // Delete uploaded images when ticket is closed
+  if (body.data.status === "closed") {
+    const msgs = await prisma.ticketMessage.findMany({
+      where: { ticketId: ticket.id, imageUrl: { not: null } },
+      select: { imageUrl: true },
+    });
+    const uploadsDir = path.resolve(process.cwd(), "uploads", "tickets");
+    for (const m of msgs) {
+      if (!m.imageUrl) continue;
+      const filename = m.imageUrl.split("/").pop();
+      if (!filename) continue;
+      unlink(path.join(uploadsDir, filename)).catch(() => {});
+    }
+  }
+
   return res.json({ id: ticket.id, status: ticket.status });
 }));
 
@@ -1968,7 +2016,8 @@ adminRouter.post("/tickets/:id/messages", asyncRoute(async (req, res) => {
   const msg = await prisma.ticketMessage.create({
     data: { ticketId: ticket.id, authorType: "support", content: body.data.content.trim() },
   });
-  await prisma.ticket.update({ where: { id: ticket.id }, data: { updatedAt: new Date() } });
+  // Admin replied → set status back to open (no longer needs_reply)
+  await prisma.ticket.update({ where: { id: ticket.id }, data: { status: "open", updatedAt: new Date() } });
   notifyAdminsAboutSupportReply({
     ticketId: ticket.id,
     clientId: ticket.clientId,
@@ -3086,68 +3135,5 @@ adminRouter.delete("/announcements/:id", async (req, res) => {
   const existing = await prisma.announcement.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ message: "Not found" });
   await prisma.announcement.delete({ where: { id: req.params.id } });
-  return res.json({ ok: true });
-});
-
-// ═══════════════════════════════════════════════════════════════
-// ──── Активности / акции (Activities) ────────────────────────
-// ═══════════════════════════════════════════════════════════════
-
-/** Получить все активности */
-adminRouter.get("/activities", async (_req, res) => {
-  const list = await prisma.activity.findMany({ orderBy: { startAt: "desc" } });
-  return res.json(list);
-});
-
-const upsertActivitySchema = z.object({
-  title: z.string().min(1).max(500),
-  summary: z.string().max(1000).nullable().optional(),
-  content: z.string().min(1),
-  coverImage: z.string().nullable().optional(),
-  startAt: z.string(),
-  endAt: z.string().nullable().optional(),
-  showOnDashboard: z.boolean().optional(),
-  published: z.boolean().optional(),
-});
-
-/** Создать активность */
-adminRouter.post("/activities", async (req, res) => {
-  const parsed = upsertActivitySchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
-  const d = parsed.data;
-  const item = await prisma.activity.create({
-    data: {
-      title: d.title,
-      summary: d.summary ?? null,
-      content: d.content,
-      coverImage: d.coverImage ?? null,
-      startAt: new Date(d.startAt),
-      endAt: d.endAt ? new Date(d.endAt) : null,
-      showOnDashboard: d.showOnDashboard ?? false,
-      published: d.published ?? false,
-    },
-  });
-  return res.json(item);
-});
-
-/** Обновить активность */
-adminRouter.patch("/activities/:id", async (req, res) => {
-  const existing = await prisma.activity.findUnique({ where: { id: req.params.id } });
-  if (!existing) return res.status(404).json({ message: "Not found" });
-  const parsed = upsertActivitySchema.partial().safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
-  const d = parsed.data;
-  const data: Record<string, unknown> = { ...d };
-  if (d.startAt) data.startAt = new Date(d.startAt);
-  if (d.endAt !== undefined) data.endAt = d.endAt ? new Date(d.endAt) : null;
-  const item = await prisma.activity.update({ where: { id: req.params.id }, data });
-  return res.json(item);
-});
-
-/** Удалить активность */
-adminRouter.delete("/activities/:id", async (req, res) => {
-  const existing = await prisma.activity.findUnique({ where: { id: req.params.id } });
-  if (!existing) return res.status(404).json({ message: "Not found" });
-  await prisma.activity.delete({ where: { id: req.params.id } });
   return res.json({ ok: true });
 });
