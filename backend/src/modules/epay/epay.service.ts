@@ -25,7 +25,7 @@ export function isEpayConfigured(config: EpayConfig | null): boolean {
  */
 export function buildEpaySign(params: Record<string, string>, key: string): string {
   const filtered = Object.entries(params)
-    .filter(([k, v]) => k !== "sign" && k !== "sign_type" && v !== "" && v !== "0")
+    .filter(([k, v]) => k !== "sign" && k !== "sign_type" && v !== "")
     .sort(([a], [b]) => a.localeCompare(b));
   const str = filtered.map(([k, v]) => `${k}=${v}`).join("&");
   return createHash("md5").update(str + key).digest("hex");

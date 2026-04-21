@@ -46,6 +46,7 @@ import {
 } from "../notification/telegram-notify.service.js";
 import { runRule, runAllRules, getEligibleClientIds } from "../auto-broadcast/auto-broadcast.service.js";
 import { t } from "../../i18n/index.js";
+import { adminDetailRouter } from "./admin-detail.routes.js";
 
 
 function adminLang(req: import("express").Request): string {
@@ -67,6 +68,9 @@ function asyncRoute(
 registerBackupRoutes(adminRouter, asyncRoute);
 
 adminRouter.use(requireAdminSection);
+
+// Дополнительные эндпоинты детализации (clients/:id/overview/payments/referrals/services + payments/:id)
+adminRouter.use(adminDetailRouter);
 
 adminRouter.get("/me", asyncRoute(async (req, res) => {
   const adminId = (req as unknown as { adminId: string }).adminId;
@@ -2829,17 +2833,31 @@ adminRouter.get("/sales-report", async (req, res) => {
   const from = typeof req.query.from === "string" ? req.query.from : null;
   const to = typeof req.query.to === "string" ? req.query.to : null;
   const provider = typeof req.query.provider === "string" ? req.query.provider : null;
+  const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+  const clientIdFilter = typeof req.query.clientId === "string" ? req.query.clientId.trim() : "";
   const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
   const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? "50"), 10) || 50));
 
-  const where: Record<string, unknown> = { status: "PAID" };
+  const where: Prisma.PaymentWhereInput = { status: "PAID" };
   if (from || to) {
-    const paidAt: Record<string, Date> = {};
+    const paidAt: { gte?: Date; lte?: Date } = {};
     if (from) paidAt.gte = new Date(from);
     if (to) paidAt.lte = new Date(to + "T23:59:59.999Z");
     where.paidAt = paidAt;
   }
   if (provider) where.provider = provider;
+  if (clientIdFilter) where.clientId = clientIdFilter;
+  if (search) {
+    // Поиск по: orderId / externalId / email клиента / telegramUsername / telegramId / id клиента
+    where.OR = [
+      { orderId: { contains: search, mode: "insensitive" } },
+      { externalId: { contains: search, mode: "insensitive" } },
+      { client: { email: { contains: search, mode: "insensitive" } } },
+      { client: { telegramUsername: { contains: search, mode: "insensitive" } } },
+      { client: { telegramId: { contains: search } } },
+      { clientId: search },
+    ];
+  }
 
   const [total, payments] = await Promise.all([
     prisma.payment.count({ where }),
@@ -2849,8 +2867,10 @@ adminRouter.get("/sales-report", async (req, res) => {
       skip: (page - 1) * limit,
       take: limit,
       include: {
-        client: { select: { id: true, email: true, telegramId: true, telegramUsername: true } },
+        client: { select: { id: true, email: true, telegramId: true, telegramUsername: true, isBlocked: true } },
         tariff: { select: { id: true, name: true } },
+        proxyTariff: { select: { id: true, name: true } },
+        singboxTariff: { select: { id: true, name: true } },
       },
     }),
   ]);
@@ -2872,6 +2892,7 @@ adminRouter.get("/sales-report", async (req, res) => {
           else if (meta.originalPrice != null) originalAmount = Number(meta.originalPrice);
         } catch { /* ignore */ }
       }
+      const product = p.tariff?.name ?? p.proxyTariff?.name ?? p.singboxTariff?.name ?? null;
       return {
         id: p.id,
         orderId: p.orderId,
@@ -2881,10 +2902,13 @@ adminRouter.get("/sales-report", async (req, res) => {
         currency: p.currency,
         provider: p.provider ?? "unknown",
         status: p.status,
-        tariffName: p.tariff?.name ?? null,
+        tariffName: product,
+        clientId: p.clientId,
         clientEmail: p.client?.email ?? null,
         clientTelegramId: p.client?.telegramId ?? null,
         clientTelegramUsername: p.client?.telegramUsername ?? null,
+        clientBlocked: p.client?.isBlocked ?? false,
+        clientMissing: p.client == null,
         paidAt: p.paidAt?.toISOString() ?? null,
         createdAt: p.createdAt.toISOString(),
         promoCode: promoCodeStr,

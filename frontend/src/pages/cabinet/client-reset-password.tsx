@@ -80,13 +80,6 @@ export function ClientResetPasswordPage() {
         eyebrow="new password"
         title={t("auth.resetPasswordTitle")}
         subtitle={t("auth.resetPasswordSubtitle")}
-        sideTitle={t("auth.resetPasswordSideTitle")}
-        sideDescription={t("auth.resetPasswordSideDescription")}
-        sidePoints={[
-          t("auth.resetPasswordPoint1"),
-          t("auth.resetPasswordPoint2"),
-          t("auth.resetPasswordPoint3"),
-        ]}
         footer={<><Link to="/cabinet/login" className="font-medium text-primary transition-colors hover:text-primary/80 hover:underline">{t("auth.backToLogin")}</Link></>}
       >
         <form onSubmit={handleSubmit} className="space-y-5">

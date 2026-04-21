@@ -109,6 +109,36 @@ function HeroStatCard({
   );
 }
 
+/* ─── Revenue tone palette ─── */
+const REVENUE_TONES = {
+  primary: {
+    bg: "bg-gradient-to-br from-primary/10 to-primary/5",
+    ring: "ring-primary/20",
+    text: "text-primary",
+    dot: "bg-primary",
+  },
+  emerald: {
+    bg: "bg-gradient-to-br from-emerald-500/10 to-teal-500/5",
+    ring: "ring-emerald-500/20",
+    text: "text-emerald-600 dark:text-emerald-400",
+    dot: "bg-emerald-500",
+  },
+  sky: {
+    bg: "bg-gradient-to-br from-sky-500/10 to-cyan-500/5",
+    ring: "ring-sky-500/20",
+    text: "text-sky-600 dark:text-sky-400",
+    dot: "bg-sky-500",
+  },
+  fuchsia: {
+    bg: "bg-gradient-to-br from-fuchsia-500/10 to-pink-500/5",
+    ring: "ring-fuchsia-500/20",
+    text: "text-fuchsia-600 dark:text-fuchsia-400",
+    dot: "bg-fuchsia-500",
+  },
+} as const;
+
+type RevenueTone = keyof typeof REVENUE_TONES;
+
 /* ─── Revenue Metric ─── */
 function RevenueMetric({
   label,
@@ -116,19 +146,24 @@ function RevenueMetric({
   count,
   currency,
   paymentsLabel,
-  accent = false,
+  tone = "primary",
 }: {
   label: string;
   amount: number;
   count: number;
   currency: string;
   paymentsLabel: string;
-  accent?: boolean;
+  tone?: RevenueTone;
 }) {
+  const t = REVENUE_TONES[tone];
   return (
-    <div className={`rounded-xl p-4 transition-colors ${accent ? "bg-primary/5 ring-1 ring-primary/10" : "bg-muted/30"}`}>
-      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
-      <p className={`text-xl font-bold tracking-tight ${accent ? "text-primary" : ""}`}>
+    <div className={`relative overflow-hidden rounded-xl p-4 ring-1 transition-all hover:-translate-y-0.5 ${t.bg} ${t.ring}`}>
+      <div className={`absolute -top-8 -right-8 h-20 w-20 rounded-full ${t.dot} opacity-10 blur-2xl`} />
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className={`h-1.5 w-1.5 rounded-full ${t.dot}`} />
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      </div>
+      <p className={`text-xl font-bold tracking-tight ${t.text}`}>
         {formatMoney(amount, currency)}
       </p>
       <p className="text-[11px] text-muted-foreground mt-1">
@@ -138,24 +173,37 @@ function RevenueMetric({
   );
 }
 
+/* ─── Analytics tone palette ─── */
+const ANALYTICS_TONES = [
+  { bg: "bg-blue-500/10", text: "text-blue-500", ring: "ring-blue-500/20", hoverBg: "hover:bg-blue-500/15" },
+  { bg: "bg-violet-500/10", text: "text-violet-500", ring: "ring-violet-500/20", hoverBg: "hover:bg-violet-500/15" },
+  { bg: "bg-emerald-500/10", text: "text-emerald-500", ring: "ring-emerald-500/20", hoverBg: "hover:bg-emerald-500/15" },
+  { bg: "bg-amber-500/10", text: "text-amber-500", ring: "ring-amber-500/20", hoverBg: "hover:bg-amber-500/15" },
+  { bg: "bg-rose-500/10", text: "text-rose-500", ring: "ring-rose-500/20", hoverBg: "hover:bg-rose-500/15" },
+  { bg: "bg-cyan-500/10", text: "text-cyan-500", ring: "ring-cyan-500/20", hoverBg: "hover:bg-cyan-500/15" },
+];
+
 /* ─── Analytics Mini Card ─── */
 function AnalyticsMiniCard({
   label,
   value,
   icon: Icon,
+  toneIndex = 0,
 }: {
   label: string;
   value: string;
   icon: typeof Users;
+  toneIndex?: number;
 }) {
+  const tone = ANALYTICS_TONES[toneIndex % ANALYTICS_TONES.length];
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-muted/20 p-3 ring-1 ring-border/50 transition-all hover:bg-muted/40">
-      <div className="rounded-lg bg-muted/50 p-2">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+    <div className={`flex items-center gap-3 rounded-xl bg-card p-3 ring-1 transition-all ${tone.ring} ${tone.hoverBg} hover:-translate-y-0.5`}>
+      <div className={`rounded-lg p-2 ${tone.bg}`}>
+        <Icon className={`h-3.5 w-3.5 ${tone.text}`} />
       </div>
       <div className="min-w-0">
         <p className="text-[11px] text-muted-foreground truncate">{label}</p>
-        <p className="text-sm font-semibold">{value}</p>
+        <p className={`text-sm font-semibold ${tone.text}`}>{value}</p>
       </div>
     </div>
   );
@@ -482,8 +530,8 @@ export function DashboardPage() {
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-primary/10 p-2">
-                <DollarSign className="h-4 w-4 text-primary" />
+              <div className="rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/10 p-2 ring-1 ring-emerald-500/20">
+                <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
                 <CardTitle className="text-base">{t("admin.dash.salesTitle")}</CardTitle>
@@ -498,7 +546,7 @@ export function DashboardPage() {
                 count={stats?.sales.totalCount ?? 0}
                 currency={defaultCurrency}
                 paymentsLabel={t("admin.dash.payments")}
-                accent
+                tone="primary"
               />
               <RevenueMetric
                 label={t("admin.dash.today")}
@@ -506,6 +554,7 @@ export function DashboardPage() {
                 count={stats?.sales.todayCount ?? 0}
                 currency={defaultCurrency}
                 paymentsLabel={t("admin.dash.payments")}
+                tone="emerald"
               />
               <RevenueMetric
                 label={t("admin.dash.last7")}
@@ -513,6 +562,7 @@ export function DashboardPage() {
                 count={stats?.sales.last7DaysCount ?? 0}
                 currency={defaultCurrency}
                 paymentsLabel={t("admin.dash.payments")}
+                tone="sky"
               />
               <RevenueMetric
                 label={t("admin.dash.last30")}
@@ -520,6 +570,7 @@ export function DashboardPage() {
                 count={stats?.sales.last30DaysCount ?? 0}
                 currency={defaultCurrency}
                 paymentsLabel={t("admin.dash.payments")}
+                tone="fuchsia"
               />
             </div>
           </CardContent>
@@ -531,8 +582,8 @@ export function DashboardPage() {
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-primary/10 p-2">
-                <Activity className="h-4 w-4 text-primary" />
+              <div className="rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/10 p-2 ring-1 ring-violet-500/20">
+                <Activity className="h-4 w-4 text-violet-600 dark:text-violet-400" />
               </div>
               <CardTitle className="text-base">{t("admin.dash.analyticsTitle")}</CardTitle>
             </div>
@@ -543,31 +594,37 @@ export function DashboardPage() {
                 label={t("admin.dash.newUsersToday")}
                 value={String(stats?.users.newToday ?? "—")}
                 icon={UserPlus}
+                toneIndex={0}
               />
               <AnalyticsMiniCard
                 label={t("admin.dash.newUsers7")}
                 value={String(stats?.users.newLast7Days ?? "—")}
                 icon={Users}
+                toneIndex={1}
               />
               <AnalyticsMiniCard
                 label={t("admin.dash.newUsers30")}
                 value={String(stats?.users.newLast30Days ?? "—")}
                 icon={TrendingUp}
+                toneIndex={2}
               />
               <AnalyticsMiniCard
                 label={t("admin.dash.salesToday")}
                 value={stats ? formatMoney(stats.sales.todayAmount, defaultCurrency) : "—"}
                 icon={DollarSign}
+                toneIndex={3}
               />
               <AnalyticsMiniCard
                 label={t("admin.dash.sales7")}
                 value={stats ? formatMoney(stats.sales.last7DaysAmount, defaultCurrency) : "—"}
                 icon={Zap}
+                toneIndex={4}
               />
               <AnalyticsMiniCard
                 label={t("admin.dash.sales30")}
                 value={stats ? formatMoney(stats.sales.last30DaysAmount, defaultCurrency) : "—"}
                 icon={ArrowUpRight}
+                toneIndex={5}
               />
             </div>
           </CardContent>
@@ -580,8 +637,8 @@ export function DashboardPage() {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <Server className="h-4 w-4 text-primary" />
+                <div className="rounded-lg bg-gradient-to-br from-sky-500/20 to-cyan-500/10 p-2 ring-1 ring-sky-500/20">
+                  <Server className="h-4 w-4 text-sky-600 dark:text-sky-400" />
                 </div>
                 <div>
                   <CardTitle className="text-base">{t("admin.dash.nodesTitle")}</CardTitle>

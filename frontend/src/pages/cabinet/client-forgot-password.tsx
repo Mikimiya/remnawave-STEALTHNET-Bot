@@ -44,13 +44,6 @@ export function ClientForgotPasswordPage() {
         eyebrow="password recovery"
         title={t("auth.forgotPasswordTitle")}
         subtitle={t("auth.forgotPasswordSubtitle")}
-        sideTitle={t("auth.forgotPasswordSideTitle")}
-        sideDescription={t("auth.forgotPasswordSideDescription")}
-        sidePoints={[
-          t("auth.forgotPasswordPoint1"),
-          t("auth.forgotPasswordPoint2"),
-          t("auth.forgotPasswordPoint3"),
-        ]}
         footer={<><Link to="/cabinet/login" className="font-medium text-primary transition-colors hover:text-primary/80 hover:underline">{t("auth.backToLogin")}</Link></>}
       >
         <form onSubmit={handleSubmit} className="space-y-5">

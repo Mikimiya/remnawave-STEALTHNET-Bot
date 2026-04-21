@@ -4,8 +4,9 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Download, ChevronLeft, ChevronRight, DollarSign, ShoppingCart, Filter, Copy, Check, Tag } from "lucide-react";
+import { Loader2, Download, ChevronLeft, ChevronRight, DollarSign, ShoppingCart, Filter, Copy, Check, Tag, Search, Ban, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { OrderDetailDrawer } from "@/components/order-detail-drawer";
 
 function formatDate(s: string | null) {
   if (!s) return "—";
@@ -30,9 +31,12 @@ interface SaleItem {
   provider: string;
   status: string;
   tariffName: string | null;
+  clientId: string | null;
   clientEmail: string | null;
   clientTelegramId: string | null;
   clientTelegramUsername: string | null;
+  clientBlocked?: boolean;
+  clientMissing?: boolean;
   paidAt: string | null;
   createdAt: string;
   promoCode: string | null;
@@ -58,7 +62,8 @@ const PROVIDERS = [
 /** Small inline ID display with copy-to-clipboard */
 function CopyableId({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
     navigator.clipboard.writeText(value).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
@@ -91,7 +96,10 @@ export function SalesReportPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [provider, setProvider] = useState("");
+  const [search, setSearch] = useState("");
+  const [searchApplied, setSearchApplied] = useState("");
   const [page, setPage] = useState(1);
+  const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
   const limit = 50;
 
   const load = useCallback(async () => {
@@ -102,6 +110,7 @@ export function SalesReportPage() {
         from: dateFrom || undefined,
         to: dateTo || undefined,
         provider: provider || undefined,
+        search: searchApplied || undefined,
         page,
         limit,
       });
@@ -111,12 +120,13 @@ export function SalesReportPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, dateFrom, dateTo, provider, page]);
+  }, [token, dateFrom, dateTo, provider, searchApplied, page]);
 
   useEffect(() => { load(); }, [load]);
 
   function applyFilters() {
     setPage(1);
+    setSearchApplied(search);
     load();
   }
 
@@ -209,6 +219,29 @@ export function SalesReportPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3 items-end">
+            <div className="flex-1 min-w-[260px]">
+              <label className="text-xs text-muted-foreground">{t("admin.salesReport.searchLabel", { defaultValue: "搜索（订单号/扩展单号/邮箱/TG）" })}</label>
+              <div className="relative">
+                <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") applyFilters(); }}
+                  placeholder={t("admin.salesReport.searchPlaceholder", { defaultValue: "orderId / externalId / email / @username / tg" })}
+                  className="pl-8 pr-8"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearch(""); setSearchApplied(""); setPage(1); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    title="clear"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
             <div>
               <label className="text-xs text-muted-foreground">{t("admin.salesReport.dateFrom")}</label>
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" />
@@ -230,7 +263,7 @@ export function SalesReportPage() {
               </select>
             </div>
             <Button size="sm" onClick={applyFilters}>{t("admin.salesReport.applyFilters")}</Button>
-            <Button size="sm" variant="ghost" onClick={() => { setDateFrom(""); setDateTo(""); setProvider(""); setPage(1); }}>{t("admin.salesReport.resetFilters")}</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setDateFrom(""); setDateTo(""); setProvider(""); setSearch(""); setSearchApplied(""); setPage(1); }}>{t("admin.salesReport.resetFilters")}</Button>
           </div>
         </CardContent>
       </Card>
@@ -260,7 +293,7 @@ export function SalesReportPage() {
                 </thead>
                 <tbody>
                   {data.items.map((r) => (
-                    <tr key={r.id} className="border-b hover:bg-muted/30 transition-colors">
+                    <tr key={r.id} className="border-b hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setActivePaymentId(r.id)}>
                       <td className="px-4 py-3 whitespace-nowrap">{formatDate(r.paidAt)}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
@@ -269,6 +302,19 @@ export function SalesReportPage() {
                           {!r.clientEmail && !r.clientTelegramUsername && r.clientTelegramId && (
                             <span className="text-xs text-muted-foreground">TG: {r.clientTelegramId}</span>
                           )}
+                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                            {r.clientBlocked && (
+                              <span className="inline-flex items-center gap-0.5 rounded bg-destructive/15 text-destructive px-1.5 py-0.5 text-[10px] font-semibold">
+                                <Ban className="h-2.5 w-2.5" />
+                                {t("admin.salesReport.clientBlocked", { defaultValue: "已禁用" })}
+                              </span>
+                            )}
+                            {r.clientMissing && (
+                              <span className="rounded bg-muted text-muted-foreground px-1.5 py-0.5 text-[10px] font-semibold">
+                                {t("admin.salesReport.clientDeleted", { defaultValue: "已删除" })}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">{r.tariffName ?? <span className="text-muted-foreground">—</span>}</td>
@@ -328,6 +374,12 @@ export function SalesReportPage() {
           </Button>
         </div>
       )}
+
+      <OrderDetailDrawer
+        paymentId={activePaymentId}
+        open={Boolean(activePaymentId)}
+        onOpenChange={(v) => !v && setActivePaymentId(null)}
+      />
     </div>
   );
 }

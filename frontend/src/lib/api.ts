@@ -222,15 +222,53 @@ export const api = {
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async getSalesReport(token: string, params?: { from?: string; to?: string; provider?: string; page?: number; limit?: number }): Promise<any> {
+  async getSalesReport(token: string, params?: { from?: string; to?: string; provider?: string; search?: string; clientId?: string; page?: number; limit?: number }): Promise<any> {
     const search = new URLSearchParams();
     if (params?.from) search.set("from", params.from);
     if (params?.to) search.set("to", params.to);
     if (params?.provider) search.set("provider", params.provider);
+    if (params?.search) search.set("search", params.search);
+    if (params?.clientId) search.set("clientId", params.clientId);
     if (params?.page) search.set("page", String(params.page));
     if (params?.limit) search.set("limit", String(params.limit));
     const q = search.toString();
     return request(`/admin/sales-report${q ? `?${q}` : ""}`, { token });
+  },
+
+  // ——— Детальные эндпоинты для одного клиента / одного платежа ———
+  async getClientOverview(token: string, clientId: string): Promise<ClientOverviewResponse> {
+    return request(`/admin/clients/${clientId}/overview`, { token });
+  },
+  async getClientPayments(
+    token: string,
+    clientId: string,
+    params?: { status?: string; provider?: string; type?: string; page?: number; limit?: number }
+  ): Promise<ClientPaymentsResponse> {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set("status", params.status);
+    if (params?.provider) sp.set("provider", params.provider);
+    if (params?.type) sp.set("type", params.type);
+    if (params?.page) sp.set("page", String(params.page));
+    if (params?.limit) sp.set("limit", String(params.limit));
+    const q = sp.toString();
+    return request(`/admin/clients/${clientId}/payments${q ? `?${q}` : ""}`, { token });
+  },
+  async getClientReferrals(
+    token: string,
+    clientId: string,
+    params?: { page?: number; limit?: number }
+  ): Promise<ClientReferralsResponse> {
+    const sp = new URLSearchParams();
+    if (params?.page) sp.set("page", String(params.page));
+    if (params?.limit) sp.set("limit", String(params.limit));
+    const q = sp.toString();
+    return request(`/admin/clients/${clientId}/referrals${q ? `?${q}` : ""}`, { token });
+  },
+  async getClientServices(token: string, clientId: string): Promise<ClientServicesResponse> {
+    return request(`/admin/clients/${clientId}/services`, { token });
+  },
+  async getPaymentDetail(token: string, paymentId: string): Promise<PaymentDetail> {
+    return request(`/admin/payments/${paymentId}`, { token });
   },
 
   async getRemnaSystemStats(token: string): Promise<RemnaSystemStats> {
@@ -2470,4 +2508,139 @@ export interface PublicConfig {
   announcementEnabled?: boolean;
   announcementTitle?: string | null;
   announcementContent?: string | null;
+}
+
+// ═════════════════════════════════════════════════════════════
+// Типы для детализации клиента и платежа (admin)
+// ═════════════════════════════════════════════════════════════
+
+export interface ClientOverviewResponse {
+  client: {
+    id: string;
+    email: string | null;
+    telegramId: string | null;
+    telegramUsername: string | null;
+    preferredLang: string;
+    preferredCurrency: string;
+    balance: number;
+    referralCode: string | null;
+    referralPercent: number | null;
+    remnawaveUuid: string | null;
+    isBlocked: boolean;
+    blockReason: string | null;
+    trialUsed: boolean;
+    utmSource: string | null;
+    utmMedium: string | null;
+    utmCampaign: string | null;
+    createdAt: string;
+  };
+  referrer: { id: string; email: string | null; telegramUsername: string | null; telegramId: string | null } | null;
+  stats: {
+    paymentsTotal: number;
+    paymentsPaid: number;
+    paymentsPending: number;
+    totalPaidAmount: number;
+    lastPaymentAt: string | null;
+    lastPaymentAmount: number | null;
+    lastPaymentCurrency: string | null;
+    referralsCount: number;
+    referralsDirectCount: number;
+    referralEarnings: number;
+    ticketsTotal: number;
+    ticketsOpen: number;
+    proxySlotsActive: number;
+    singboxSlotsActive: number;
+    promoActivations: number;
+    promoCodesUsed: number;
+  };
+}
+
+export interface AdminPaymentItem {
+  id: string;
+  orderId: string;
+  externalId: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  provider: string | null;
+  type: "vpn" | "proxy" | "singbox" | "extra" | "topup";
+  tariffId: string | null;
+  proxyTariffId: string | null;
+  singboxTariffId: string | null;
+  tariffName?: string | null;
+  remnawaveUserId: string | null;
+  promoCode: string | null;
+  originalAmount: number | null;
+  discount: number | null;
+  extraOption: unknown;
+  metadataRaw: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  referralDistributedAt: string | null;
+}
+
+export interface ClientPaymentsResponse {
+  items: AdminPaymentItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPaidAmount: number;
+}
+
+export interface ClientReferralsResponse {
+  referralCode: string | null;
+  referralPercent: number | null;
+  referrer: { id: string; email: string | null; telegramUsername: string | null; telegramId: string | null; referralCode: string | null } | null;
+  directReferrals: {
+    items: {
+      id: string; email: string | null; telegramId: string | null; telegramUsername: string | null;
+      createdAt: string; isBlocked: boolean; totalPaid: number;
+    }[];
+    total: number; page: number; limit: number;
+  };
+  countsByLevel: { l1: number; l2: number; l3: number; total: number };
+  earnings: { total: number; byLevel: { level: number; count: number; amount: number }[] };
+  recentCredits: {
+    id: string; amount: number; level: number; createdAt: string;
+    payment: {
+      id: string; orderId: string; amount: number; currency: string; paidAt: string | null;
+      fromClient: { id: string; email: string | null; telegramId: string | null; telegramUsername: string | null } | null;
+    } | null;
+  }[];
+}
+
+export interface ClientServicesResponse {
+  proxySlots: {
+    id: string; login: string; status: string; expiresAt: string;
+    trafficLimitBytes: number | null; trafficUsedBytes: number | null;
+    currentConnections: number; connectionLimit: number | null; createdAt: string;
+    node: { id: string; name: string; publicHost: string | null } | null;
+    tariff: { id: string; name: string } | null;
+  }[];
+  singboxSlots: {
+    id: string; userIdentifier: string; status: string; expiresAt: string;
+    trafficLimitBytes: number | null; trafficUsedBytes: number | null;
+    currentConnections: number; createdAt: string;
+    node: { id: string; name: string; publicHost: string | null; protocol: string } | null;
+    tariff: { id: string; name: string } | null;
+  }[];
+  promoActivations: { id: string; createdAt: string; group: { id: string; name: string; code: string } }[];
+  promoCodeUsages: { id: string; createdAt: string; code: { id: string; code: string; name: string; type: string } | null }[];
+  tickets: { id: string; subject: string; status: string; createdAt: string; updatedAt: string }[];
+}
+
+export interface PaymentDetail extends AdminPaymentItem {
+  client: {
+    id: string; email: string | null; telegramId: string | null; telegramUsername: string | null;
+    isBlocked: boolean; balance: number; referralCode: string | null;
+  } | null;
+  product:
+    | { kind: "vpn"; id: string; name: string; durationDays: number; price: number; currency: string }
+    | { kind: "proxy"; id: string; name: string; durationDays: number; proxyCount: number; price: number; currency: string }
+    | { kind: "singbox"; id: string; name: string; durationDays: number; slotCount: number; price: number; currency: string }
+    | null;
+  referralCredits: {
+    id: string; amount: number; level: number; createdAt: string;
+    referrer: { id: string; email: string | null; telegramUsername: string | null; telegramId: string | null } | null;
+  }[];
 }

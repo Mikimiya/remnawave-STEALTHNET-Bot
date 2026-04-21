@@ -966,26 +966,26 @@ export function ClientDashboardPage() {
             <div className="relative z-10 flex flex-col justify-center h-full">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-5">{t("dashboard.quickActions")}</p>
               <div className="grid grid-cols-2 gap-3">
-                <Link to="/cabinet/announcements" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-background/80 dark:hover:bg-white/[0.08] hover:border-primary/30 hover:shadow-sm active:scale-[0.97]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 dark:bg-white/10 text-muted-foreground">
+                <Link to="/cabinet/announcements" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-amber-500/5 dark:hover:bg-amber-500/10 hover:border-amber-500/40 hover:shadow-sm active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20">
                     <Megaphone className="h-5 w-5" />
                   </div>
                   <span className="text-xs font-semibold text-foreground/80">{t("dashboard.latestAnnouncements")}</span>
                 </Link>
-                <Link to="/cabinet/traffic" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-background/80 dark:hover:bg-white/[0.08] hover:border-primary/30 hover:shadow-sm active:scale-[0.97]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 dark:bg-white/10 text-muted-foreground">
+                <Link to="/cabinet/traffic" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-sky-500/5 dark:hover:bg-sky-500/10 hover:border-sky-500/40 hover:shadow-sm active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-1 ring-sky-500/20">
                     <BarChart3 className="h-5 w-5" />
                   </div>
                   <span className="text-xs font-semibold text-foreground/80">{t("nav.traffic")}</span>
                 </Link>
-                <Link to="/cabinet/referral" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-background/80 dark:hover:bg-white/[0.08] hover:border-primary/30 hover:shadow-sm active:scale-[0.97]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 dark:bg-white/10 text-muted-foreground">
+                <Link to="/cabinet/referral" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-emerald-500/5 dark:hover:bg-emerald-500/10 hover:border-emerald-500/40 hover:shadow-sm active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/20">
                     <Users className="h-5 w-5" />
                   </div>
                   <span className="text-xs font-semibold text-foreground/80">{t("dashboard.referrals")}</span>
                 </Link>
-                <Link to="/cabinet/tickets" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-background/80 dark:hover:bg-white/[0.08] hover:border-primary/30 hover:shadow-sm active:scale-[0.97]">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 dark:bg-white/10 text-muted-foreground">
+                <Link to="/cabinet/tickets" className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/30 dark:border-white/10 bg-background/60 dark:bg-white/[0.04] p-5 text-center transition-all duration-200 hover:bg-violet-500/5 dark:hover:bg-violet-500/10 hover:border-violet-500/40 hover:shadow-sm active:scale-[0.97]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-1 ring-violet-500/20">
                     <TicketCheck className="h-5 w-5" />
                   </div>
                   <span className="text-xs font-semibold text-foreground/80">{t("dashboard.tickets")}</span>

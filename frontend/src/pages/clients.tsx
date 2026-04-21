@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/auth";
 import {
@@ -18,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Pencil, Trash2, Ban, ShieldCheck, Wifi, Ticket, KeyRound, Search, Filter } from "lucide-react";
+import { Pencil, Trash2, Ban, ShieldCheck, Wifi, Ticket, KeyRound, Search, Filter, Eye } from "lucide-react";
 
 export function ClientsPage() {
   const { t } = useTranslation();
@@ -308,6 +309,11 @@ export function ClientsPage() {
                       {new Date(c.createdAt).toLocaleDateString()}
                     </td>
                     <td className="py-2 px-2 flex gap-1">
+                      <Link to={`/admin/clients/${c.id}`}>
+                        <Button variant="ghost" size="sm" title={t("admin.clients.viewDetail", { defaultValue: "查看详情" })}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
                       <Button variant="ghost" size="sm" onClick={() => openEdit(c)} title={t("admin.clients.editTitle")}>
                         <Pencil className="h-4 w-4" />
                       </Button>
