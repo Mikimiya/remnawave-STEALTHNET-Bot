@@ -65,10 +65,38 @@ function canAccessRemnaNodes(role: string, allowedSections: string[] | undefined
 
 /* ─── Stat card accent configs ─── */
 const STAT_CARD_STYLES = [
-  { gradient: "from-blue-500/10 to-blue-600/5", iconBg: "bg-blue-500/10", iconColor: "text-blue-500" },
-  { gradient: "from-violet-500/10 to-violet-600/5", iconBg: "bg-violet-500/10", iconColor: "text-violet-500" },
-  { gradient: "from-emerald-500/10 to-emerald-600/5", iconBg: "bg-emerald-500/10", iconColor: "text-emerald-500" },
-  { gradient: "from-amber-500/10 to-amber-600/5", iconBg: "bg-amber-500/10", iconColor: "text-amber-500" },
+  {
+    accentBar: "bg-blue-500",
+    glow: "bg-blue-500/20 dark:bg-blue-500/10",
+    iconBg: "bg-blue-500/10 dark:bg-blue-500/15",
+    iconRing: "ring-blue-500/25 dark:ring-blue-500/30",
+    iconColor: "text-blue-600 dark:text-blue-400",
+    valueColor: "text-blue-700 dark:text-blue-300",
+  },
+  {
+    accentBar: "bg-violet-500",
+    glow: "bg-violet-500/20 dark:bg-violet-500/10",
+    iconBg: "bg-violet-500/10 dark:bg-violet-500/15",
+    iconRing: "ring-violet-500/25 dark:ring-violet-500/30",
+    iconColor: "text-violet-600 dark:text-violet-400",
+    valueColor: "text-violet-700 dark:text-violet-300",
+  },
+  {
+    accentBar: "bg-emerald-500",
+    glow: "bg-emerald-500/20 dark:bg-emerald-500/10",
+    iconBg: "bg-emerald-500/10 dark:bg-emerald-500/15",
+    iconRing: "ring-emerald-500/25 dark:ring-emerald-500/30",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    valueColor: "text-emerald-700 dark:text-emerald-300",
+  },
+  {
+    accentBar: "bg-amber-500",
+    glow: "bg-amber-500/20 dark:bg-amber-500/10",
+    iconBg: "bg-amber-500/10 dark:bg-amber-500/15",
+    iconRing: "ring-amber-500/25 dark:ring-amber-500/30",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    valueColor: "text-amber-700 dark:text-amber-300",
+  },
 ];
 
 /* ─── Hero Stat Card ─── */
@@ -90,16 +118,19 @@ function HeroStatCard({
   const s = STAT_CARD_STYLES[styleIndex % STAT_CARD_STYLES.length];
   return (
     <motion.div custom={index} variants={fadeUp} initial="hidden" animate="visible">
-      <Card className={`relative overflow-hidden border-0 bg-gradient-to-br ${s.gradient}`}>
-        <div className={`absolute -top-6 -right-6 h-24 w-24 rounded-full ${s.iconBg} opacity-50 blur-2xl`} />
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
-              <p className="text-3xl font-bold tracking-tight">{value}</p>
+      <Card className="relative overflow-hidden bg-card border-border/60 shadow-sm dark:shadow-none dark:bg-card/80 transition-all hover:shadow-md dark:hover:border-border hover:-translate-y-0.5">
+        {/* left accent bar */}
+        <div className={`absolute inset-y-0 left-0 w-0.5 ${s.accentBar} opacity-70`} />
+        {/* soft glow */}
+        <div className={`absolute -top-10 -right-10 h-28 w-28 rounded-full ${s.glow} blur-2xl pointer-events-none`} />
+        <CardContent className="relative p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2 min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</p>
+              <p className={`text-3xl font-bold tracking-tight ${s.valueColor}`}>{value}</p>
               <p className="text-xs text-muted-foreground">{subtitle}</p>
             </div>
-            <div className={`rounded-xl ${s.iconBg} p-2.5`}>
+            <div className={`shrink-0 rounded-xl ${s.iconBg} ring-1 ${s.iconRing} p-2.5`}>
               <Icon className={`h-5 w-5 ${s.iconColor}`} />
             </div>
           </div>
@@ -112,28 +143,28 @@ function HeroStatCard({
 /* ─── Revenue tone palette ─── */
 const REVENUE_TONES = {
   primary: {
-    bg: "bg-gradient-to-br from-primary/10 to-primary/5",
-    ring: "ring-primary/20",
+    bar: "bg-primary",
+    glow: "bg-primary/20 dark:bg-primary/10",
     text: "text-primary",
-    dot: "bg-primary",
+    label: "text-primary/80",
   },
   emerald: {
-    bg: "bg-gradient-to-br from-emerald-500/10 to-teal-500/5",
-    ring: "ring-emerald-500/20",
-    text: "text-emerald-600 dark:text-emerald-400",
-    dot: "bg-emerald-500",
+    bar: "bg-emerald-500",
+    glow: "bg-emerald-500/20 dark:bg-emerald-500/10",
+    text: "text-emerald-700 dark:text-emerald-300",
+    label: "text-emerald-700/80 dark:text-emerald-400/80",
   },
   sky: {
-    bg: "bg-gradient-to-br from-sky-500/10 to-cyan-500/5",
-    ring: "ring-sky-500/20",
-    text: "text-sky-600 dark:text-sky-400",
-    dot: "bg-sky-500",
+    bar: "bg-sky-500",
+    glow: "bg-sky-500/20 dark:bg-sky-500/10",
+    text: "text-sky-700 dark:text-sky-300",
+    label: "text-sky-700/80 dark:text-sky-400/80",
   },
   fuchsia: {
-    bg: "bg-gradient-to-br from-fuchsia-500/10 to-pink-500/5",
-    ring: "ring-fuchsia-500/20",
-    text: "text-fuchsia-600 dark:text-fuchsia-400",
-    dot: "bg-fuchsia-500",
+    bar: "bg-fuchsia-500",
+    glow: "bg-fuchsia-500/20 dark:bg-fuchsia-500/10",
+    text: "text-fuchsia-700 dark:text-fuchsia-300",
+    label: "text-fuchsia-700/80 dark:text-fuchsia-400/80",
   },
 } as const;
 
@@ -155,15 +186,13 @@ function RevenueMetric({
   paymentsLabel: string;
   tone?: RevenueTone;
 }) {
-  const t = REVENUE_TONES[tone];
+  const c = REVENUE_TONES[tone];
   return (
-    <div className={`relative overflow-hidden rounded-xl p-4 ring-1 transition-all hover:-translate-y-0.5 ${t.bg} ${t.ring}`}>
-      <div className={`absolute -top-8 -right-8 h-20 w-20 rounded-full ${t.dot} opacity-10 blur-2xl`} />
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className={`h-1.5 w-1.5 rounded-full ${t.dot}`} />
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      </div>
-      <p className={`text-xl font-bold tracking-tight ${t.text}`}>
+    <div className="relative overflow-hidden rounded-xl bg-card border border-border/60 shadow-sm dark:shadow-none dark:bg-muted/20 p-4 transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-border">
+      <div className={`absolute inset-y-0 left-0 w-0.5 ${c.bar} opacity-70`} />
+      <div className={`absolute -top-8 -right-8 h-20 w-20 rounded-full ${c.glow} blur-2xl pointer-events-none`} />
+      <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${c.label} mb-1.5`}>{label}</p>
+      <p className={`text-xl font-bold tracking-tight ${c.text}`}>
         {formatMoney(amount, currency)}
       </p>
       <p className="text-[11px] text-muted-foreground mt-1">
@@ -175,12 +204,12 @@ function RevenueMetric({
 
 /* ─── Analytics tone palette ─── */
 const ANALYTICS_TONES = [
-  { bg: "bg-blue-500/10", text: "text-blue-500", ring: "ring-blue-500/20", hoverBg: "hover:bg-blue-500/15" },
-  { bg: "bg-violet-500/10", text: "text-violet-500", ring: "ring-violet-500/20", hoverBg: "hover:bg-violet-500/15" },
-  { bg: "bg-emerald-500/10", text: "text-emerald-500", ring: "ring-emerald-500/20", hoverBg: "hover:bg-emerald-500/15" },
-  { bg: "bg-amber-500/10", text: "text-amber-500", ring: "ring-amber-500/20", hoverBg: "hover:bg-amber-500/15" },
-  { bg: "bg-rose-500/10", text: "text-rose-500", ring: "ring-rose-500/20", hoverBg: "hover:bg-rose-500/15" },
-  { bg: "bg-cyan-500/10", text: "text-cyan-500", ring: "ring-cyan-500/20", hoverBg: "hover:bg-cyan-500/15" },
+  { bg: "bg-blue-500/10 dark:bg-blue-500/15", text: "text-blue-600 dark:text-blue-400", ring: "ring-blue-500/25 dark:ring-blue-500/30" },
+  { bg: "bg-violet-500/10 dark:bg-violet-500/15", text: "text-violet-600 dark:text-violet-400", ring: "ring-violet-500/25 dark:ring-violet-500/30" },
+  { bg: "bg-emerald-500/10 dark:bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-500/25 dark:ring-emerald-500/30" },
+  { bg: "bg-amber-500/10 dark:bg-amber-500/15", text: "text-amber-600 dark:text-amber-400", ring: "ring-amber-500/25 dark:ring-amber-500/30" },
+  { bg: "bg-rose-500/10 dark:bg-rose-500/15", text: "text-rose-600 dark:text-rose-400", ring: "ring-rose-500/25 dark:ring-rose-500/30" },
+  { bg: "bg-cyan-500/10 dark:bg-cyan-500/15", text: "text-cyan-600 dark:text-cyan-400", ring: "ring-cyan-500/25 dark:ring-cyan-500/30" },
 ];
 
 /* ─── Analytics Mini Card ─── */
@@ -197,8 +226,8 @@ function AnalyticsMiniCard({
 }) {
   const tone = ANALYTICS_TONES[toneIndex % ANALYTICS_TONES.length];
   return (
-    <div className={`flex items-center gap-3 rounded-xl bg-card p-3 ring-1 transition-all ${tone.ring} ${tone.hoverBg} hover:-translate-y-0.5`}>
-      <div className={`rounded-lg p-2 ${tone.bg}`}>
+    <div className="flex items-center gap-3 rounded-xl bg-card border border-border/60 shadow-sm dark:shadow-none dark:bg-muted/20 p-3 transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-border">
+      <div className={`shrink-0 rounded-lg p-2 ${tone.bg} ring-1 ${tone.ring}`}>
         <Icon className={`h-3.5 w-3.5 ${tone.text}`} />
       </div>
       <div className="min-w-0">
@@ -232,10 +261,10 @@ function NodeCard({
       : null;
 
   return (
-    <Card className="border-0 overflow-hidden">
+    <Card className="overflow-hidden border-border/60 shadow-sm dark:shadow-none dark:bg-card/80 transition-all hover:shadow-md dark:hover:border-border hover:-translate-y-0.5">
       <CardContent className="p-0">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 dark:bg-muted/20 px-4 py-3">
           <div className="flex items-center gap-2.5">
             <div className={`h-2 w-2 rounded-full ${
               node.isDisabled
@@ -310,7 +339,7 @@ function NodeCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5 border-t border-border/50 px-3 py-2">
+        <div className="flex items-center gap-1.5 border-t border-border/60 bg-muted/20 dark:bg-muted/10 px-3 py-2">
           {node.isDisabled ? (
             <Button
               size="sm"
@@ -527,7 +556,7 @@ export function DashboardPage() {
 
       {/* ── Sales overview ── */}
       <motion.div custom={4} variants={fadeUp} initial="hidden" animate="visible">
-        <Card>
+        <Card className="border-border/60 shadow-sm dark:shadow-none dark:bg-muted/10">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
               <div className="rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/10 p-2 ring-1 ring-emerald-500/20">
@@ -579,7 +608,7 @@ export function DashboardPage() {
 
       {/* ── Analytics mini-cards ── */}
       <motion.div custom={5} variants={fadeUp} initial="hidden" animate="visible">
-        <Card>
+        <Card className="border-border/60 shadow-sm dark:shadow-none dark:bg-muted/10">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
               <div className="rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/10 p-2 ring-1 ring-violet-500/20">
@@ -633,7 +662,7 @@ export function DashboardPage() {
 
       {/* ── Remna Nodes ── */}
       <motion.div custom={6} variants={fadeUp} initial="hidden" animate="visible">
-        <Card>
+        <Card className="border-border/60 shadow-sm dark:shadow-none dark:bg-muted/10">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
