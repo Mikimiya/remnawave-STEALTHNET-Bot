@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import { MessageSquarePlus, Inbox, Loader2, Send, ArrowLeft, CircleDot, CircleCheck, User, ImagePlus, Clock } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
@@ -292,7 +292,7 @@ export function ClientTicketsPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-5 sm:p-8">
+      <div className="hidden md:block relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-5 sm:p-8">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex-1 min-w-0">

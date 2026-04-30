@@ -153,6 +153,7 @@ export const ru: Record<LocaleKeys, string> = {
   invalidGoogleToken: "Недействительный токен Google",
   appleLoginNotEnabled: "Вход через Apple не включён",
   invalidAppleToken: "Недействительный токен Apple",
+  oauthEmailRequired: "Невозможно зарегистрироваться: внешний провайдер не вернул email. Зарегистрируйтесь по email/паролю или разрешите передачу email в настройках Apple ID и попробуйте снова.",
 
   // ── Telegram notifications (user-facing) ──────────────────────────
   notifyBalanceTopup: "✅ <b>Баланс пополнен</b> на {amount}.",

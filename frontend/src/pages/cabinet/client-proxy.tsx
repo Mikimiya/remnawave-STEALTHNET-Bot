@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Globe, Calendar, CreditCard, Loader2, Copy, Check, ChevronDown, Wallet, Shield, Zap, ArrowLeft } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
@@ -489,7 +489,7 @@ export function ClientProxyPage() {
             transition={{ duration: 0.2 }}
             className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500"
           >
-            <div className="relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-8 sm:p-10">
+            <div className="hidden md:block relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-8 sm:p-10">
               <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
               <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
                 <div className="flex-1">

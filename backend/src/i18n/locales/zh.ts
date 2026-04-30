@@ -153,6 +153,7 @@ export const zh: Record<LocaleKeys, string> = {
   invalidGoogleToken: "Google 令牌无效",
   appleLoginNotEnabled: "Apple 登录未启用",
   invalidAppleToken: "Apple 令牌无效",
+  oauthEmailRequired: "无法注册：第三方登录未提供邮箱地址，请改用邮箱注册或在 Apple 设置中允许分享邮箱后重试。",
 
   // ── Telegram notifications (user-facing) ──────────────────────────
   notifyBalanceTopup: "✅ <b>余额已充值</b> {amount}。",

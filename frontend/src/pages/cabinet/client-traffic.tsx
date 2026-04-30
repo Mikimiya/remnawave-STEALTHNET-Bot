@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { BarChart3, Loader2, Globe, CalendarDays } from "lucide-react";
 import { useClientAuth } from "@/contexts/client-auth";
 import { api } from "@/lib/api";
@@ -117,7 +117,7 @@ export function ClientTrafficPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-5 sm:p-8">
+      <div className="hidden md:block relative overflow-hidden rounded-3xl bg-muted/40 dark:bg-white/[0.06] backdrop-blur-2xl border border-border/50 dark:border-white/10 p-5 sm:p-8">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/20 blur-[80px] pointer-events-none" />
         <div className="relative z-10 flex-1">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground flex items-center gap-3">

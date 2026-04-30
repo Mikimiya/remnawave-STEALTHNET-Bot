@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, Shield, Loader2 } from "lucide-react";
@@ -15,8 +15,11 @@ export function ClientVerifyLinkEmailPage() {
   const { verifyLinkEmail } = useClientAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const hasRunRef = useRef(false);
 
   useEffect(() => {
+    if (hasRunRef.current) return;
+    hasRunRef.current = true;
     if (!token) {
       setStatus("error");
       setMessage(t("auth.invalidLink"));
@@ -31,7 +34,8 @@ export function ClientVerifyLinkEmailPage() {
         setStatus("error");
         setMessage(err instanceof Error ? translateBackendMessage(err.message, t) : t("auth.invalidLinkExpired"));
       });
-  }, [token, verifyLinkEmail, navigate, t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-svh flex flex-col items-center justify-center bg-gradient-to-b from-background to-muted/20 p-4">

@@ -151,6 +151,7 @@ export const en = {
   invalidGoogleToken: "Invalid Google token",
   appleLoginNotEnabled: "Apple login is not enabled",
   invalidAppleToken: "Invalid Apple token",
+  oauthEmailRequired: "Cannot register: the OAuth provider did not return an email address. Please register with email/password, or enable email sharing in your Apple ID settings and try again.",
 
   // ── Telegram notifications (user-facing) ──────────────────────────
   notifyBalanceTopup: "✅ <b>Balance topped up</b> by {amount}.",

@@ -99,8 +99,8 @@ const utmSchema = {
 const registerSchema = z.object({
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),
-  telegramId: z.string().optional(),
-  telegramUsername: z.string().optional(),
+  telegramId: z.string().trim().min(1).optional(),
+  telegramUsername: z.string().trim().min(1).optional(),
   preferredLang: z.string().max(5).default("ru"),
   preferredCurrency: z.string().max(5).default("usd"),
   referralCode: z.string().optional(),
@@ -801,6 +801,13 @@ clientAuthRouter.post("/google", async (req, res) => {
     }
   }
 
+  // Защита от создания "пустого" аккаунта: Google ID-token обязан содержать email.
+  // Если email отсутствует (нет scope=email или provider не вернул) — отказ.
+  if (!googleEmail) {
+    console.warn("[Google OAuth] reject new account: no email in id_token, sub=", googleId);
+    return res.status(400).json({ message: t(reqLang(req), "oauthEmailRequired") });
+  }
+
   const configForDefaults = await getSystemConfig();
   let remnawaveUuid: string | null = null;
   if (isRemnaConfigured()) {
@@ -884,6 +891,14 @@ clientAuthRouter.post("/apple", async (req, res) => {
       const auth = buildAuthResponse(byEmail);
       return res.json(auth);
     }
+  }
+
+  // Защита от создания "пустого" аккаунта: Apple часто не возвращает email
+  // в последующих id_token (только при первом входе и если пользователь разрешил).
+  // Если email отсутствует — отказ, чтобы не создавать клиента без контактных данных.
+  if (!appleEmail) {
+    console.warn("[Apple OAuth] reject new account: no email in id_token, sub=", appleSub);
+    return res.status(400).json({ message: t(reqLang(req), "oauthEmailRequired") });
   }
 
   const configForDefaults = await getSystemConfig();
@@ -2820,7 +2835,7 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
     let tariffIdToStore: string | null = null;
     let proxyTariffIdToStore: string | null = null;
     let singboxTariffIdToStore: string | null = null;
-    let metadataObj: Record<string, unknown> = promoCode ? { promoCode } : {};
+    let metadataObj: Record<string, unknown> = {};
 
     if (customBuildBody) {
       const cfg = getCustomBuildConfig(config);
@@ -2908,6 +2923,27 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
     }
   }
 
+    // ——— Применение промокода на скидку ———
+    let yookassaPromoRecord: { id: string } | null = null;
+    if (promoCode?.trim() && !extraOption) {
+      let tariffCtx: { tariffId?: string; categoryId?: string; subGroupId?: string | null } | undefined;
+      if (tariffIdToStore) {
+        const tariffForCtx = await prisma.tariff.findUnique({ where: { id: tariffIdToStore }, select: { id: true, categoryId: true, subGroupId: true } });
+        if (tariffForCtx) tariffCtx = { tariffId: tariffForCtx.id, categoryId: tariffForCtx.categoryId, subGroupId: tariffForCtx.subGroupId };
+      }
+      const result = await validatePromoCode(promoCode.trim(), clientId, reqLang(req), tariffCtx);
+      if (!result.ok) return res.status(result.status).json({ message: result.error });
+      const promo = result.promo;
+      if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
+      const originalAmount = amountRounded;
+      if (promo.discountPercent && promo.discountPercent > 0) amountRounded = Math.max(0, amountRounded - amountRounded * promo.discountPercent / 100);
+      if (promo.discountFixed && promo.discountFixed > 0) amountRounded = Math.max(0, amountRounded - promo.discountFixed);
+      amountRounded = Math.round(amountRounded * 100) / 100;
+      if (amountRounded <= 0) return res.status(400).json({ message: t(reqLang(req), "finalAmountCannotBeZero") });
+      metadataObj = { ...metadataObj, promoCodeId: promo.id, originalAmount };
+      yookassaPromoRecord = promo;
+    }
+
     if (amountRounded < 1) {
       return res.status(400).json({ message: t(reqLang(req), "minimumPaymentAmount1") });
     }
@@ -2965,6 +3001,10 @@ clientRouter.post("/yookassa/create-payment", async (req, res) => {
       return res.status(500).json({ message: result.error });
     }
 
+    if (yookassaPromoRecord) {
+      await prisma.promoCodeUsage.create({ data: { promoCodeId: yookassaPromoRecord.id, clientId } });
+    }
+
     return res.status(201).json({
       paymentId: payment.id,
       confirmationUrl: result.confirmationUrl,
@@ -3008,7 +3048,7 @@ clientRouter.post("/cryptopay/create-payment", async (req, res) => {
     let tariffIdToStore: string | null = null;
     let proxyTariffIdToStore: string | null = null;
     let singboxTariffIdToStore: string | null = null;
-    let metadataObj: Record<string, unknown> = promoCodeStr ? { promoCode: promoCodeStr } : {};
+    let metadataObj: Record<string, unknown> = {};
 
     if (customBuildBody) {
       const cfg = getCustomBuildConfig(config);
@@ -3076,6 +3116,26 @@ clientRouter.post("/cryptopay/create-payment", async (req, res) => {
         if (amountBody == null) return res.status(400).json({ message: t(reqLang(req), "specifyAmount") });
         amountRounded = Math.round(amountBody * 100) / 100;
       }
+    }
+
+    let cryptopayPromoRecord: { id: string } | null = null;
+    if (promoCodeStr?.trim() && !extraOption) {
+      let tariffCtx: { tariffId?: string; categoryId?: string; subGroupId?: string | null } | undefined;
+      if (tariffIdToStore) {
+        const tfCtx = await prisma.tariff.findUnique({ where: { id: tariffIdToStore }, select: { id: true, categoryId: true, subGroupId: true } });
+        if (tfCtx) tariffCtx = { tariffId: tfCtx.id, categoryId: tfCtx.categoryId, subGroupId: tfCtx.subGroupId };
+      }
+      const r = await validatePromoCode(promoCodeStr.trim(), clientId, reqLang(req), tariffCtx);
+      if (!r.ok) return res.status(r.status).json({ message: r.error });
+      const promo = r.promo;
+      if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
+      const originalAmount = amountRounded;
+      if (promo.discountPercent && promo.discountPercent > 0) amountRounded = Math.max(0, amountRounded - (amountRounded * promo.discountPercent) / 100);
+      if (promo.discountFixed && promo.discountFixed > 0) amountRounded = Math.max(0, amountRounded - promo.discountFixed);
+      amountRounded = Math.round(amountRounded * 100) / 100;
+      if (amountRounded <= 0) return res.status(400).json({ message: t(reqLang(req), "finalAmountCannotBeZero") });
+      metadataObj = { ...metadataObj, promoCodeId: promo.id, originalAmount };
+      cryptopayPromoRecord = promo;
     }
 
     const fiatSupported = ["USD", "RUB", "EUR", "UAH", "KZT", "BYN", "UZS", "GEL", "TRY", "AMD", "THB", "INR", "CNY", "GBP", "BRL", "IDR", "AZN", "AED", "PLN", "ILS"];
@@ -3127,6 +3187,10 @@ clientRouter.post("/cryptopay/create-payment", async (req, res) => {
       return res.status(500).json({ message: result.error });
     }
 
+    if (cryptopayPromoRecord) {
+      await prisma.promoCodeUsage.create({ data: { promoCodeId: cryptopayPromoRecord.id, clientId } }).catch(() => {});
+    }
+
     return res.status(201).json({
       paymentId: payment.id,
       payUrl: result.payUrl,
@@ -3171,7 +3235,7 @@ clientRouter.post("/heleket/create-payment", async (req, res) => {
     let tariffIdToStore: string | null = null;
     let proxyTariffIdToStore: string | null = null;
     let singboxTariffIdToStore: string | null = null;
-    let metadataObj: Record<string, unknown> = promoCodeStr ? { promoCode: promoCodeStr } : {};
+    let metadataObj: Record<string, unknown> = {};
 
     if (customBuildBody) {
       const cfg = getCustomBuildConfig(config);
@@ -3241,6 +3305,26 @@ clientRouter.post("/heleket/create-payment", async (req, res) => {
       }
     }
 
+    let heleketPromoRecord: { id: string } | null = null;
+    if (promoCodeStr?.trim() && !extraOption) {
+      let tariffCtx: { tariffId?: string; categoryId?: string; subGroupId?: string | null } | undefined;
+      if (tariffIdToStore) {
+        const tfCtx = await prisma.tariff.findUnique({ where: { id: tariffIdToStore }, select: { id: true, categoryId: true, subGroupId: true } });
+        if (tfCtx) tariffCtx = { tariffId: tfCtx.id, categoryId: tfCtx.categoryId, subGroupId: tfCtx.subGroupId };
+      }
+      const r = await validatePromoCode(promoCodeStr.trim(), clientId, reqLang(req), tariffCtx);
+      if (!r.ok) return res.status(r.status).json({ message: r.error });
+      const promo = r.promo;
+      if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
+      const originalAmount = amountRounded;
+      if (promo.discountPercent && promo.discountPercent > 0) amountRounded = Math.max(0, amountRounded - (amountRounded * promo.discountPercent) / 100);
+      if (promo.discountFixed && promo.discountFixed > 0) amountRounded = Math.max(0, amountRounded - promo.discountFixed);
+      amountRounded = Math.round(amountRounded * 100) / 100;
+      if (amountRounded <= 0) return res.status(400).json({ message: t(reqLang(req), "finalAmountCannotBeZero") });
+      metadataObj = { ...metadataObj, promoCodeId: promo.id, originalAmount };
+      heleketPromoRecord = promo;
+    }
+
     if (amountRounded < 1) return res.status(400).json({ message: t(reqLang(req), "minimumPaymentAmount1") });
 
     const orderId = randomUUID();
@@ -3281,6 +3365,10 @@ clientRouter.post("/heleket/create-payment", async (req, res) => {
     if (!result.ok) {
       await prisma.payment.delete({ where: { id: payment.id } }).catch(() => {});
       return res.status(500).json({ message: result.error });
+    }
+
+    if (heleketPromoRecord) {
+      await prisma.promoCodeUsage.create({ data: { promoCodeId: heleketPromoRecord.id, clientId } }).catch(() => {});
     }
 
     return res.status(201).json({
@@ -3328,7 +3416,7 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
     let tariffIdToStore: string | null = null;
     let proxyTariffIdToStore: string | null = null;
     let singboxTariffIdToStore: string | null = null;
-    let metadataObj: Record<string, unknown> = promoCodeStr ? { promoCode: promoCodeStr } : {};
+    let metadataObj: Record<string, unknown> = {};
 
     if (customBuildBody) {
       const cfg = getCustomBuildConfig(config);
@@ -3396,6 +3484,26 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
         if (amountBody == null) return res.status(400).json({ message: t(reqLang(req), "specifyAmount") });
         amountRounded = Math.round(amountBody * 100) / 100;
       }
+    }
+
+    let epayPromoRecord: { id: string } | null = null;
+    if (promoCodeStr?.trim() && !extraOption) {
+      let tariffCtx: { tariffId?: string; categoryId?: string; subGroupId?: string | null } | undefined;
+      if (tariffIdToStore) {
+        const tfCtx = await prisma.tariff.findUnique({ where: { id: tariffIdToStore }, select: { id: true, categoryId: true, subGroupId: true } });
+        if (tfCtx) tariffCtx = { tariffId: tfCtx.id, categoryId: tfCtx.categoryId, subGroupId: tfCtx.subGroupId };
+      }
+      const r = await validatePromoCode(promoCodeStr.trim(), clientId, reqLang(req), tariffCtx);
+      if (!r.ok) return res.status(r.status).json({ message: r.error });
+      const promo = r.promo;
+      if (promo.type !== "DISCOUNT") return res.status(400).json({ message: t(reqLang(req), "promoNotDiscount") });
+      const originalAmount = amountRounded;
+      if (promo.discountPercent && promo.discountPercent > 0) amountRounded = Math.max(0, amountRounded - (amountRounded * promo.discountPercent) / 100);
+      if (promo.discountFixed && promo.discountFixed > 0) amountRounded = Math.max(0, amountRounded - promo.discountFixed);
+      amountRounded = Math.round(amountRounded * 100) / 100;
+      if (amountRounded <= 0) return res.status(400).json({ message: t(reqLang(req), "finalAmountCannotBeZero") });
+      metadataObj = { ...metadataObj, promoCodeId: promo.id, originalAmount };
+      epayPromoRecord = promo;
     }
 
     if (amountRounded < 0.01) return res.status(400).json({ message: t(reqLang(req), "minimumAmount001") });
@@ -3447,6 +3555,11 @@ clientRouter.post("/epay/create-payment", async (req, res) => {
     }
 
     console.log(`[epay/create-payment] OK orderId=${orderId} payUrl=${result.payUrl}`);
+
+    if (epayPromoRecord) {
+      await prisma.promoCodeUsage.create({ data: { promoCodeId: epayPromoRecord.id, clientId } }).catch(() => {});
+    }
+
     return res.status(201).json({
       paymentId: payment.id,
       payUrl: result.payUrl,

@@ -407,7 +407,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-linux-amd64.deb",
+                  "link": "https://gh-proxy.com/https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-linux-amd64.deb",
                   "text": {
                     "en": "amd64 (.deb)",
                     "fa": "amd64 (.deb)",
@@ -419,7 +419,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-linux-amd64.AppImage",
+                  "link": "https://gh-proxy.com/https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-linux-amd64.AppImage",
                   "text": {
                     "en": "amd64 (AppImage)",
                     "fa": "amd64 (AppImage)",
@@ -431,7 +431,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-linux-amd64.rpm",
+                  "link": "https://gh-proxy.com/https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-linux-amd64.rpm",
                   "text": {
                     "en": "amd64 (.rpm)",
                     "fa": "amd64 (.rpm)",
@@ -443,7 +443,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-linux-arm64.deb",
+                  "link": "https://gh-proxy.com/https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-linux-arm64.deb",
                   "text": {
                     "en": "arm64 (.deb)",
                     "fa": "arm64 (.deb)",
@@ -551,7 +551,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_amd64.deb",
+                  "link": "https://gh-proxy.com/https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_amd64.deb",
                   "text": {
                     "en": "amd64 (.deb)",
                     "fa": "amd64 (.deb)",
@@ -563,7 +563,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash.x86_64.rpm",
+                  "link": "https://gh-proxy.com/https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash.x86_64.rpm",
                   "text": {
                     "en": "amd64 (.rpm)",
                     "fa": "amd64 (.rpm)",
@@ -575,7 +575,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_arm64.deb",
+                  "link": "https://gh-proxy.com/https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_arm64.deb",
                   "text": {
                     "en": "arm64 (.deb)",
                     "fa": "arm64 (.deb)",
@@ -587,7 +587,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash.aarch64.rpm",
+                  "link": "https://gh-proxy.com/https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash.aarch64.rpm",
                   "text": {
                     "en": "arm64 (.rpm)",
                     "fa": "arm64 (.rpm)",
@@ -714,7 +714,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-amd64.deb",
+                  "link": "https://gh-proxy.com/https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-amd64.deb",
                   "text": {
                     "en": "amd64 (.deb)",
                     "fa": "amd64 (.deb)",
@@ -726,7 +726,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-amd64.rpm",
+                  "link": "https://gh-proxy.com/https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-amd64.rpm",
                   "text": {
                     "en": "amd64 (.rpm)",
                     "fa": "amd64 (.rpm)",
@@ -738,7 +738,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-arm64.deb",
+                  "link": "https://gh-proxy.com/https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-arm64.deb",
                   "text": {
                     "en": "arm64 (.deb)",
                     "fa": "arm64 (.deb)",
@@ -750,7 +750,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-arm64.rpm",
+                  "link": "https://gh-proxy.com/https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-arm64.rpm",
                   "text": {
                     "en": "arm64 (.rpm)",
                     "fa": "arm64 (.rpm)",
@@ -990,7 +990,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-macos-arm64.dmg",
+                  "link": "https://gh-proxy.com/https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-macos-arm64.dmg",
                   "text": {
                     "en": "macOS (Apple Silicon)",
                     "fa": "مک (Apple Silicon)",
@@ -1002,7 +1002,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-macos-amd64.dmg",
+                  "link": "https://gh-proxy.com/https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-macos-amd64.dmg",
                   "text": {
                     "en": "macOS (Intel)",
                     "fa": "مک (اینتل)",
@@ -1110,7 +1110,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_aarch64.dmg",
+                  "link": "https://gh-proxy.com/https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_aarch64.dmg",
                   "text": {
                     "en": "macOS (Apple Silicon)",
                     "fa": "مک (Apple Silicon)",
@@ -1122,7 +1122,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_x64.dmg",
+                  "link": "https://gh-proxy.com/https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_x64.dmg",
                   "text": {
                     "en": "macOS (Intel)",
                     "fa": "مک (اینتل)",
@@ -1249,7 +1249,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/macos-arm64-dmg.zip",
+                  "link": "https://gh-proxy.com/https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/macos-arm64-dmg.zip",
                   "text": {
                     "en": "macOS (Apple Silicon)",
                     "fa": "macOS (Apple Silicon)",
@@ -1261,7 +1261,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/macos-amd64-dmg.zip",
+                  "link": "https://gh-proxy.com/https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/macos-amd64-dmg.zip",
                   "text": {
                     "en": "macOS (Intel)",
                     "fa": "macOS (Intel)",
@@ -1293,7 +1293,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/legiz-ru/Prizrak-Box/blob/v3/doc/mac/mac.md",
+                  "link": "https://gh-proxy.com/https://github.com/legiz-ru/Prizrak-Box/blob/v3/doc/mac/mac.md",
                   "text": {
                     "en": "Mac Guide",
                     "fa": "راهنمای مک",
@@ -1425,7 +1425,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/Happ-proxy/happ-android/releases/latest/download/Happ.apk",
+                  "link": "https://gh-proxy.com/https://github.com/Happ-proxy/happ-android/releases/latest/download/Happ.apk",
                   "text": {
                     "en": "Download APK",
                     "fa": "دانلود APK",
@@ -1514,7 +1514,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-android-arm64-v8a.apk",
+                  "link": "https://gh-proxy.com/https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-android-arm64-v8a.apk",
                   "text": {
                     "en": "Download APK",
                     "fa": "دانلود APK",
@@ -1622,7 +1622,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/MetaCubeX/ClashMetaForAndroid/releases/download/v2.11.24/cmfa-2.11.24-meta-universal-release.apk",
+                  "link": "https://gh-proxy.com/https://github.com/MetaCubeX/ClashMetaForAndroid/releases/download/v2.11.24/cmfa-2.11.24-meta-universal-release.apk",
                   "text": {
                     "en": "Download APK",
                     "fa": "دانلود APK",
@@ -1723,7 +1723,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/2dust/v2rayNG/releases/download/1.10.31/v2rayNG_1.10.31_universal.apk",
+                  "link": "https://gh-proxy.com/https://github.com/2dust/v2rayNG/releases/download/1.10.31/v2rayNG_1.10.31_universal.apk",
                   "text": {
                     "en": "Download APK",
                     "fa": "دانلود APK",
@@ -1831,7 +1831,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/dyhkwong/Exclave/releases/download/0.17.4/Exclave-0.17.4-arm64-v8a.apk",
+                  "link": "https://gh-proxy.com/https://github.com/dyhkwong/Exclave/releases/download/0.17.4/Exclave-0.17.4-arm64-v8a.apk",
                   "text": {
                     "en": "Download APK",
                     "fa": "دانلود APK",
@@ -2286,7 +2286,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-windows-amd64-setup.exe",
+                  "link": "https://gh-proxy.com/https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-windows-amd64-setup.exe",
                   "text": {
                     "en": "Windows (Setup)",
                     "fa": "ویندوز (نصب)",
@@ -2298,7 +2298,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-windows-arm64-setup.exe",
+                  "link": "https://gh-proxy.com/https://github.com/pluralplay/FlClashX/releases/download/v0.3.2/FlClashX-windows-arm64-setup.exe",
                   "text": {
                     "en": "Windows on ARM (Setup)",
                     "fa": "ویندوز ARM (نصب)",
@@ -2406,7 +2406,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_x64-setup.exe",
+                  "link": "https://gh-proxy.com/https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_x64-setup.exe",
                   "text": {
                     "en": "Windows (Setup)",
                     "fa": "ویندوز (نصب)",
@@ -2533,7 +2533,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/windows-amd64.msi",
+                  "link": "https://gh-proxy.com/https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/windows-amd64.msi",
                   "text": {
                     "en": "Windows (Setup)",
                     "fa": "ویندوز (نصب)",
@@ -2545,7 +2545,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/windows-arm64.msi",
+                  "link": "https://gh-proxy.com/https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/windows-arm64.msi",
                   "text": {
                     "en": "Windows on ARM (Setup)",
                     "fa": "ویندوز ARM (نصب)",
@@ -2672,7 +2672,7 @@
               },
               "buttons": [
                 {
-                  "link": "https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe",
+                  "link": "https://gh-proxy.com/https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe",
                   "text": {
                     "en": "Windows",
                     "fa": "ویندوز",
@@ -2785,7 +2785,7 @@
                   "svgIconKey": "ExternalLink"
                 },
                 {
-                  "link": "https://github.com/Happ-proxy/happ-android/releases/latest/download/Happ.apk",
+                  "link": "https://gh-proxy.com/https://github.com/Happ-proxy/happ-android/releases/latest/download/Happ.apk",
                   "text": {
                     "en": "Download APK",
                     "fa": "دانلود APK",
